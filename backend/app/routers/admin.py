@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import enum
 import uuid
 import traceback
@@ -34,6 +34,20 @@ class AssignBatchRequest(BaseModel):
     batch_id: str
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
+ 
+def parse_times(start_date_obj, time_str):
+    """Helper to convert '09:00 - 10:00' to start/end datetime objects."""
+    try:
+        start_t, end_t = time_str.split(" - ")
+        start_h, start_m = map(int, start_t.split(":"))
+        end_h, end_m = map(int, end_t.split(":"))
+        
+        start_dt = datetime.combine(start_date_obj, time(start_h, start_m))
+        end_dt = datetime.combine(start_date_obj, time(end_h, end_m))
+        return start_dt, end_dt
+    except:
+        # Fallback to defaults if parsing fails
+        return datetime.combine(start_date_obj, time(9, 0)), datetime.combine(start_date_obj, time(10, 0))
 
 @router.get("/dashboard")
 async def dashboard_stats(
@@ -252,6 +266,7 @@ async def update_batch(
     _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
 ):
     from app.models.course import Batch
+    from app.models.session import Session
     batch = await db.get(Batch, batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
@@ -276,7 +291,6 @@ async def update_batch(
             
         # Session Autopilot: If a link exists and NO sessions exist for this batch, create the first one
         if batch.schedule_link:
-            from app.models.session import Session
             ses_check = await db.execute(select(Session).where(Session.batch_id == batch_id))
             if not ses_check.scalars().first():
                 s_time, e_time = parse_times(batch.start_date, batch.schedule_time or "09:00 - 10:00")
