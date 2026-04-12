@@ -5,7 +5,7 @@ import traceback
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, update, func, or_
+from sqlalchemy import select, delete, update, func, or_, and_
 import bcrypt
 from pydantic import BaseModel
 
@@ -13,6 +13,7 @@ from app.database import get_db
 from app.middleware.auth import get_current_user, require_roles
 from app.models.user import User, Role, AdminPermission
 from app.models.course import Course, Batch, BatchStudent
+from app.models.session import Session
 from app.models.registration import Registration
 from app.models.attendance import LeaveRequest, Attendance, TimeTracking, AttendanceStatus, LeaveStatus, LeaveType
 from app.models.notification import Notification, Message, Feedback, Video
@@ -223,12 +224,23 @@ async def update_batch(
     if body.end_date is not None: batch.end_date = datetime.fromisoformat(body.end_date)
     if body.schedule_time is not None: batch.schedule_time = body.schedule_time
     if hasattr(body, 'schedule_link') and body.schedule_link is not None: 
+        old_link = batch.schedule_link
         batch.schedule_link = body.schedule_link if body.schedule_link else None
+        
+        # Auto-sync to scheduled sessions if link changed
+        if batch.schedule_link != old_link:
+            await db.execute(
+                update(Session)
+                .where(and_(Session.batch_id == batch_id, Session.status == "SCHEDULED"))
+                .values(meeting_link=batch.schedule_link)
+            )
+
     if hasattr(body, 'trainer_id') and body.trainer_id is not None: 
         batch.trainer_id = body.trainer_id if body.trainer_id else None
     if body.is_active is not None: batch.is_active = body.is_active
 
     await db.flush()
+    await db.commit()
     return {"status": "updated"}
 
 @router.delete("/batches/{batch_id}")

@@ -22,6 +22,7 @@ export default function AdminSessionsPage() {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [form, setForm] = useState({ title: '', description: '', batch_id: '', trainer_id: '', start_time: '', end_time: '', meeting_link: '', resources_url: '' });
+    const [editingSession, setEditingSession] = useState<Session | null>(null);
     const [error, setError] = useState('');
     
     // Dependencies
@@ -54,13 +55,17 @@ export default function AdminSessionsPage() {
         e.preventDefault();
         setError('');
         try {
-            const res = await apiPost('/api/sessions', form);
+            const endpoint = editingSession ? `/api/sessions/${editingSession.id}` : '/api/sessions';
+            const method = editingSession ? apiPatch : apiPost;
+            
+            const res = await method(endpoint, form);
             if (res.ok) {
                 setShowModal(false);
+                setEditingSession(null);
                 loadData();
             } else {
                 const d = await res.json().catch(()=>({}));
-                setError(d.detail || 'Failed to create session');
+                setError(d.detail || 'Failed to save session');
             }
         } catch (err: any) {
             setError(err.message || 'Network error');
@@ -144,7 +149,21 @@ export default function AdminSessionsPage() {
                                             )}
                                             {s.resources_url && <a href={s.resources_url} target="_blank" rel="noreferrer" style={{ color: 'var(--info)', fontWeight: 600, display: 'block', marginTop: '4px' }}>📚 Resources</a>}
                                         </td>
-                                        <td style={{ padding: '20px 24px' }}>
+                                        <td style={{ padding: '20px 24px', display: 'flex', gap: '8px' }}>
+                                            <button className="btn btn-sm btn-ghost" onClick={() => {
+                                                setEditingSession(s);
+                                                setForm({
+                                                    title: s.title,
+                                                    description: s.description || '',
+                                                    batch_id: s.batch_id,
+                                                    trainer_id: s.trainer_id,
+                                                    start_time: s.start_time.slice(0, 16),
+                                                    end_time: s.end_time.slice(0, 16),
+                                                    meeting_link: s.meeting_link || '',
+                                                    resources_url: s.resources_url || ''
+                                                });
+                                                setShowModal(true);
+                                            }}>Edit</button>
                                             <button className="btn btn-sm btn-ghost" onClick={() => handleDelete(s.id)} style={{ color: 'var(--danger)' }}>Cancel</button>
                                         </td>
                                     </tr>
@@ -159,7 +178,7 @@ export default function AdminSessionsPage() {
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
-                        <h2 className="modal-title">Schedule New Session</h2>
+                        <h2 className="modal-title">{editingSession ? 'Edit Session' : 'Schedule New Session'}</h2>
                         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <div className="form-group mb-0">
                                 <label className="form-label">Session Title</label>

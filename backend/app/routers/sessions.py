@@ -101,6 +101,18 @@ async def update_session_status(
         s.meeting_link = body["meeting_link"]
     if "resources_url" in body:
         s.resources_url = body["resources_url"]
+    if "title" in body:
+        s.title = body["title"]
+    if "description" in body:
+        s.description = body["description"]
+    if "trainer_id" in body:
+        s.trainer_id = body["trainer_id"]
+    if "batch_id" in body:
+        s.batch_id = body["batch_id"]
+    if "start_time" in body:
+        s.start_time = datetime.fromisoformat(body["start_time"].replace("Z", "+00:00"))
+    if "end_time" in body:
+        s.end_time = datetime.fromisoformat(body["end_time"].replace("Z", "+00:00"))
         
     await db.commit()
     return {"status": "success"}
