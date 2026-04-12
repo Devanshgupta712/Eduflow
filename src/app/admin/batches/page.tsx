@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { apiGet, apiPost, apiPut, apiDelete, getStoredUser } from '@/lib/api';
+import { apiGet, apiPost, apiPut, apiDelete, apiFetch, getStoredUser, API_BASE } from '@/lib/api';
 
 interface Batch {
     id: string; name: string; start_date: string; end_date: string;
@@ -133,13 +133,10 @@ export default function BatchesPage() {
             setDeletingIds(prev => new Set(prev).add(id));
             
             // Wake-up ping for render.com free tier cold starts
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com';
-            await fetch(apiBase + '/api/health').catch(() => {});
+            await fetch(API_BASE + '/api/health').catch(() => {});
             
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${apiBase}/api/admin/batches/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await apiFetch(`/api/admin/batches/${id}`, {
+                method: 'DELETE'
             });
             
             if (!res.ok) {
@@ -152,6 +149,8 @@ export default function BatchesPage() {
                 // Real server errors (500) vs potential cold start network failures
                 if (res.status === 500) {
                     alert(`Server Error: ${errMsg}. This often happens if the batch has complex dependencies. Please try again.`);
+                } else if (res.status === 403) {
+                    alert('Permission Denied: Only Super Admins can delete batches.');
                 } else {
                     alert(errMsg);
                 }
@@ -162,8 +161,9 @@ export default function BatchesPage() {
             loadData();
         } catch (err: any) {
             console.error('Delete error:', err);
+            // If the error happens during the request (e.g. timeout or network drop)
             if (err.message === 'Failed to fetch') {
-                alert('Connection failed. The server might still be warming up or your network is unstable. Please try again in a few moments.');
+                alert('Connection timed out or failed. The server might still be processing the deletion or warming up. Please refresh the page in a few seconds to check if the batch was deleted.');
             } else {
                 alert(err.message || 'Failed to delete batch');
             }
