@@ -15,7 +15,8 @@ from app.models.user import User, Role, AdminPermission
 from app.models.course import Course, Batch, BatchStudent
 from app.models.registration import Registration
 from app.models.attendance import LeaveRequest, Attendance, TimeTracking, AttendanceStatus, LeaveStatus, LeaveType
-from app.models.notification import Notification, Message, Feedback
+from app.models.notification import Notification, Message, Feedback, Video
+from app.models.session import Session
 from app.models.project import Project, Task, Assignment, AssignmentSubmission, Violation
 from app.models.lead import Lead, LeadActivity
 from app.models.placement import JobApplication, AssessmentSubmission, MockInterview, CommunicationPractice
@@ -261,6 +262,9 @@ async def delete_batch(
         await db.execute(delete(Feedback).where(Feedback.batch_id == batch_id))
     except Exception:
         pass
+    
+    await db.execute(delete(Session).where(Session.batch_id == batch_id))
+    await db.execute(delete(Video).where(Video.batch_id == batch_id))
     
     # Projects and Tasks
     projects_res = await db.execute(select(Project.id).where(Project.batch_id == batch_id))

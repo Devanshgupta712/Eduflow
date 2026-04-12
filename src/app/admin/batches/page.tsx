@@ -21,6 +21,7 @@ export default function BatchesPage() {
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
+    const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
     // Roster Modal State
     const [viewStudentsId, setViewStudentsId] = useState<string | null>(null);
@@ -126,8 +127,11 @@ export default function BatchesPage() {
     };
     
     const handleDelete = async (id: string, name: string) => {
-        if (!window.confirm(`Are you sure you want to permanently delete batch "${name}"? All enrolled students and records will be completely removed.`)) return;
+        if (!window.confirm(`Are you sure you want to permanently delete batch "${name}"? All enrolled students, scheduled sessions, and records will be completely removed.`)) return;
+        
         try {
+            setDeletingIds(prev => new Set(prev).add(id));
+            
             // Wake-up ping for render.com free tier cold starts
             const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com';
             await fetch(apiBase + '/api/health').catch(() => {});
@@ -139,27 +143,36 @@ export default function BatchesPage() {
             });
             
             if (!res.ok) {
-                // Server returned an error
                 let errMsg = `Delete failed (${res.status})`;
                 try {
                     const errData = await res.json();
                     errMsg = errData.detail || errData.message || errMsg;
                 } catch {}
-                if (res.status === 500 && res.status.toString().includes('Server is still warming up')) {
-                    alert('Server is still warming up. Please try again in 10 seconds.');
+                
+                // Real server errors (500) vs potential cold start network failures
+                if (res.status === 500) {
+                    alert(`Server Error: ${errMsg}. This often happens if the batch has complex dependencies. Please try again.`);
                 } else {
                     alert(errMsg);
                 }
                 return;
             }
             
+            // Success
             loadData();
         } catch (err: any) {
+            console.error('Delete error:', err);
             if (err.message === 'Failed to fetch') {
-                alert('Server is still warming up. Please try again in 10 seconds.');
+                alert('Connection failed. The server might still be warming up or your network is unstable. Please try again in a few moments.');
             } else {
                 alert(err.message || 'Failed to delete batch');
             }
+        } finally {
+            setDeletingIds(prev => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
         }
     };
 
@@ -280,8 +293,10 @@ export default function BatchesPage() {
                                 <button className="btn btn-sm btn-primary" onClick={() => handleViewStudents(b.id, b.name)}>Student</button>
                                 {['SUPER_ADMIN', 'ADMIN'].includes(currentUserRole.toUpperCase()) && (
                                     <>
-                                        <button className="btn btn-sm btn-ghost" onClick={() => openEdit(b)}>Edit</button>
-                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(b.id, b.name)}>Delete</button>
+                                        <button className="btn btn-sm btn-ghost" onClick={() => openEdit(b)} disabled={deletingIds.has(b.id)}>Edit</button>
+                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(b.id, b.name)} disabled={deletingIds.has(b.id)}>
+                                            {deletingIds.has(b.id) ? 'Deleting...' : 'Delete'}
+                                        </button>
                                     </>
                                 )}
                             </div>
