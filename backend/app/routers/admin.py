@@ -34,20 +34,33 @@ class AssignBatchRequest(BaseModel):
     batch_id: str
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
- 
-def parse_times(start_date_obj, time_str):
-    """Helper to convert '09:00 - 10:00' to start/end datetime objects."""
+
+def parse_flexible_date(date_str: str):
+    """Robust date parser for multiple formats."""
+    if not date_str: return datetime.now()
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
     try:
-        start_t, end_t = time_str.split(" - ")
-        start_h, start_m = map(int, start_t.split(":"))
-        end_h, end_m = map(int, end_t.split(":"))
-        
-        start_dt = datetime.combine(start_date_obj, time(start_h, start_m))
-        end_dt = datetime.combine(start_date_obj, time(end_h, end_m))
-        return start_dt, end_dt
+        return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
     except:
-        # Fallback to defaults if parsing fails
-        return datetime.combine(start_date_obj, time(9, 0)), datetime.combine(start_date_obj, time(10, 0))
+        return datetime.now()
+
+def parse_times(date_obj: datetime, timeframe: str):
+    """Helper to parse '05:00 - 06:00' into start/end datetimes."""
+    try:
+        parts = timeframe.split('-')
+        s_str = parts[0].strip()
+        e_str = parts[1].strip()
+        s_h, s_m = map(int, s_str.split(':'))
+        e_h, e_m = map(int, e_str.split(':'))
+        start = date_obj.replace(hour=s_h, minute=s_m, second=0, microsecond=0)
+        end = date_obj.replace(hour=e_h, minute=e_m, second=0, microsecond=0)
+        return start, end
+    except:
+        return date_obj, date_obj + timedelta(hours=1)
 
 @router.get("/dashboard")
 async def dashboard_stats(
@@ -55,19 +68,22 @@ async def dashboard_stats(
     _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
 ):
     from app.models.course import Course, Batch
+    from app.models.user import User, Role
+    from app.models.lead import Lead
+    from app.models.placement import Job
+    from app.models.attendance import LeaveRequest
+
     students = await db.execute(select(func.count(User.id)).where(User.role == Role.STUDENT))
     courses = await db.execute(select(func.count(Course.id)))
     batches = await db.execute(select(func.count(Batch.id)))
-    from app.models.lead import Lead
     leads = await db.execute(select(func.count(Lead.id)))
-    from app.models.placement import Job
     jobs = await db.execute(select(func.count(Job.id)).where(Job.is_active == True))
     pending = await db.execute(select(func.count(LeaveRequest.id)).where(LeaveRequest.status == "PENDING"))
 
     return DashboardStats(
         total_students=students.scalar() or 0,
         total_courses=courses.scalar() or 0,
-        total_batches=batches.scalar() or 0,
+        active_batches=batches.scalar() or 0,
         total_leads=leads.scalar() or 0,
         active_jobs=jobs.scalar() or 0,
         pending_leaves=pending.scalar() or 0,
@@ -193,22 +209,7 @@ async def list_batches(
 
 
 
-def parse_times(date_obj: datetime, timeframe: str):
-    """Helper to parse '05:00 - 06:00' into start/end datetimes."""
-    try:
-        parts = timeframe.split('-')
-        start_str = parts[0].strip()
-        end_str = parts[1].strip()
-        
-        s_h, s_m = map(int, start_str.split(':'))
-        e_h, e_m = map(int, end_str.split(':'))
-        
-        start = date_obj.replace(hour=s_h, minute=s_m, second=0, microsecond=0)
-        end = date_obj.replace(hour=e_h, minute=e_m, second=0, microsecond=0)
-        return start, end
-    except:
-        # Fallback to 1 hour around now if parsing fails
-        return date_obj, date_obj + timedelta(hours=1)
+
 
 @router.post("/batches", status_code=201)
 async def create_batch(
@@ -220,8 +221,8 @@ async def create_batch(
     
     batch = Batch(
         course_id=course_id, name=body.name,
-        start_date=datetime.fromisoformat(body.start_date),
-        end_date=datetime.fromisoformat(body.end_date),
+        start_date=parse_flexible_date(body.start_date),
+        end_date=parse_flexible_date(body.end_date),
         schedule_time=body.schedule_time,
         schedule_link=body.schedule_link if hasattr(body, 'schedule_link') else None,
         trainer_id=body.trainer_id or None,
@@ -271,11 +272,13 @@ async def update_batch(
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
         
+
+
     if body.name is not None: batch.name = body.name
     if body.course_id is not None: 
         batch.course_id = body.course_id if body.course_id else None
-    if body.start_date is not None: batch.start_date = datetime.fromisoformat(body.start_date)
-    if body.end_date is not None: batch.end_date = datetime.fromisoformat(body.end_date)
+    if body.start_date is not None: batch.start_date = parse_flexible_date(body.start_date)
+    if body.end_date is not None: batch.end_date = parse_flexible_date(body.end_date)
     if body.schedule_time is not None: batch.schedule_time = body.schedule_time
     if hasattr(body, 'schedule_link') and body.schedule_link is not None: 
         old_link = batch.schedule_link
