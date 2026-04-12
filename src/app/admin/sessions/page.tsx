@@ -100,7 +100,15 @@ export default function AdminSessionsPage() {
                     <h1 className="page-title">Session Schedule</h1>
                     <p className="page-subtitle">Manage live training classes and batch schedules.</p>
                 </div>
-                <button onClick={() => {setForm({ title: '', description: '', batch_id: '', trainer_id: '', start_time: '', end_time: '', meeting_link: '', resources_url: '' }); setShowModal(true);}} className="btn btn-primary">+ Schedule Session</button>
+                <button onClick={() => {
+                    setEditingSession(null);
+                    setForm({ 
+                        title: '', description: '', batch_id: '', trainer_id: '', 
+                        start_time: '', end_time: '', meeting_link: '', resources_url: '',
+                        recurrence: { type: 'NONE', count: 1 } 
+                    }); 
+                    setShowModal(true);
+                }} className="btn btn-primary">+ Schedule Session</button>
             </div>
 
             <div className="glass-premium" style={{ borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border)' }}>
@@ -168,7 +176,8 @@ export default function AdminSessionsPage() {
                                                     start_time: s.start_time.slice(0, 16),
                                                     end_time: s.end_time.slice(0, 16),
                                                     meeting_link: s.meeting_link || '',
-                                                    resources_url: s.resources_url || ''
+                                                    resources_url: s.resources_url || '',
+                                                    recurrence: { type: 'NONE', count: 1 }
                                                 });
                                                 setShowModal(true);
                                             }}>Edit</button>
