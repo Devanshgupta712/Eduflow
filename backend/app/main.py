@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -219,14 +220,35 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# CORS - Hardened for production
+origins = [
+    "https://lms-beta-lilac.vercel.app",
+    "https://lms.appteknow.com",
+    "http://localhost:3000"
+]
+# Merge with settings origins
+for o in settings.CORS_ORIGINS:
+    if o not in origins:
+        origins.append(o)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    error_msg = str(exc)
+    stack_trace = traceback.format_exc()
+    print(f"GLOBAL ERROR: {error_msg}\n{stack_trace}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal Server Error: {error_msg}", "type": str(type(exc).__name__)},
+    )
 
 from app.routers import auth, admin, marketing, training, placement, sessions
 

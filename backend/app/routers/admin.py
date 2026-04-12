@@ -280,41 +280,47 @@ async def update_batch(
     if body.start_date is not None: batch.start_date = parse_flexible_date(body.start_date)
     if body.end_date is not None: batch.end_date = parse_flexible_date(body.end_date)
     if body.schedule_time is not None: batch.schedule_time = body.schedule_time
-    if hasattr(body, 'schedule_link') and body.schedule_link is not None: 
-        old_link = batch.schedule_link
-        batch.schedule_link = body.schedule_link if body.schedule_link else None
-        
-        # Auto-sync to scheduled sessions if link changed
-        if batch.schedule_link != old_link:
-            await db.execute(
-                update(Session)
-                .where(and_(Session.batch_id == batch_id, Session.status == "SCHEDULED"))
-                .values(meeting_link=batch.schedule_link)
-            )
+    try:
+        if hasattr(body, 'schedule_link') and body.schedule_link is not None: 
+            old_link = batch.schedule_link
+            batch.schedule_link = body.schedule_link if body.schedule_link else None
             
-        # Session Autopilot: If a link exists and NO sessions exist for this batch, create the first one
-        if batch.schedule_link:
-            ses_check = await db.execute(select(Session).where(Session.batch_id == batch_id))
-            if not ses_check.scalars().first():
-                s_time, e_time = parse_times(batch.start_date, batch.schedule_time or "09:00 - 10:00")
-                first_session = Session(
-                    title=f"Welcome Session - {batch.name}",
-                    batch_id=batch.id,
-                    trainer_id=batch.trainer_id,
-                    start_time=s_time,
-                    end_time=e_time,
-                    meeting_link=batch.schedule_link,
-                    status="SCHEDULED"
+            # Auto-sync to scheduled sessions if link changed
+            if batch.schedule_link != old_link:
+                await db.execute(
+                    update(Session)
+                    .where(and_(Session.batch_id == batch_id, Session.status == "SCHEDULED"))
+                    .values(meeting_link=batch.schedule_link)
                 )
-                db.add(first_session)
+                
+            # Session Autopilot: If a link exists and NO sessions exist for this batch, create the first one
+            if batch.schedule_link:
+                ses_check = await db.execute(select(Session).where(Session.batch_id == batch_id))
+                if not ses_check.scalars().first():
+                    s_time, e_time = parse_times(batch.start_date, batch.schedule_time or "09:00 - 10:00")
+                    first_session = Session(
+                        title=f"Welcome Session - {batch.name}",
+                        batch_id=batch.id,
+                        trainer_id=batch.trainer_id,
+                        start_time=s_time,
+                        end_time=e_time,
+                        meeting_link=batch.schedule_link,
+                        status="SCHEDULED"
+                    )
+                    db.add(first_session)
 
-    if hasattr(body, 'trainer_id') and body.trainer_id is not None: 
-        batch.trainer_id = body.trainer_id if body.trainer_id else None
-    if body.is_active is not None: batch.is_active = body.is_active
+        if hasattr(body, 'trainer_id') and body.trainer_id is not None: 
+            batch.trainer_id = body.trainer_id if body.trainer_id else None
+        if body.is_active is not None: batch.is_active = body.is_active
 
-    await db.flush()
-    await db.commit()
-    return {"status": "updated"}
+        await db.flush()
+        await db.commit()
+        return {"status": "updated"}
+    except Exception as e:
+        print(f"Error in update_batch automation: {str(e)}")
+        # Even if autopilot fails, we want at least to commit the name/date changes if possible
+        await db.commit()
+        return {"status": "updated", "warning": f"Automation failed: {str(e)}"}
 
 @router.delete("/batches/{batch_id}")
 async def delete_batch(
