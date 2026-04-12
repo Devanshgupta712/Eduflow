@@ -224,12 +224,14 @@ app = FastAPI(
 origins = [
     "https://lms-beta-lilac.vercel.app",
     "https://lms.appteknow.com",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
 ]
-# Merge with settings origins
+# Merge with settings origins, stripping trailing slashes
 for o in settings.CORS_ORIGINS:
-    if o not in origins:
-        origins.append(o)
+    clean_o = o.rstrip('/')
+    if clean_o not in origins:
+        origins.append(clean_o)
 
 app.add_middleware(
     CORSMiddleware,

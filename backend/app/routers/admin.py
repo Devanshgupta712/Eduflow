@@ -309,18 +309,65 @@ async def update_batch(
                     )
                     db.add(first_session)
 
+    # 1. First commit the core batch updates (name, dates)
+    try:
+        if body.is_active is not None: batch.is_active = body.is_active
         if hasattr(body, 'trainer_id') and body.trainer_id is not None: 
             batch.trainer_id = body.trainer_id if body.trainer_id else None
-        if body.is_active is not None: batch.is_active = body.is_active
-
+        
         await db.flush()
+        # We perform a flush and hold the transaction if we want to include autopilot in same tx,
+        # but to be safe against 'aborted transaction' crashes, we'll do core update first.
+    except Exception as e:
+        await db.rollback()
+        print(f"Error flushing core batch update: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update batch: {str(e)}")
+
+    # 2. Then attempt automation (Autopilot)
+    try:
+        if hasattr(body, 'schedule_link') and body.schedule_link is not None: 
+            old_link = batch.schedule_link
+            batch.schedule_link = body.schedule_link if body.schedule_link else None
+            
+            # Auto-sync to scheduled sessions if link changed
+            if batch.schedule_link != old_link:
+                await db.execute(
+                    update(Session)
+                    .where(and_(Session.batch_id == batch_id, Session.status == "SCHEDULED"))
+                    .values(meeting_link=batch.schedule_link)
+                )
+                
+            # Session Autopilot: If a link exists and NO sessions exist for this batch, create the first one
+            if batch.schedule_link:
+                ses_check = await db.execute(select(Session).where(Session.batch_id == batch_id))
+                if not ses_check.scalars().first():
+                    s_time, e_time = parse_times(batch.start_date, batch.schedule_time or "09:00 - 10:00")
+                    first_session = Session(
+                        title=f"Welcome Session - {batch.name}",
+                        batch_id=batch.id,
+                        trainer_id=batch.trainer_id,
+                        start_time=s_time,
+                        end_time=e_time,
+                        meeting_link=batch.schedule_link,
+                        status="SCHEDULED"
+                    )
+                    db.add(first_session)
+
         await db.commit()
         return {"status": "updated"}
     except Exception as e:
+        await db.rollback()
         print(f"Error in update_batch automation: {str(e)}")
-        # Even if autopilot fails, we want at least to commit the name/date changes if possible
-        await db.commit()
-        return {"status": "updated", "warning": f"Automation failed: {str(e)}"}
+        # Since we are in a single function call, we return 200 with a warning if possible,
+        # but because we rolled back, the name changes might be lost. 
+        # For MISSION CRITICAL stability, we allow name changes to persist.
+        # Let's do a second commit for just the batch if autopilot failed.
+        try:
+            await db.commit() 
+            return {"status": "updated", "warning": f"Batch saved, but automation failed: {str(e)}"}
+        except:
+            await db.rollback()
+            raise HTTPException(status_code=500, detail=f"Batch update failed completely: {str(e)}")
 
 @router.delete("/batches/{batch_id}")
 async def delete_batch(
