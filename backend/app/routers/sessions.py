@@ -7,13 +7,13 @@ from app.utils.email import send_session_notification # We will create this
 from app.database import get_db
 from app.routers.auth import get_current_user
 from app.models.user import User
-from app.models.session import Session, StudentFeedback
-from app.models.course import Batch, BatchStudent
+# Models are imported inline inside route functions to avoid circularities
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 
 async def check_trainer_conflict(db: AsyncSession, trainer_id: str, s_time: datetime, e_time: datetime, exclude_session_id: str = None):
     """Check if trainer is already booked during this time slot."""
+    from app.models.session import Session
     query = select(Session).where(
         and_(
             Session.trainer_id == trainer_id,
@@ -40,6 +40,8 @@ async def get_all_sessions(
     db: AsyncSession = Depends(get_db), 
     user: User = Depends(get_current_user)
 ):
+    from app.models.session import Session
+    from app.models.course import Batch, BatchStudent
     query = select(Session, Batch.schedule_link.label("batch_schedule_link")).outerjoin(Batch, Session.batch_id == Batch.id)
 
     if user.role in ["SUPER_ADMIN", "ADMIN"]:

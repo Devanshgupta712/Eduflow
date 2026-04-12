@@ -13,12 +13,13 @@ from app.database import get_db
 from app.middleware.auth import get_current_user, require_roles
 from app.models.user import User, Role, AdminPermission
 from app.models.course import Course, Batch
-from app.models.registration import Registration
-from app.models.attendance import Attendance, LeaveRequest, TimeTracking, AttendanceStatus, LeaveStatus, LeaveType
+from app.models.registration import Registration, Document
+from app.models.attendance import LeaveRequest, Attendance, TimeTracking, AttendanceStatus, LeaveStatus, LeaveType
 from app.models.notification import Notification, Message, Feedback, Video
 from app.models.project import Project, Task, Assignment, AssignmentSubmission, Violation
 from app.models.lead import Lead, LeadActivity
-from app.models.placement import JobApplication, MockInterview, CommunicationPractice
+from app.models.placement import Job, JobApplication, MockInterview, CommunicationPractice
+
 from app.schemas.schemas import (
     CourseCreate, CourseOut, BatchCreate, BatchOut,
     StudentCreate, StudentOut, LeaveAction, LeaveOut,
@@ -37,8 +38,10 @@ router = APIRouter(prefix="/api/admin", tags=["Admin"])
 @router.get("/dashboard")
 async def dashboard_stats(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
+    _user = Depends(require_roles("SUPER_ADMIN", "ADMIN")),
 ):
+    from app.models.user import User, Role
+    from app.models.course import Course, Batch
     students = await db.execute(select(func.count(User.id)).where(User.role == Role.STUDENT))
     courses = await db.execute(select(func.count(Course.id)))
     batches = await db.execute(select(func.count(Batch.id)))
@@ -149,6 +152,8 @@ async def list_batches(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
+    from app.models.course import Batch, Course
+    from app.models.user import User, Role
     query = select(Batch)
     if user.role == Role.TRAINER:
         query = query.where(Batch.trainer_id == user.id)
@@ -245,8 +250,9 @@ async def update_batch(
     batch_id: str,
     body: BatchUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user = Depends(require_roles("SUPER_ADMIN", "ADMIN"))
 ):
+    from app.models.course import Batch
     batch = await db.get(Batch, batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
