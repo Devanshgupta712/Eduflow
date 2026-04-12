@@ -38,9 +38,8 @@ router = APIRouter(prefix="/api/admin", tags=["Admin"])
 @router.get("/dashboard")
 async def dashboard_stats(
     db: AsyncSession = Depends(get_db),
-    _user = Depends(require_roles("SUPER_ADMIN", "ADMIN")),
+    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
 ):
-    from app.models.user import User, Role
     from app.models.course import Course, Batch
     students = await db.execute(select(func.count(User.id)).where(User.role == Role.STUDENT))
     courses = await db.execute(select(func.count(Course.id)))
@@ -250,7 +249,7 @@ async def update_batch(
     batch_id: str,
     body: BatchUpdate,
     db: AsyncSession = Depends(get_db),
-    _user = Depends(require_roles("SUPER_ADMIN", "ADMIN"))
+    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
 ):
     from app.models.course import Batch
     batch = await db.get(Batch, batch_id)
