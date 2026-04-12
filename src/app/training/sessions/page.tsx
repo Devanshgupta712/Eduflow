@@ -8,6 +8,7 @@ interface Session {
     batch_id: string; trainer_id: string;
     start_time: string; end_time: string;
     status: string; meeting_link: string | null; resources_url: string | null;
+    batch_schedule_link: string | null;
 }
 
 export default function TrainerSessionsPage() {
@@ -111,7 +112,11 @@ export default function TrainerSessionsPage() {
                                             )}
                                         </td>
                                         <td style={{ padding: '20px 24px', fontSize: '13px' }}>
-                                            {s.meeting_link && <a href={s.meeting_link} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>🎥 Join Meet</a>}
+                                            {s.meeting_link ? (
+                                                <a href={s.meeting_link} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>🎥 Join Meet</a>
+                                            ) : s.batch_schedule_link ? (
+                                                <a href={s.batch_schedule_link} target="_blank" rel="noreferrer" style={{ color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>🔗 Batch Link (Default)</a>
+                                            ) : null}
                                             {s.resources_url ? (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                     <a href={s.resources_url} target="_blank" rel="noreferrer" style={{ color: 'var(--info)', fontWeight: 600 }}>📚 Resources Linked</a>

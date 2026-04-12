@@ -8,6 +8,13 @@ interface Session {
     batch_id: string; trainer_id: string;
     start_time: string; end_time: string;
     status: string; meeting_link: string | null; resources_url: string | null;
+    batch_schedule_link: string | null;
+}
+
+interface Batch {
+    id: string;
+    name: string;
+    schedule_link: string | null;
 }
 
 export default function AdminSessionsPage() {
@@ -18,7 +25,7 @@ export default function AdminSessionsPage() {
     const [error, setError] = useState('');
     
     // Dependencies
-    const [batches, setBatches] = useState<{id:string, name:string}[]>([]);
+    const [batches, setBatches] = useState<Batch[]>([]);
     const [trainers, setTrainers] = useState<{id:string, name:string}[]>([]);
 
     useEffect(() => {
@@ -128,7 +135,13 @@ export default function AdminSessionsPage() {
                                             </span>
                                         </td>
                                         <td style={{ padding: '20px 24px', fontSize: '13px' }}>
-                                            {s.meeting_link ? <a href={s.meeting_link} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 600, display: 'block' }}>🎥 Join Meet</a> : <span style={{ color: 'var(--text-muted)' }}>No Meet</span>}
+                                            {s.meeting_link ? (
+                                                <a href={s.meeting_link} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 600, display: 'block' }}>🎥 Join Meet</a>
+                                            ) : s.batch_schedule_link ? (
+                                                <a href={s.batch_schedule_link} target="_blank" rel="noreferrer" style={{ color: 'var(--text-muted)', fontWeight: 600, display: 'block' }}>🔗 Batch Link (Default)</a>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-muted)' }}>No Meet</span>
+                                            )}
                                             {s.resources_url && <a href={s.resources_url} target="_blank" rel="noreferrer" style={{ color: 'var(--info)', fontWeight: 600, display: 'block', marginTop: '4px' }}>📚 Resources</a>}
                                         </td>
                                         <td style={{ padding: '20px 24px' }}>
@@ -155,7 +168,16 @@ export default function AdminSessionsPage() {
                             <div className="grid-2 mb-0">
                                 <div className="form-group mb-0">
                                     <label className="form-label">Batch</label>
-                                    <select className="form-select" required value={form.batch_id} onChange={e => setForm(f => ({ ...f, batch_id: e.target.value }))}>
+                                    <select className="form-select" required value={form.batch_id} onChange={e => {
+                                        const bid = e.target.value;
+                                        const b = batches.find(x => x.id === bid);
+                                        setForm(f => ({ 
+                                            ...f, 
+                                            batch_id: bid,
+                                            // Auto-fill meeting link if currently empty
+                                            meeting_link: f.meeting_link || b?.schedule_link || '' 
+                                        }));
+                                    }}>
                                         <option value="">Select Batch</option>
                                         {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                     </select>

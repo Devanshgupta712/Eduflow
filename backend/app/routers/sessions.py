@@ -17,25 +17,44 @@ async def get_all_sessions(
     db: AsyncSession = Depends(get_db), 
     user: User = Depends(get_current_user)
 ):
+    query = select(Session, Batch.schedule_link.label("batch_schedule_link")).outerjoin(Batch, Session.batch_id == Batch.id)
+
     if user.role in ["SUPER_ADMIN", "ADMIN"]:
-        result = await db.execute(select(Session).order_by(Session.start_time.asc()))
-        return result.scalars().all()
+        result = await db.execute(query.order_by(Session.start_time.asc()))
     elif user.role == "TRAINER":
         result = await db.execute(
-            select(Session).where(Session.trainer_id == user.id).order_by(Session.start_time.asc())
+            query.where(Session.trainer_id == user.id).order_by(Session.start_time.asc())
         )
-        return result.scalars().all()
     elif user.role == "STUDENT":
-        # Get student's batches
         batch_res = await db.execute(select(BatchStudent.batch_id).where(BatchStudent.student_id == user.id))
         student_batch_ids = [r[0] for r in batch_res.fetchall()]
         if not student_batch_ids:
             return []
         result = await db.execute(
-            select(Session).where(Session.batch_id.in_(student_batch_ids)).order_by(Session.start_time.asc())
+            query.where(Session.batch_id.in_(student_batch_ids)).order_by(Session.start_time.asc())
         )
-        return result.scalars().all()
-    return []
+    else:
+        return []
+
+    data = []
+    for row in result.all():
+        s, batch_link = row
+        data.append({
+            "id": s.id,
+            "title": s.title,
+            "description": s.description,
+            "batch_id": s.batch_id,
+            "trainer_id": s.trainer_id,
+            "start_time": s.start_time.isoformat(),
+            "end_time": s.end_time.isoformat(),
+            "status": s.status,
+            "meeting_link": s.meeting_link,
+            "resources_url": s.resources_url,
+            "batch_schedule_link": batch_link,
+            "created_at": s.created_at.isoformat(),
+            "updated_at": s.updated_at.isoformat()
+        })
+    return data
 
 @router.post("/")
 async def create_session(
