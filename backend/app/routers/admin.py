@@ -12,16 +12,13 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.middleware.auth import get_current_user, require_roles
 from app.models.user import User, Role, AdminPermission
-from app.models.course import Course, Batch, BatchStudent
-from app.models.session import Session
+from app.models.course import Course, Batch
 from app.models.registration import Registration
-from app.models.attendance import LeaveRequest, Attendance, TimeTracking, AttendanceStatus, LeaveStatus, LeaveType
+from app.models.attendance import Attendance, LeaveRequest, TimeTracking, AttendanceStatus, LeaveStatus, LeaveType
 from app.models.notification import Notification, Message, Feedback, Video
-from app.models.session import Session
 from app.models.project import Project, Task, Assignment, AssignmentSubmission, Violation
 from app.models.lead import Lead, LeadActivity
-from app.models.placement import JobApplication, AssessmentSubmission, MockInterview, CommunicationPractice
-from app.models.registration import Document
+from app.models.placement import JobApplication, MockInterview, CommunicationPractice
 from app.schemas.schemas import (
     CourseCreate, CourseOut, BatchCreate, BatchOut,
     StudentCreate, StudentOut, LeaveAction, LeaveOut,
@@ -162,6 +159,8 @@ async def list_batches(
     for b in batches:
         course = await db.get(Course, b.course_id)
         trainer = await db.get(User, b.trainer_id) if b.trainer_id else None
+        # Inline import to avoid circular dependencies
+        from app.models.course import BatchStudent
         stu_q = await db.execute(select(func.count(BatchStudent.id)).where(BatchStudent.batch_id == b.id))
         out.append(BatchOut(
             id=b.id, name=b.name, start_date=b.start_date, end_date=b.end_date,
@@ -209,6 +208,7 @@ async def create_batch(
         schedule_link=body.schedule_link if hasattr(body, 'schedule_link') else None,
         trainer_id=body.trainer_id or None,
     )
+    from app.models.session import Session
     db.add(batch)
     await db.flush()
     await db.refresh(batch)
@@ -271,6 +271,7 @@ async def update_batch(
             
         # Session Autopilot: If a link exists and NO sessions exist for this batch, create the first one
         if batch.schedule_link:
+            from app.models.session import Session
             ses_check = await db.execute(select(Session).where(Session.batch_id == batch_id))
             if not ses_check.scalars().first():
                 s_time, e_time = parse_times(batch.start_date, batch.schedule_time or "09:00 - 10:00")
