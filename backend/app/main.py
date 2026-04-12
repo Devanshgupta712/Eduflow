@@ -235,13 +235,18 @@ for o in settings.CORS_ORIGINS:
 
 @app.middleware("http")
 async def custom_cors_middleware(request: Request, call_next):
+    origin = request.headers.get("origin")
+    
     # Handle preflight OPTIONS requests directly
     if request.method == "OPTIONS":
         response = JSONResponse(content="OK")
     else:
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            # Re-raise to let the exception handler handle it, but we need headers there too
+            raise e
         
-    origin = request.headers.get("origin")
     if origin in origins or "*" in origins:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
@@ -256,10 +261,19 @@ async def global_exception_handler(request: Request, exc: Exception):
     error_msg = str(exc)
     stack_trace = traceback.format_exc()
     print(f"GLOBAL ERROR: {error_msg}\n{stack_trace}")
-    return JSONResponse(
+    
+    origin = request.headers.get("origin")
+    response = JSONResponse(
         status_code=500,
         content={"detail": f"Internal Server Error: {error_msg}", "type": str(type(exc).__name__)},
     )
+    
+    # Manually add CORS headers to the error response
+    if origin in origins or "*" in origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        
+    return response
 
 from app.routers import auth, admin, marketing, training, placement, sessions
 
