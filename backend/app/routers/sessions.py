@@ -101,6 +101,9 @@ async def create_session(
     r_type = recurrence.get("type", "NONE") # NONE, DAILY, WEEKLY
     r_count = int(recurrence.get("count", 1))
     
+    from app.models.session import Session
+    from app.models.course import BatchStudent
+    
     created_sessions = []
     
     for i in range(r_count):
@@ -162,6 +165,7 @@ async def update_session_status(
     db: AsyncSession = Depends(get_db), 
     user: User = Depends(get_current_user)
 ):
+    from app.models.session import Session
     result = await db.execute(select(Session).where(Session.id == session_id))
     s = result.scalars().first()
     if not s:
@@ -208,6 +212,7 @@ async def delete_session(
     if user.role not in ["SUPER_ADMIN", "ADMIN"]:
         raise HTTPException(status_code=403, detail="Not authorized")
         
+    from app.models.session import Session
     result = await db.execute(select(Session).where(Session.id == session_id))
     s = result.scalars().first()
     if not s:
@@ -227,6 +232,7 @@ async def submit_feedback(
     if user.role != "STUDENT":
         raise HTTPException(status_code=403, detail="Only students can submit feedback")
         
+    from app.models.session import StudentFeedback
     f = StudentFeedback(
         target_type=body.get("target_type", "SESSION"),
         target_id=body.get("target_id"),
@@ -247,6 +253,7 @@ async def get_all_feedback(
     if user.role not in ["SUPER_ADMIN", "ADMIN"]:
         raise HTTPException(status_code=403, detail="Not authorized")
         
+    from app.models.session import StudentFeedback
     result = await db.execute(select(StudentFeedback).order_by(StudentFeedback.created_at.desc()))
     feedbacks = result.scalars().all()
     
