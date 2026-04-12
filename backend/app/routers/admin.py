@@ -176,6 +176,23 @@ async def list_batches(
 
 
 
+def parse_times(date_obj: datetime, timeframe: str):
+    """Helper to parse '05:00 - 06:00' into start/end datetimes."""
+    try:
+        parts = timeframe.split('-')
+        start_str = parts[0].strip()
+        end_str = parts[1].strip()
+        
+        s_h, s_m = map(int, start_str.split(':'))
+        e_h, e_m = map(int, end_str.split(':'))
+        
+        start = date_obj.replace(hour=s_h, minute=s_m, second=0, microsecond=0)
+        end = date_obj.replace(hour=e_h, minute=e_m, second=0, microsecond=0)
+        return start, end
+    except:
+        # Fallback to 1 hour around now if parsing fails
+        return date_obj, date_obj + timedelta(hours=1)
+
 @router.post("/batches", status_code=201)
 async def create_batch(
     body: BatchCreate,
@@ -195,6 +212,23 @@ async def create_batch(
     db.add(batch)
     await db.flush()
     await db.refresh(batch)
+    
+    # Session Autopilot: Auto-create first session if link provided
+    if batch.schedule_link and batch.schedule_time:
+        s_time, e_time = parse_times(batch.start_date, batch.schedule_time)
+        first_session = Session(
+            title=f"Initial Session - {batch.name}",
+            description=f"First session for {batch.name}",
+            batch_id=batch.id,
+            trainer_id=batch.trainer_id,
+            start_time=s_time,
+            end_time=e_time,
+            meeting_link=batch.schedule_link,
+            status="SCHEDULED"
+        )
+        db.add(first_session)
+        await db.flush()
+
     course = await db.get(Course, batch.course_id) if batch.course_id else None
     return BatchOut(
         id=batch.id, name=batch.name, start_date=batch.start_date,
@@ -234,6 +268,22 @@ async def update_batch(
                 .where(and_(Session.batch_id == batch_id, Session.status == "SCHEDULED"))
                 .values(meeting_link=batch.schedule_link)
             )
+            
+        # Session Autopilot: If NO sessions exist and we added a link, create the first one
+        if batch.schedule_link and not old_link:
+            ses_check = await db.execute(select(Session).where(Session.batch_id == batch_id))
+            if not ses_check.scalars().first():
+                s_time, e_time = parse_times(batch.start_date, batch.schedule_time or "09:00 - 10:00")
+                first_session = Session(
+                    title=f"Welcome Session - {batch.name}",
+                    batch_id=batch.id,
+                    trainer_id=batch.trainer_id,
+                    start_time=s_time,
+                    end_time=e_time,
+                    meeting_link=batch.schedule_link,
+                    status="SCHEDULED"
+                )
+                db.add(first_session)
 
     if hasattr(body, 'trainer_id') and body.trainer_id is not None: 
         batch.trainer_id = body.trainer_id if body.trainer_id else None
