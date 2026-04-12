@@ -235,8 +235,6 @@ for o in settings.CORS_ORIGINS:
 
 @app.middleware("http")
 async def custom_cors_middleware(request: Request, call_next):
-    origin = request.headers.get("origin")
-    
     # Handle preflight OPTIONS requests directly
     if request.method == "OPTIONS":
         response = JSONResponse(content="OK")
@@ -244,14 +242,18 @@ async def custom_cors_middleware(request: Request, call_next):
         try:
             response = await call_next(request)
         except Exception as e:
-            # Re-raise to let the exception handler handle it, but we need headers there too
+            # Re-raise to let the exception handler handle it
             raise e
         
-    if origin in origins or "*" in origins:
-        response.headers["Access-Control-Allow-Origin"] = origin
+    origin = request.headers.get("origin")
+    # Always set headers if origin is in our whitelist OR for any origin if we want extreme stability
+    # (Checking against specific whitelisted origins for security + allow_credentials)
+    if origin in origins or not origin:
+        target_origin = origin if origin else origins[0]
+        response.headers["Access-Control-Allow-Origin"] = target_origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
         
     return response
 
@@ -268,10 +270,12 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": f"Internal Server Error: {error_msg}", "type": str(type(exc).__name__)},
     )
     
-    # Manually add CORS headers to the error response
-    if origin in origins or "*" in origins:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+    # Manually add CORS headers to the error response so the browser doesn't block it
+    target_origin = origin if origin in origins else (origins[0] if origins else "*")
+    response.headers["Access-Control-Allow-Origin"] = target_origin
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
         
     return response
 
@@ -284,6 +288,10 @@ app.include_router(marketing.router)
 app.include_router(training.router)
 app.include_router(placement.router)
 app.include_router(sessions.router)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
 
 # Mount Socket.io app
 app.mount("/socket.io", sio_app)
