@@ -106,7 +106,13 @@ export default function TrainerSessionsPage() {
                                             {s.status === 'SCHEDULED' ? (
                                                 <button className="btn btn-sm btn-primary" onClick={() => handleUpdateStatus(s.id, 'ONGOING')}>Start Class</button>
                                             ) : s.status === 'ONGOING' ? (
-                                                <button className="btn btn-sm" style={{background: 'var(--success)', color: '#fff'}} onClick={() => handleUpdateStatus(s.id, 'COMPLETED')}>Mark Completed</button>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                    <div className="pulse" style={{ background: 'var(--danger)', color: '#fff', fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px', width: 'fit-content', boxShadow: '0 0 10px var(--danger)' }}>
+                                                        <span style={{ width: '6px', height: '6px', background: '#fff', borderRadius: '50%' }}></span>
+                                                        LIVE NOW
+                                                    </div>
+                                                    <button className="btn btn-sm" style={{background: 'var(--success)', color: '#fff'}} onClick={() => handleUpdateStatus(s.id, 'COMPLETED')}>Mark Completed</button>
+                                                </div>
                                             ) : (
                                                 <span className={`badge ${s.status === 'COMPLETED' ? 'badge-success' : 'badge-secondary'}`}>{s.status}</span>
                                             )}

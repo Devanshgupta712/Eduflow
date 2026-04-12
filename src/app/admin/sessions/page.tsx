@@ -21,7 +21,11 @@ export default function AdminSessionsPage() {
     const [sessions, setSessions] = useState<Session[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [form, setForm] = useState({ title: '', description: '', batch_id: '', trainer_id: '', start_time: '', end_time: '', meeting_link: '', resources_url: '' });
+    const [form, setForm] = useState({ 
+        title: '', description: '', batch_id: '', trainer_id: '', 
+        start_time: '', end_time: '', meeting_link: '', resources_url: '',
+        recurrence: { type: 'NONE', count: 1 } 
+    });
     const [editingSession, setEditingSession] = useState<Session | null>(null);
     const [error, setError] = useState('');
     
@@ -65,7 +69,11 @@ export default function AdminSessionsPage() {
                 loadData();
             } else {
                 const d = await res.json().catch(()=>({}));
-                setError(d.detail || 'Failed to save session');
+                if (res.status === 409) {
+                    setError(`Conflict: ${d.detail}`);
+                } else {
+                    setError(d.detail || 'Failed to save session');
+                }
             }
         } catch (err: any) {
             setError(err.message || 'Network error');
@@ -227,7 +235,28 @@ export default function AdminSessionsPage() {
                                 <label className="form-label">Resources / Notes Link <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '12px' }}>(Optional)</span></label>
                                 <input type="url" className="form-input" value={form.resources_url} onChange={e => setForm(f => ({ ...f, resources_url: e.target.value }))} placeholder="https://drive.google.com/..." />
                             </div>
-                            {error && <div className="error-text" style={{ color: 'var(--danger)', fontSize: '13px' }}>{error}</div>}
+                            {!editingSession && (
+                                <div className="glass-premium" style={{ padding: '16px', borderRadius: '12px', background: 'rgba(99,102,241,0.05)', border: '1px dashed var(--primary)' }}>
+                                    <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span>🔄 Repeat Session</span>
+                                        <span style={{ fontSize: '10px', fontWeight: 400, color: 'var(--text-muted)' }}>(Bulk Create)</span>
+                                    </label>
+                                    <div className="grid-2 mb-0" style={{ marginTop: '8px' }}>
+                                        <select className="form-select" value={form.recurrence.type} onChange={e => setForm(f => ({ ...f, recurrence: { ...f.recurrence, type: e.target.value } }))}>
+                                            <option value="NONE">No Repeat</option>
+                                            <option value="DAILY">Daily</option>
+                                            <option value="WEEKLY">Weekly</option>
+                                        </select>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ fontSize: '12px' }}>For</span>
+                                            <input type="number" min="1" max="30" className="form-input" style={{ width: '70px' }} value={form.recurrence.count} onChange={e => setForm(f => ({ ...f, recurrence: { ...f.recurrence, count: parseInt(e.target.value) || 1 } }))} />
+                                            <span style={{ fontSize: '12px' }}>days/weeks</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {error && <div className="error-text" style={{ color: 'var(--danger)', fontSize: '13px', background: 'rgba(239, 68, 68, 0.1)', padding: '8px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>{error}</div>}
                             <div className="modal-footer" style={{ marginTop: '10px' }}>
                                 <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
                                 <button type="submit" className="btn btn-primary">Schedule Session</button>

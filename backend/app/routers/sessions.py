@@ -1,7 +1,8 @@
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
+from app.utils.email import send_session_notification # We will create this
 
 from app.database import get_db
 from app.routers.auth import get_current_user
@@ -11,6 +12,28 @@ from app.models.course import Batch, BatchStudent
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 
+async def check_trainer_conflict(db: AsyncSession, trainer_id: str, s_time: datetime, e_time: datetime, exclude_session_id: str = None):
+    """Check if trainer is already booked during this time slot."""
+    query = select(Session).where(
+        and_(
+            Session.trainer_id == trainer_id,
+            Session.status != "CANCELLED",
+            or_(
+                # New session starts inside an existing one
+                and_(Session.start_time <= s_time, Session.end_time > s_time),
+                # New session ends inside an existing one
+                and_(Session.start_time < e_time, Session.end_time >= e_time),
+                # New session completely wraps an existing one
+                and_(Session.start_time >= s_time, Session.end_time <= e_time)
+            )
+        )
+    )
+    if exclude_session_id:
+        query = query.where(Session.id != exclude_session_id)
+        
+    result = await db.execute(query)
+    conflict = result.scalars().first()
+    return conflict
 @router.get("/")
 async def get_all_sessions(
     role: str = "ADMIN", 
@@ -59,27 +82,77 @@ async def get_all_sessions(
 @router.post("/")
 async def create_session(
     body: dict, 
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db), 
     user: User = Depends(get_current_user)
 ):
     if user.role not in ["SUPER_ADMIN", "ADMIN"]:
         raise HTTPException(status_code=403, detail="Not authorized")
         
-    s = Session(
-        title=body.get("title"),
-        description=body.get("description"),
-        batch_id=body.get("batch_id"),
-        trainer_id=body.get("trainer_id"),
-        start_time=datetime.fromisoformat(body.get("start_time").replace("Z", "+00:00")),
-        end_time=datetime.fromisoformat(body.get("end_time").replace("Z", "+00:00")),
-        meeting_link=body.get("meeting_link"),
-        resources_url=body.get("resources_url"),
-        status="SCHEDULED"
-    )
-    db.add(s)
-    await db.commit()
-    return {"status": "success", "id": s.id}
+    start_time = datetime.fromisoformat(body.get("start_time").replace("Z", "+00:00"))
+    end_time = datetime.fromisoformat(body.get("end_time").replace("Z", "+00:00"))
+    trainer_id = body.get("trainer_id")
+    batch_id = body.get("batch_id")
+    
+    # Recurrence logic
+    recurrence = body.get("recurrence", {})
+    r_type = recurrence.get("type", "NONE") # NONE, DAILY, WEEKLY
+    r_count = int(recurrence.get("count", 1))
+    
+    created_sessions = []
+    
+    for i in range(r_count):
+        # Calculate times for this instance
+        current_start = start_time
+        current_end = end_time
+        
+        if r_type == "DAILY":
+            current_start += timedelta(days=i)
+            current_end += timedelta(days=i)
+        elif r_type == "WEEKLY":
+            current_start += timedelta(weeks=i)
+            current_end += timedelta(weeks=i)
+            
+        # 1. Check for conflicts
+        conflict = await check_trainer_conflict(db, trainer_id, current_start, current_end)
+        if conflict:
+            raise HTTPException(
+                status_code=409, 
+                detail=f"Conflict detected for instance {i+1} ({current_start.strftime('%d %b %H:%M')}). Trainer is already busy with session: {conflict.title}"
+            )
 
+        s = Session(
+            title=body.get("title"),
+            description=body.get("description"),
+            batch_id=batch_id,
+            trainer_id=trainer_id,
+            start_time=current_start,
+            end_time=current_end,
+            meeting_link=body.get("meeting_link"),
+            resources_url=body.get("resources_url"),
+            status="SCHEDULED"
+        )
+        db.add(s)
+        created_sessions.append(s)
+
+    await db.commit()
+    
+    # Send email notification in background
+    # (We will send to all students in the batch)
+    try:
+        background_tasks.add_task(trigger_session_notifications, db, batch_id, body.get("title"), start_time)
+    except: pass
+
+    return {"status": "success", "count": len(created_sessions)}
+
+async def trigger_session_notifications(db: AsyncSession, batch_id: str, title: str, start_time: datetime):
+    # Get students in batch
+    res = await db.execute(
+        select(User.email).join(BatchStudent, User.id == BatchStudent.student_id).where(BatchStudent.batch_id == batch_id)
+    )
+    emails = res.scalars().all()
+    for email in emails:
+        send_session_notification(email, title, start_time.strftime("%d %b %Y, %I:%M %p"))
 @router.patch("/{session_id}")
 async def update_session_status(
     session_id: str, 
@@ -101,18 +174,25 @@ async def update_session_status(
         s.meeting_link = body["meeting_link"]
     if "resources_url" in body:
         s.resources_url = body["resources_url"]
+    if "start_time" in body or "end_time" in body or "trainer_id" in body:
+        new_start = datetime.fromisoformat(body.get("start_time", s.start_time.isoformat()).replace("Z", "+00:00"))
+        new_end = datetime.fromisoformat(body.get("end_time", s.end_time.isoformat()).replace("Z", "+00:00"))
+        new_trainer = body.get("trainer_id", s.trainer_id)
+        
+        conflict = await check_trainer_conflict(db, new_trainer, new_start, new_end, exclude_session_id=session_id)
+        if conflict:
+            raise HTTPException(status_code=409, detail=f"Conflict detected. Trainer is already busy with session: {conflict.title}")
+            
+        s.start_time = new_start
+        s.end_time = new_end
+        s.trainer_id = new_trainer
+
     if "title" in body:
         s.title = body["title"]
     if "description" in body:
         s.description = body["description"]
-    if "trainer_id" in body:
-        s.trainer_id = body["trainer_id"]
     if "batch_id" in body:
         s.batch_id = body["batch_id"]
-    if "start_time" in body:
-        s.start_time = datetime.fromisoformat(body["start_time"].replace("Z", "+00:00"))
-    if "end_time" in body:
-        s.end_time = datetime.fromisoformat(body["end_time"].replace("Z", "+00:00"))
         
     await db.commit()
     return {"status": "success"}
