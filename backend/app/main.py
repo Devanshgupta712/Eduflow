@@ -220,7 +220,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS - Hardened for production
+# CORS - Hardened manual implementation for production stability
 origins = [
     "https://lms-beta-lilac.vercel.app",
     "https://lms.appteknow.com",
@@ -233,13 +233,22 @@ for o in settings.CORS_ORIGINS:
     if clean_o not in origins:
         origins.append(clean_o)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.middleware("http")
+async def custom_cors_middleware(request: Request, call_next):
+    # Handle preflight OPTIONS requests directly
+    if request.method == "OPTIONS":
+        response = JSONResponse(content="OK")
+    else:
+        response = await call_next(request)
+        
+    origin = request.headers.get("origin")
+    if origin in origins or "*" in origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+        
+    return response
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
