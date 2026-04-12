@@ -7,6 +7,7 @@ import { apiGet, apiPost, apiPut, apiDelete, getStoredUser } from '@/lib/api';
 interface Batch {
     id: string; name: string; start_date: string; end_date: string;
     is_active: boolean; course_name: string; trainer_name: string | null; student_count: number; schedule_time: string | null;
+    schedule_link: string | null;
 }
 
 export default function BatchesPage() {
@@ -16,7 +17,7 @@ export default function BatchesPage() {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [form, setForm] = useState({ course_id: '', name: '', start_date: '', end_date: '', schedule_time: '', trainer_id: '' });
+    const [form, setForm] = useState({ course_id: '', name: '', start_date: '', end_date: '', schedule_time: '', trainer_id: '', schedule_link: '' });
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
@@ -78,6 +79,7 @@ export default function BatchesPage() {
                 start_date: form.start_date,
                 end_date: form.end_date,
                 schedule_time: form.schedule_time || null,
+                schedule_link: form.schedule_link || null,
                 trainer_id: form.trainer_id || null,
             };
             
@@ -85,13 +87,13 @@ export default function BatchesPage() {
                 await apiPut(`/api/admin/batches/${editingId}`, payload);
                 setShowModal(false);
                 setEditingId(null);
-                setForm({ course_id: '', name: '', start_date: '', end_date: '', schedule_time: '', trainer_id: '' });
+                setForm({ course_id: '', name: '', start_date: '', end_date: '', schedule_time: '', trainer_id: '', schedule_link: '' });
                 loadData();
             } else {
                 const res = await apiPost('/api/admin/batches', payload);
                 if (res.ok) {
                     setShowModal(false);
-                    setForm({ course_id: '', name: '', start_date: '', end_date: '', schedule_time: '', trainer_id: '' });
+                    setForm({ course_id: '', name: '', start_date: '', end_date: '', schedule_time: '', trainer_id: '', schedule_link: '' });
                     loadData();
                 } else {
                     const d = await res.json().catch(() => ({}));
@@ -117,6 +119,7 @@ export default function BatchesPage() {
             start_date: b.start_date.split('T')[0],
             end_date: b.end_date.split('T')[0],
             schedule_time: b.schedule_time || '',
+            schedule_link: b.schedule_link || '',
             trainer_id: b.trainer_name ? trainers.find(t => t.name === b.trainer_name)?.id || '' : ''
         });
         setShowModal(true);
@@ -126,22 +129,37 @@ export default function BatchesPage() {
         if (!window.confirm(`Are you sure you want to permanently delete batch "${name}"? All enrolled students and records will be completely removed.`)) return;
         try {
             // Wake-up ping for render.com free tier cold starts
-            await fetch((process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com') + '/api/health').catch(() => {});
+            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com';
+            await fetch(apiBase + '/api/health').catch(() => {});
             
-            try {
-                await apiDelete(`/api/admin/batches/${id}`);
-            } catch (err: any) {
-                // If it's a network error (Failed to fetch), the server might still be spinning up. Wait and retry once.
-                if (err.message && err.message.includes('Failed to fetch')) {
-                    await new Promise(r => setTimeout(r, 6000));
-                    await apiDelete(`/api/admin/batches/${id}`);
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch(`${apiBase}/api/admin/batches/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (!res.ok) {
+                // Server returned an error
+                let errMsg = `Delete failed (${res.status})`;
+                try {
+                    const errData = await res.json();
+                    errMsg = errData.detail || errData.message || errMsg;
+                } catch {}
+                if (res.status === 500 && res.status.toString().includes('Server is still warming up')) {
+                    alert('Server is still warming up. Please try again in 10 seconds.');
                 } else {
-                    throw err;
+                    alert(errMsg);
                 }
+                return;
             }
+            
             loadData();
         } catch (err: any) {
-            alert(err.message === 'Failed to fetch' ? 'Server is still warming up. Please try again in 10 seconds.' : err.message || 'Failed to delete');
+            if (err.message === 'Failed to fetch') {
+                alert('Server is still warming up. Please try again in 10 seconds.');
+            } else {
+                alert(err.message || 'Failed to delete batch');
+            }
         }
     };
 
@@ -241,6 +259,12 @@ export default function BatchesPage() {
                                         <span>{b.schedule_time}</span>
                                     </div>
                                 )}
+                                {b.schedule_link && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '16px' }}>🔗</span>
+                                        <a href={b.schedule_link} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>Join Meeting</a>
+                                    </div>
+                                )}
                                 {b.trainer_name && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--info-dark)', fontWeight: 600 }}>
                                         <span style={{ fontSize: '16px' }}>👨‍🏫</span> 
@@ -317,6 +341,11 @@ export default function BatchesPage() {
                                         {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                     </select>
                                 </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">📅 Schedule / Meeting Link <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '12px' }}>(Optional – Google Meet, Zoom, etc.)</span></label>
+                                <input className="form-input" type="url" placeholder="https://meet.google.com/..." value={form.schedule_link} onChange={e => setForm({ ...form, schedule_link: e.target.value })} />
                             </div>
 
                             <div className="modal-footer">

@@ -179,8 +179,12 @@ export default function AdminSessionsPage() {
                                 </div>
                             </div>
                             <div className="form-group mb-0">
-                                <label className="form-label">Meeting Link (Optional)</label>
+                                <label className="form-label">Meeting / Schedule Link <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '12px' }}>(Google Meet, Zoom, etc.)</span></label>
                                 <input type="url" className="form-input" value={form.meeting_link} onChange={e => setForm(f => ({ ...f, meeting_link: e.target.value }))} placeholder="https://meet.google.com/..." />
+                            </div>
+                            <div className="form-group mb-0">
+                                <label className="form-label">Resources / Notes Link <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '12px' }}>(Optional)</span></label>
+                                <input type="url" className="form-input" value={form.resources_url} onChange={e => setForm(f => ({ ...f, resources_url: e.target.value }))} placeholder="https://drive.google.com/..." />
                             </div>
                             {error && <div className="error-text" style={{ color: 'var(--danger)', fontSize: '13px' }}>{error}</div>}
                             <div className="modal-footer" style={{ marginTop: '10px' }}>

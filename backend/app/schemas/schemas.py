@@ -96,6 +96,7 @@ class BatchCreate(BaseModel):
     start_date: str
     end_date: str
     schedule_time: str | None = None
+    schedule_link: str | None = None
     trainer_id: str | None = None
 
 class BatchUpdate(BaseModel):
@@ -104,6 +105,7 @@ class BatchUpdate(BaseModel):
     start_date: str | None = None
     end_date: str | None = None
     schedule_time: str | None = None
+    schedule_link: str | None = None
     trainer_id: str | None = None
     is_active: bool | None = None
 
@@ -114,6 +116,7 @@ class BatchOut(BaseModel):
     end_date: datetime
     is_active: bool
     schedule_time: str | None = None
+    schedule_link: str | None = None
     course_name: str | None = None
     trainer_name: str | None = None
     student_count: int = 0

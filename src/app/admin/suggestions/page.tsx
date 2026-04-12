@@ -194,6 +194,26 @@ export default function SuggestionsPage() {
                                                 background: 'rgba(99,102,241,0.15)', color: '#6366f1'
                                             }}>NEW</span>
                                         )}
+                                        {(s.screenshot_base64 || s.has_screenshot) && (
+                                            <span
+                                                title="Has attached screenshot — click View to see it"
+                                                onClick={() => {
+                                                    if (s.screenshot_base64) setViewImage(s.screenshot_base64);
+                                                    else {
+                                                        setExpanded(s.id);
+                                                        if (!s.is_read) markRead(s.id);
+                                                    }
+                                                }}
+                                                style={{
+                                                    fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '10px',
+                                                    background: 'rgba(16,185,129,0.1)', color: '#059669',
+                                                    cursor: 'pointer', border: '1px solid rgba(16,185,129,0.3)',
+                                                    display: 'inline-flex', alignItems: 'center', gap: '4px'
+                                                }}
+                                            >
+                                                📷 Screenshot
+                                            </span>
+                                        )}
                                     </div>
                                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
                                         {s.created_at ? new Date(s.created_at).toLocaleString('en-IN', {
@@ -237,15 +257,17 @@ export default function SuggestionsPage() {
                             </div>
                             
                             {/* Attachment indicator / Viewer */}
-                            {expanded === s.id && (s.screenshot_base64 || s.screenshot_url) && (
+                            {expanded === s.id && s.screenshot_base64 && (
                                 <div style={{ marginTop: '12px' }}>
-                                    <button 
-                                        className="btn btn-sm" 
-                                        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                        onClick={() => setViewImage(s.screenshot_base64 || s.screenshot_url)}
-                                    >
-                                        <span style={{ fontSize: '16px' }}>🖼️</span> View Attached Screenshot
-                                    </button>
+                                    <div style={{ marginBottom: '8px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>📎 Attached Screenshot</div>
+                                    <img
+                                        src={s.screenshot_base64}
+                                        alt="Suggestion Screenshot"
+                                        style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'zoom-in' }}
+                                        onClick={() => setViewImage(s.screenshot_base64)}
+                                        title="Click to view full size"
+                                    />
+                                    <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>Click image to view full size</div>
                                 </div>
                             )}
 

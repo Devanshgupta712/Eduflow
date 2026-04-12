@@ -165,6 +165,7 @@ async def list_batches(
             id=b.id, name=b.name, start_date=b.start_date, end_date=b.end_date,
             is_active=b.is_active,
             schedule_time=b.schedule_time,
+            schedule_link=b.schedule_link if hasattr(b, 'schedule_link') else None,
             course_name=course.name if course else "",
             trainer_name=trainer.name if trainer else None,
             student_count=stu_q.scalar() or 0,
@@ -186,6 +187,7 @@ async def create_batch(
         start_date=datetime.fromisoformat(body.start_date),
         end_date=datetime.fromisoformat(body.end_date),
         schedule_time=body.schedule_time,
+        schedule_link=body.schedule_link if hasattr(body, 'schedule_link') else None,
         trainer_id=body.trainer_id or None,
     )
     db.add(batch)
@@ -196,6 +198,7 @@ async def create_batch(
         id=batch.id, name=batch.name, start_date=batch.start_date,
         end_date=batch.end_date, is_active=batch.is_active,
         schedule_time=batch.schedule_time,
+        schedule_link=batch.schedule_link,
         course_name=course.name if course else None,
     )
 
@@ -218,6 +221,8 @@ async def update_batch(
     if body.start_date is not None: batch.start_date = datetime.fromisoformat(body.start_date)
     if body.end_date is not None: batch.end_date = datetime.fromisoformat(body.end_date)
     if body.schedule_time is not None: batch.schedule_time = body.schedule_time
+    if hasattr(body, 'schedule_link') and body.schedule_link is not None: 
+        batch.schedule_link = body.schedule_link if body.schedule_link else None
     if hasattr(body, 'trainer_id') and body.trainer_id is not None: 
         batch.trainer_id = body.trainer_id if body.trainer_id else None
     if body.is_active is not None: batch.is_active = body.is_active
@@ -266,7 +271,7 @@ async def delete_batch(
         await db.execute(delete(Project).where(Project.batch_id == batch_id))
 
     await db.delete(batch)
-    await db.flush()
+    await db.commit()
     return {"status": "deleted"}
 
 
@@ -1429,21 +1434,26 @@ async def get_suggestions(
     for s in suggestions:
         student_name = "Anonymous"
         student_sid = None
+        user_role = None
         if s.student_id and not s.is_anonymous:
             student = await db.get(User, s.student_id)
             if student:
                 student_name = student.name
                 student_sid = student.student_id
+                user_role = student.role.value if hasattr(student.role, 'value') else str(student.role)
         out.append({
             "id": s.id,
             "student_name": student_name,
             "student_sid": student_sid,
+            "user_role": user_role,
             "message": s.message,
             "category": s.category or "General",
             "is_anonymous": s.is_anonymous,
             "is_read": s.is_read,
             "admin_reply": s.admin_reply,
             "created_at": s.created_at.isoformat() if s.created_at else None,
+            "screenshot_base64": s.screenshot_base64,
+            "has_screenshot": bool(s.screenshot_base64),
         })
     return out
 

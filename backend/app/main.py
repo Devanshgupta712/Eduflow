@@ -82,6 +82,12 @@ async def lifespan(app: FastAPI):
                 sugg_cols = [row[1] for row in result.fetchall()]
                 if "screenshot_base64" not in sugg_cols:
                     await conn.execute(text("ALTER TABLE suggestions ADD COLUMN screenshot_base64 TEXT"))
+                
+                # Batches schema migration
+                result = await conn.execute(text("PRAGMA table_info(batches)"))
+                batch_cols = [row[1] for row in result.fetchall()]
+                if "schedule_link" not in batch_cols:
+                    await conn.execute(text("ALTER TABLE batches ADD COLUMN schedule_link TEXT"))
             print("SQLite startup complete.")
         else:
             # For PostgreSQL production: Run critical startup queries
@@ -178,6 +184,8 @@ async def lifespan(app: FastAPI):
                     "ALTER TABLE assessment_sessions ADD COLUMN IF NOT EXISTS mic_violation_count INTEGER DEFAULT 0",
                     "ALTER TABLE assessment_sessions ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMP",
                     "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS screenshot_base64 TEXT",
+                    # Batches: schedule_link for meeting link
+                    "ALTER TABLE batches ADD COLUMN IF NOT EXISTS schedule_link VARCHAR",
                 ]
                 for sql in pg_migrations:
                     try:

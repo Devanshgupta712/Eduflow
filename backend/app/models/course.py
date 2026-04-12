@@ -34,6 +34,7 @@ class Batch(Base):
     start_date: Mapped[datetime] = mapped_column(DateTime)
     end_date: Mapped[datetime] = mapped_column(DateTime)
     schedule_time: Mapped[str | None] = mapped_column(String, nullable=True)
+    schedule_link: Mapped[str | None] = mapped_column(String, nullable=True)
     trainer_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
