@@ -19,6 +19,8 @@ export default function CoursesPage() {
     const [form, setForm] = useState(EMPTY_FORM);
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const user = getStoredUser();
     const canEdit = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
 
@@ -43,17 +45,15 @@ export default function CoursesPage() {
         e.preventDefault(); setError(''); setSubmitting(true);
         try {
             const payload = { name: form.name, description: form.description, duration: form.duration, fee: parseFloat(form.fee) || 0 };
-            
             if (editCourse) {
-                // apiPatch throws an error if it fails and returns parsed JSON if successful
                 await apiPatch(`/api/admin/courses/${editCourse.id}`, { ...payload, is_active: editCourse.is_active });
-                setShowModal(false); 
-                loadCourses();
+                // Optimistic update
+                setCourses(prev => prev.map(c => c.id === editCourse.id ? { ...c, ...payload } : c));
+                setShowModal(false);
             } else {
-                // apiPost returns a raw Response object
                 const res = await apiPost('/api/admin/courses', payload);
                 if (res.ok) {
-                    setShowModal(false); 
+                    setShowModal(false);
                     loadCourses();
                 } else {
                     const d = await res.json().catch(() => ({}));
@@ -65,22 +65,31 @@ export default function CoursesPage() {
     };
 
     const handleToggleActive = async (c: Course) => {
+        // Optimistic update
+        setCourses(prev => prev.map(x => x.id === c.id ? { ...x, is_active: !x.is_active } : x));
         try {
             await apiPatch(`/api/admin/courses/${c.id}`, { is_active: !c.is_active });
-            loadCourses();
         } catch (err: any) {
+            // Rollback on failure
+            setCourses(prev => prev.map(x => x.id === c.id ? { ...x, is_active: c.is_active } : x));
             alert(err.message || 'Failed to toggle course status.');
         }
     };
 
-    const handleDelete = async (c: Course) => {
-        if (!confirm(`Delete "${c.name}"? This cannot be undone.`)) return;
+    const handleDelete = async (courseId: string) => {
+        setDeletingId(courseId);
+        setConfirmDeleteId(null);
+        // Optimistic remove from list
+        const removed = courses.find(c => c.id === courseId);
+        setCourses(prev => prev.filter(c => c.id !== courseId));
         try {
-            const res = await apiDelete(`/api/admin/courses/${c.id}`);
-            // apiDelete also returns JSON via res.json() internally! So checking res.ok fails.
-            loadCourses();
+            await apiDelete(`/api/admin/courses/${courseId}`);
         } catch (err: any) {
+            // Rollback on failure
+            if (removed) setCourses(prev => [...prev, removed].sort((a, b) => a.name.localeCompare(b.name)));
             alert(err.message || 'Failed to delete course.');
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -143,27 +152,49 @@ export default function CoursesPage() {
                             </thead>
                             <tbody>
                                 {courses.map(c => (
-                                    <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }} className="hover-lift">
+                                    <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.2s', opacity: deletingId === c.id ? 0.4 : 1 }} className="hover-lift">
                                         <td style={{ padding: '20px 24px' }}>
                                             <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-primary)' }}>{c.name}</div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{c.description?.slice(0, 80)}...</div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{c.description?.slice(0, 80)}</div>
                                         </td>
                                         <td style={{ padding: '20px 24px', fontWeight: 700, fontSize: '14px' }}>{c.duration || 'Flexible'}</td>
                                         <td style={{ padding: '20px 24px', fontWeight: 700, fontSize: '14px', color: 'var(--primary)' }}>₹{c.fee.toLocaleString()}</td>
                                         <td style={{ padding: '20px 24px' }}>
-                                            <span 
+                                            <span
                                                 onClick={() => canEdit && handleToggleActive(c)}
                                                 className={`badge ${c.is_active ? 'badge-success' : 'badge-secondary'}`}
                                                 style={{ cursor: canEdit ? 'pointer' : 'default' }}
                                             >
-                                                {c.is_active ? 'PROGRAM ACTIVE' : 'PROGRAM PAUSED'}
+                                                {c.is_active ? 'ACTIVE' : 'PAUSED'}
                                             </span>
                                         </td>
                                         {canEdit && (
                                             <td style={{ padding: '20px 24px' }}>
-                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                                     <button onClick={() => openEdit(c)} className="btn btn-sm btn-ghost" style={{ padding: '8px', width: '36px', height: '36px' }}>✏️</button>
-                                                    <button onClick={() => handleDelete(c)} disabled={c.batch_count > 0} className="btn btn-sm btn-ghost" style={{ padding: '8px', width: '36px', height: '36px' }}>🗑️</button>
+
+                                                    {/* Inline delete confirmation */}
+                                                    {confirmDeleteId === c.id ? (
+                                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: 'rgba(239,68,68,0.08)', padding: '4px 8px', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                                                            <span style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: 600 }}>Sure?</span>
+                                                            <button
+                                                                onClick={() => handleDelete(c.id)}
+                                                                className="btn btn-sm"
+                                                                style={{ padding: '2px 8px', fontSize: '11px', background: 'var(--danger)', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
+                                                            >Yes</button>
+                                                            <button
+                                                                onClick={() => setConfirmDeleteId(null)}
+                                                                className="btn btn-sm btn-ghost"
+                                                                style={{ padding: '2px 6px', fontSize: '11px' }}
+                                                            >No</button>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => setConfirmDeleteId(c.id)}
+                                                            className="btn btn-sm btn-ghost"
+                                                            style={{ padding: '8px', width: '36px', height: '36px' }}
+                                                        >🗑️</button>
+                                                    )}
                                                 </div>
                                             </td>
                                         )}
@@ -179,7 +210,7 @@ export default function CoursesPage() {
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
                         <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '24px', letterSpacing: '-0.04em' }}>{editCourse ? 'Modify Program' : 'New Program Identity'}</h2>
-                        
+
                         {error && (
                             <div style={{ background: 'hsla(0, 80%, 60%, 0.1)', border: '1px solid hsla(0, 80%, 60%, 0.2)', padding: '12px', borderRadius: '12px', color: '#ef4444', fontSize: '13px', fontWeight: 600, marginBottom: '20px' }}>
                                 ⚠️ {error}
