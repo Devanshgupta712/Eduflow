@@ -51,8 +51,8 @@ export default function Courses({ activeCategory = 'All Courses' }: { activeCate
 
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(3, 1fr)', 
-          gap: '32px'
+          gridTemplateColumns: 'repeat(4, 1fr)', 
+          gap: '24px'
         }}>
           {displayCourses.map((course) => (
             <div 
@@ -127,12 +127,12 @@ export default function Courses({ activeCategory = 'All Courses' }: { activeCate
 
       <style jsx>{`
         @media (max-width: 1024px) {
-          div[style*="gridTemplateColumns: repeat(3, 1fr)"] {
+          div[style*="gridTemplateColumns: repeat(4, 1fr)"] {
             grid-template-columns: repeat(2, 1fr) !important;
           }
         }
         @media (max-width: 768px) {
-          div[style*="gridTemplateColumns: repeat(3, 1fr)"] {
+          div[style*="gridTemplateColumns: repeat(4, 1fr)"] {
             grid-template-columns: 1fr !important;
           }
         }

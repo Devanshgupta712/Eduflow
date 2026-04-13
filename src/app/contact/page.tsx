@@ -96,33 +96,24 @@ export default function ContactPage() {
                   </div>
                 </div>
                 
-                {/* Mock Map Placeholder */}
-                <div className="hover-lift shadow-sm" style={{ 
+                {/* Embedded Google Map */}
+                <div className="shadow-sm" style={{ 
                   width: '100%', 
-                  height: '220px', 
-                  background: 'var(--bg-secondary)', 
+                  height: '240px', 
                   borderRadius: '24px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  border: '1px solid var(--border)',
                   overflow: 'hidden',
+                  border: '1px solid var(--border)',
                   position: 'relative'
                 }}>
-                  <svg width="100%" height="100%" style={{ position: 'absolute', inset: 0, opacity: 0.1 }} viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <defs>
-                      <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                        <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5"/>
-                      </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#grid)" />
-                  </svg>
-                  <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ color: 'var(--primary)', opacity: 0.5 }}>
-                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                    </div>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>Interactive Map Loading...</span>
-                  </div>
+                  <iframe 
+                    src="https://www.google.com/maps?q=123,+BTM+Layout+2nd+Stage,+Bangalore,+KA+560076+India&output=embed" 
+                    width="100%" 
+                    height="100%" 
+                    style={{ border: 0 }} 
+                    allowFullScreen 
+                    loading="lazy" 
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
                 </div>
               </div>
             </div>
