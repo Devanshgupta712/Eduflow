@@ -1,15 +1,16 @@
 from datetime import datetime, timedelta
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
-from app.utils.email import send_session_notification # We will create this
+from sqlalchemy import select, delete, and_, or_
+from app.utils.email import send_session_notification
 
 from app.database import get_db
 from app.routers.auth import get_current_user
 from app.models.user import User
-# Models are imported inline inside route functions to avoid circularities
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
+
 
 async def check_trainer_conflict(db: AsyncSession, trainer_id: str, s_time: datetime, e_time: datetime, exclude_session_id: str = None):
     """Check if trainer is already booked during this time slot."""
@@ -19,51 +20,95 @@ async def check_trainer_conflict(db: AsyncSession, trainer_id: str, s_time: date
             Session.trainer_id == trainer_id,
             Session.status != "CANCELLED",
             or_(
-                # New session starts inside an existing one
                 and_(Session.start_time <= s_time, Session.end_time > s_time),
-                # New session ends inside an existing one
                 and_(Session.start_time < e_time, Session.end_time >= e_time),
-                # New session completely wraps an existing one
                 and_(Session.start_time >= s_time, Session.end_time <= e_time)
             )
         )
     )
     if exclude_session_id:
         query = query.where(Session.id != exclude_session_id)
-        
     result = await db.execute(query)
-    conflict = result.scalars().first()
-    return conflict
+    return result.scalars().first()
+
+
 @router.get("/")
 async def get_all_sessions(
-    role: str = "ADMIN", 
-    db: AsyncSession = Depends(get_db), 
+    role: str = "ADMIN",
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    from app.models.session import Session
+    from app.models.session import Session, SessionAttendee
     from app.models.course import Batch, BatchStudent
+
     query = select(Session, Batch.schedule_link.label("batch_schedule_link")).outerjoin(Batch, Session.batch_id == Batch.id)
 
     if user.role in ["SUPER_ADMIN", "ADMIN"]:
         result = await db.execute(query.order_by(Session.start_time.asc()))
+        rows = result.all()
+        data = []
+        for s, batch_link in rows:
+            # Load attendee IDs for admin view (for editing selective sessions)
+            attendee_ids = []
+            if s.selective_attendance:
+                att_res = await db.execute(
+                    select(SessionAttendee.student_id).where(SessionAttendee.session_id == s.id)
+                )
+                attendee_ids = att_res.scalars().all()
+            data.append({
+                "id": s.id,
+                "title": s.title,
+                "description": s.description,
+                "batch_id": s.batch_id,
+                "trainer_id": s.trainer_id,
+                "start_time": s.start_time.isoformat(),
+                "end_time": s.end_time.isoformat(),
+                "status": s.status,
+                "meeting_link": s.meeting_link,
+                "resources_url": s.resources_url,
+                "batch_schedule_link": batch_link,
+                "selective_attendance": s.selective_attendance,
+                "attendee_ids": list(attendee_ids),
+                "created_at": s.created_at.isoformat(),
+                "updated_at": s.updated_at.isoformat()
+            })
+        return data
+
     elif user.role == "TRAINER":
         result = await db.execute(
             query.where(Session.trainer_id == user.id).order_by(Session.start_time.asc())
         )
+        rows = result.all()
+
     elif user.role == "STUDENT":
+        # Student sees a session if:
+        # 1. session is NOT selective AND they are in the batch, OR
+        # 2. session IS selective AND they are listed in SessionAttendee
         batch_res = await db.execute(select(BatchStudent.batch_id).where(BatchStudent.student_id == user.id))
         student_batch_ids = [r[0] for r in batch_res.fetchall()]
-        if not student_batch_ids:
-            return []
-        result = await db.execute(
-            query.where(Session.batch_id.in_(student_batch_ids)).order_by(Session.start_time.asc())
+
+        attendee_session_res = await db.execute(
+            select(SessionAttendee.session_id).where(SessionAttendee.student_id == user.id)
         )
+        selective_session_ids = [r[0] for r in attendee_session_res.fetchall()]
+
+        if not student_batch_ids and not selective_session_ids:
+            return []
+
+        result = await db.execute(
+            query.where(
+                or_(
+                    and_(Session.selective_attendance == False, Session.batch_id.in_(student_batch_ids)) if student_batch_ids else False,
+                    Session.id.in_(selective_session_ids) if selective_session_ids else False,
+                )
+            ).order_by(Session.start_time.asc())
+        )
+        rows = result.all()
     else:
         return []
 
     data = []
-    for row in result.all():
-        s, batch_link = row
+    for s, batch_link in rows:
         data.append({
             "id": s.id,
             "title": s.title,
@@ -76,54 +121,56 @@ async def get_all_sessions(
             "meeting_link": s.meeting_link,
             "resources_url": s.resources_url,
             "batch_schedule_link": batch_link,
+            "selective_attendance": s.selective_attendance,
+            "attendee_ids": [],
             "created_at": s.created_at.isoformat(),
             "updated_at": s.updated_at.isoformat()
         })
     return data
 
+
 @router.post("/")
 async def create_session(
-    body: dict, 
+    body: dict,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db), 
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
     if user.role not in ["SUPER_ADMIN", "ADMIN"]:
         raise HTTPException(status_code=403, detail="Not authorized")
-        
+
     start_time = datetime.fromisoformat(body.get("start_time").replace("Z", "+00:00"))
     end_time = datetime.fromisoformat(body.get("end_time").replace("Z", "+00:00"))
     trainer_id = body.get("trainer_id")
     batch_id = body.get("batch_id")
-    
-    # Recurrence logic
+
+    selective = bool(body.get("selective_attendance", False))
+    attendee_ids: List[str] = body.get("attendee_ids", []) or []
+
     recurrence = body.get("recurrence", {})
-    r_type = recurrence.get("type", "NONE") # NONE, DAILY, WEEKLY
+    r_type = recurrence.get("type", "NONE")
     r_count = int(recurrence.get("count", 1))
-    
-    from app.models.session import Session
+
+    from app.models.session import Session, SessionAttendee
     from app.models.course import BatchStudent
-    
+
     created_sessions = []
-    
+
     for i in range(r_count):
-        # Calculate times for this instance
         current_start = start_time
         current_end = end_time
-        
         if r_type == "DAILY":
             current_start += timedelta(days=i)
             current_end += timedelta(days=i)
         elif r_type == "WEEKLY":
             current_start += timedelta(weeks=i)
             current_end += timedelta(weeks=i)
-            
-        # 1. Check for conflicts
+
         conflict = await check_trainer_conflict(db, trainer_id, current_start, current_end)
         if conflict:
             raise HTTPException(
-                status_code=409, 
-                detail=f"Conflict detected for instance {i+1} ({current_start.strftime('%d %b %H:%M')}). Trainer is already busy with session: {conflict.title}"
+                status_code=409,
+                detail=f"Conflict detected for instance {i+1} ({current_start.strftime('%d %b %H:%M')}). Trainer already has: {conflict.title}"
             )
 
         s = Session(
@@ -135,103 +182,138 @@ async def create_session(
             end_time=current_end,
             meeting_link=body.get("meeting_link"),
             resources_url=body.get("resources_url"),
-            status="SCHEDULED"
+            status="SCHEDULED",
+            selective_attendance=selective,
         )
         db.add(s)
+        await db.flush()  # Get the session ID
+
+        # Create SessionAttendee records for selective sessions
+        if selective and attendee_ids:
+            for student_id in attendee_ids:
+                attendee = SessionAttendee(session_id=s.id, student_id=student_id)
+                db.add(attendee)
+
         created_sessions.append(s)
 
     await db.commit()
-    
-    # Send email notification in background
-    # (We will send to all students in the batch)
+
+    # Send notifications to selected students or all batch students
     try:
-        background_tasks.add_task(trigger_session_notifications, db, batch_id, body.get("title"), start_time)
-    except: pass
+        notify_ids = attendee_ids if selective else None
+        background_tasks.add_task(
+            trigger_session_notifications, db, batch_id, body.get("title"), start_time, notify_ids
+        )
+    except Exception:
+        pass
 
     return {"status": "success", "count": len(created_sessions)}
 
-async def trigger_session_notifications(db: AsyncSession, batch_id: str, title: str, start_time: datetime):
-    # Get students in batch
-    res = await db.execute(
-        select(User.email).join(BatchStudent, User.id == BatchStudent.student_id).where(BatchStudent.batch_id == batch_id)
-    )
-    emails = res.scalars().all()
-    for email in emails:
-        send_session_notification(email, title, start_time.strftime("%d %b %Y, %I:%M %p"))
+
+async def trigger_session_notifications(
+    db: AsyncSession, batch_id: str, title: str, start_time: datetime, notify_ids: Optional[List[str]] = None
+):
+    from app.models.course import BatchStudent
+    try:
+        if notify_ids:
+            # Selective: notify only specified students
+            res = await db.execute(
+                select(User.email).where(User.id.in_(notify_ids))
+            )
+        else:
+            # All students in the batch
+            res = await db.execute(
+                select(User.email).join(BatchStudent, User.id == BatchStudent.student_id).where(BatchStudent.batch_id == batch_id)
+            )
+        emails = res.scalars().all()
+        for email in emails:
+            send_session_notification(email, title, start_time.strftime("%d %b %Y, %I:%M %p"))
+    except Exception as e:
+        print(f"[trigger_session_notifications] Error: {e}")
+
+
 @router.patch("/{session_id}")
 async def update_session_status(
-    session_id: str, 
-    body: dict, 
-    db: AsyncSession = Depends(get_db), 
+    session_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    from app.models.session import Session
+    from app.models.session import Session, SessionAttendee
     result = await db.execute(select(Session).where(Session.id == session_id))
     s = result.scalars().first()
     if not s:
         raise HTTPException(status_code=404, detail="Session not found")
-        
     if user.role not in ["SUPER_ADMIN", "ADMIN", "TRAINER"]:
         raise HTTPException(status_code=403, detail="Not authorized")
-        
+
     if "status" in body:
         s.status = body["status"]
     if "meeting_link" in body:
         s.meeting_link = body["meeting_link"]
     if "resources_url" in body:
         s.resources_url = body["resources_url"]
-    if "start_time" in body or "end_time" in body or "trainer_id" in body:
-        new_start = datetime.fromisoformat(body.get("start_time", s.start_time.isoformat()).replace("Z", "+00:00"))
-        new_end = datetime.fromisoformat(body.get("end_time", s.end_time.isoformat()).replace("Z", "+00:00"))
-        new_trainer = body.get("trainer_id", s.trainer_id)
-        
-        conflict = await check_trainer_conflict(db, new_trainer, new_start, new_end, exclude_session_id=session_id)
-        if conflict:
-            raise HTTPException(status_code=409, detail=f"Conflict detected. Trainer is already busy with session: {conflict.title}")
-            
-        s.start_time = new_start
-        s.end_time = new_end
-        s.trainer_id = new_trainer
-
     if "title" in body:
         s.title = body["title"]
     if "description" in body:
         s.description = body["description"]
     if "batch_id" in body:
         s.batch_id = body["batch_id"]
-        
+
+    if "start_time" in body or "end_time" in body or "trainer_id" in body:
+        new_start = datetime.fromisoformat(body.get("start_time", s.start_time.isoformat()).replace("Z", "+00:00"))
+        new_end = datetime.fromisoformat(body.get("end_time", s.end_time.isoformat()).replace("Z", "+00:00"))
+        new_trainer = body.get("trainer_id", s.trainer_id)
+        conflict = await check_trainer_conflict(db, new_trainer, new_start, new_end, exclude_session_id=session_id)
+        if conflict:
+            raise HTTPException(status_code=409, detail=f"Conflict detected. Trainer is already busy with: {conflict.title}")
+        s.start_time = new_start
+        s.end_time = new_end
+        s.trainer_id = new_trainer
+
+    # Handle selective attendance update
+    if "selective_attendance" in body:
+        s.selective_attendance = bool(body["selective_attendance"])
+
+    if "attendee_ids" in body:
+        # Replace all attendees for this session
+        await db.execute(delete(SessionAttendee).where(SessionAttendee.session_id == session_id))
+        if s.selective_attendance:
+            for student_id in (body["attendee_ids"] or []):
+                db.add(SessionAttendee(session_id=session_id, student_id=student_id))
+
     await db.commit()
     return {"status": "success"}
 
+
 @router.delete("/{session_id}")
 async def delete_session(
-    session_id: str, 
-    db: AsyncSession = Depends(get_db), 
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
     if user.role not in ["SUPER_ADMIN", "ADMIN"]:
         raise HTTPException(status_code=403, detail="Not authorized")
-        
-    from app.models.session import Session
+    from app.models.session import Session, SessionAttendee
     result = await db.execute(select(Session).where(Session.id == session_id))
     s = result.scalars().first()
     if not s:
         raise HTTPException(status_code=404, detail="Session not found")
-        
+    await db.execute(delete(SessionAttendee).where(SessionAttendee.session_id == session_id))
     await db.delete(s)
     await db.commit()
     return {"status": "success"}
 
+
 # --- Feedback Endpoints ---
 @router.post("/feedback")
 async def submit_feedback(
-    body: dict, 
-    db: AsyncSession = Depends(get_db), 
+    body: dict,
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
     if user.role != "STUDENT":
         raise HTTPException(status_code=403, detail="Only students can submit feedback")
-        
     from app.models.session import StudentFeedback
     f = StudentFeedback(
         target_type=body.get("target_type", "SESSION"),
@@ -245,19 +327,17 @@ async def submit_feedback(
     await db.commit()
     return {"status": "success"}
 
+
 @router.get("/feedback/admin")
 async def get_all_feedback(
-    db: AsyncSession = Depends(get_db), 
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
     if user.role not in ["SUPER_ADMIN", "ADMIN"]:
         raise HTTPException(status_code=403, detail="Not authorized")
-        
     from app.models.session import StudentFeedback
     result = await db.execute(select(StudentFeedback).order_by(StudentFeedback.created_at.desc()))
     feedbacks = result.scalars().all()
-    
-    # We should enrich this with Student name (if not anonymous) and Target Name
     data = []
     for f in feedbacks:
         entry = {
@@ -275,5 +355,4 @@ async def get_all_feedback(
             u_name = u_res.scalars().first()
             entry["student_name"] = u_name or "Unknown"
         data.append(entry)
-        
     return data

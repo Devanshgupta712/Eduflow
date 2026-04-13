@@ -22,6 +22,9 @@ class Session(Base):
     status: Mapped[str] = mapped_column(String, default="SCHEDULED")  # SCHEDULED, ONGOING, COMPLETED, CANCELLED
     meeting_link: Mapped[str | None] = mapped_column(String, nullable=True)
     resources_url: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # Selective attendance: if True, only students in SessionAttendee can see this session
+    selective_attendance: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -29,6 +32,22 @@ class Session(Base):
     # Relationships
     batch = relationship("Batch", primaryjoin="Session.batch_id == Batch.id")
     trainer = relationship("User", primaryjoin="Session.trainer_id == User.id")
+    attendees = relationship("SessionAttendee", back_populates="session", cascade="all, delete-orphan")
+
+
+class SessionAttendee(Base):
+    """Join table: links specific students to a session when selective_attendance is True."""
+    __tablename__ = "session_attendees"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id: Mapped[str] = mapped_column(String, ForeignKey("sessions.id", ondelete="CASCADE"))
+    student_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    # Relationships
+    session = relationship("Session", back_populates="attendees")
+    student = relationship("User", primaryjoin="SessionAttendee.student_id == User.id")
 
 
 class StudentFeedback(Base):

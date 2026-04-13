@@ -206,6 +206,49 @@ async def delete_course(
     return {"status": "deleted"}
 
 
+# ─── All Students Grouped By Batch (for session attendee picker) ──────────────
+@router.get("/students-by-batch")
+async def get_all_students_by_batch(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+):
+    """Returns all active students grouped by their enrolled batches.
+    Used in the session creation modal for cross-batch student selection."""
+    from app.models.course import Batch, BatchStudent, Course
+    
+    # Get all active batches with their students
+    batches_res = await db.execute(
+        select(Batch).where(Batch.is_active == True).order_by(Batch.name.asc())
+    )
+    batches = batches_res.scalars().all()
+    
+    result = []
+    for batch in batches:
+        course = await db.get(Course, batch.course_id) if batch.course_id else None
+        # Get students in this batch
+        students_res = await db.execute(
+            select(User).join(BatchStudent, User.id == BatchStudent.student_id)
+            .where(BatchStudent.batch_id == batch.id, User.is_active == True)
+            .order_by(User.name.asc())
+        )
+        students = students_res.scalars().all()
+        if students:  # Only include batches that have students
+            result.append({
+                "batch_id": batch.id,
+                "batch_name": batch.name,
+                "course_name": course.name if course else "No Course",
+                "students": [
+                    {
+                        "id": s.id,
+                        "name": s.name,
+                        "student_id": s.student_id,
+                        "email": s.email
+                    } for s in students
+                ]
+            })
+    return result
+
+
 # ─── Batches ──────────────────────────────────────────
 
 @router.get("/batches")
