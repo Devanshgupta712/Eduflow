@@ -1928,7 +1928,15 @@ Return ONLY a JSON object in this EXACT format:
   "estimated_hours": 3
 }}"""
 
-    prompt = f"Generate a {body.difficulty}-level {body.task_type} task for a software training program on the topic: \"{body.topic}\"\n\n{format_instr}"
+    prompt = f"""Generate a {body.difficulty}-level {body.task_type} task for a software training program on the topic: "{body.topic}"
+
+CRITICAL INSTRUCTION: The difficulty must STRICTLY match the selected level ({body.difficulty}). 
+If {body.difficulty} is set to 'Introductory' or 'Beginner', the questions must be extremely simple, basic, foundational, and easy to solve for an absolute novice.
+If {body.difficulty} is set to 'Intermediate', target a mid-level practitioner.
+If {body.difficulty} is set to 'Advanced', 'Professional', 'Expert', or 'Master', the questions must be highly complex, tricky, and require deep problem-solving skills and architectural knowledge.
+Please tailor the complexity, vocabulary, and scenarios specifically to the {body.difficulty} level.
+
+{format_instr}"""
 
     try:
         async with httpx.AsyncClient(timeout=40.0) as client:
