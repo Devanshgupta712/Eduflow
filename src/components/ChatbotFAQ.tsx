@@ -9,13 +9,15 @@ interface Message {
     time: string;
 }
 
-const DEFAULT_RESPONSE = "🤔 I'm experiencing a temporary network issue connecting to my brain. However, here are some things I can help you with:\n\n• 📚 **Courses** — Ask about our programs\n• 💰 **Fees** — Payment structure info\n• 🚀 **Placements** — Job support details\n• 📅 **Schedule** — Batch timing info\n• 📞 **Contact** — How to contact us\n\nTry asking me another question in a moment!";
+const DEFAULT_RESPONSE = "🤔 I'm experiencing a temporary network issue. Here's a quick overview of what I can help you with:\n\n**📚 Courses & Fees** — Ask about any program\n**🎓 Student Actions** — Attendance, assignments, assessments, leaves\n**🧑‍🏫 Trainer Tools** — QR codes, task generation, CSV exports\n**🚀 Placements** — Job support & placement stats\n**🔧 Platform Help** — How to use any feature step by step\n\nTry again in a moment!";
 
 const QUICK_QUESTIONS = [
     "What courses do you offer?",
-    "I'm looking for a beginner course",
-    "Tell me about placements",
-    "I need technical help",
+    "How do I mark my attendance?",
+    "How do I submit an assignment?",
+    "Tell me about job placements",
+    "How do I apply for leave?",
+    "What can trainers do on the platform?",
 ];
 
 async function getGeminiResponse(userMessage: string, previousMessages: Message[]): Promise<string> {
@@ -81,7 +83,7 @@ export default function ChatbotFAQ() {
             setMessages([{
                 id: 'welcome',
                 role: 'bot',
-                text: "👋 Hi! I'm the **AppTechno AI Assistant**.\n\nI can help you with information about our courses, placements, fees, schedules, and more.\n\nJust type your question below or tap a quick option! 👇",
+                text: "👋 Hi! I'm the **AppTechno AI Assistant**.\n\nI can help you with:\n\n📚 **Courses & Fees** — Full Stack, MERN, Python, Data Science & more\n🎓 **Student Actions** — How to mark attendance, submit assignments, apply for leave\n🧑‍🏫 **Trainer Tools** — Generating tasks, QR codes, exporting reports\n🚀 **Placements** — Jobs, mock interviews, placement stats\n🔧 **Platform Help** — Step-by-step guidance for any feature\n\nType your question or tap a quick option below 👇",
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }]);
         }
