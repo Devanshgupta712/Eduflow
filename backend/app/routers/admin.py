@@ -83,7 +83,7 @@ async def dashboard_stats(
     return DashboardStats(
         total_students=students.scalar() or 0,
         total_courses=courses.scalar() or 0,
-        active_batches=batches.scalar() or 0,
+        total_batches=batches.scalar() or 0,
         total_leads=leads.scalar() or 0,
         active_jobs=jobs.scalar() or 0,
         pending_leaves=pending.scalar() or 0,
