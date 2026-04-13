@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.middleware.auth import get_current_user, require_roles
 from app.models.user import User, Role, AdminPermission
-from app.models.course import Course, Batch
+from app.models.course import Course, Batch, BatchStudent
 from app.models.registration import Registration, Document
 from app.models.attendance import LeaveRequest, Attendance, TimeTracking, AttendanceStatus, LeaveStatus, LeaveType
 from app.models.notification import Notification, Message, Feedback, Video
