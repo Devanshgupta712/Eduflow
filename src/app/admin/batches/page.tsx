@@ -201,15 +201,25 @@ export default function BatchesPage() {
         setEnrolling(true);
         setEnrollMsg(null);
         try {
-            await apiPost(`/api/admin/users/${studentId}/assign-batch`, { batch_id: viewStudentsId });
+            const res = await apiFetch(`/api/admin/users/${studentId}/assign-batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ batch_id: viewStudentsId })
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || errData.message || `Server error (${res.status})`);
+            }
             setEnrollStudentId('');
             setStudentSearch('');
             setSelectedStudentName('');
             setEnrollMsg({ type: 'success', text: `✅ ${studentName || 'Student'} enrolled successfully!` });
             setTimeout(() => setEnrollMsg(null), 3000);
-            handleViewStudents(viewStudentsId, viewStudentsName); // Reload roster
-        } catch {
-            setEnrollMsg({ type: 'error', text: '❌ Failed to enroll. Student may already be in this batch.' });
+            // Reload roster to show the newly added student
+            const updatedStudents = await apiGet(`/api/training/batches/${viewStudentsId}/students`).catch(() => null);
+            if (updatedStudents) setStudentsList(updatedStudents);
+        } catch (err: any) {
+            setEnrollMsg({ type: 'error', text: `❌ ${err.message || 'Failed to enroll. Student may already be in this batch.'}` });
         } finally {
             setEnrolling(false);
         }

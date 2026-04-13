@@ -885,59 +885,66 @@ async def get_student_details(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
 ):
-    student = await db.get(User, user_id)
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
-    
-    # Get batches and registrations based on role
-    batches = []
-    registrations = []
-    
-    if student.role == Role.TRAINER:
-        batch_links_result = await db.execute(
-            select(Batch, Course.name.label("course_name"))
-            .join(Course, Course.id == Batch.course_id)
-            .where(Batch.trainer_id == user_id)
-        )
-        for b, cname in batch_links_result.all():
-            batches.append({
-                "id": b.id,
-                "name": b.name,
-                "course_name": cname
-            })
-    else:
-        batch_links_result = await db.execute(
-            select(BatchStudent, Batch.name, Course.name.label("course_name"))
-            .join(Batch, Batch.id == BatchStudent.batch_id)
-            .join(Course, Course.id == Batch.course_id)
-            .where(BatchStudent.student_id == user_id)
-        )
-        for row in batch_links_result.all():
-            batches.append({
-                "id": row[0].batch_id,
-                "name": row[1],
-                "course_name": row[2]
-            })
+    try:
+        student = await db.get(User, user_id)
+        if not student:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        # Get batches and registrations based on role
+        batches = []
+        registrations = []
+        
+        if student.role == Role.TRAINER:
+            batch_links_result = await db.execute(
+                select(Batch, Course.name.label("course_name"))
+                .outerjoin(Course, Course.id == Batch.course_id)
+                .where(Batch.trainer_id == user_id)
+            )
+            for b, cname in batch_links_result.all():
+                batches.append({
+                    "id": b.id,
+                    "name": b.name,
+                    "course_name": cname or "No Course"
+                })
+        else:
+            batch_links_result = await db.execute(
+                select(BatchStudent, Batch.name, Course.name.label("course_name"))
+                .join(Batch, Batch.id == BatchStudent.batch_id)
+                .outerjoin(Course, Course.id == Batch.course_id)
+                .where(BatchStudent.student_id == user_id)
+            )
+            for row in batch_links_result.all():
+                batches.append({
+                    "id": row[0].batch_id,
+                    "name": row[1],
+                    "course_name": row[2] or "No Course"
+                })
 
-        # Get registrations
-        reg_result = await db.execute(
-            select(Registration, Course.name)
-            .join(Course, Course.id == Registration.course_id)
-            .where(Registration.student_id == user_id)
-        )
-        for row in reg_result.all():
-            registrations.append({
-                "id": row[0].id,
-                "course_id": row[0].course_id,
-                "course_name": row[1],
-                "status": row[0].status
-            })
+            # Get registrations
+            reg_result = await db.execute(
+                select(Registration, Course.name)
+                .join(Course, Course.id == Registration.course_id)
+                .where(Registration.student_id == user_id)
+            )
+            for row in reg_result.all():
+                registrations.append({
+                    "id": row[0].id,
+                    "course_id": row[0].course_id,
+                    "course_name": row[1],
+                    "status": row[0].status
+                })
 
-    return {
-        "user": UserOut.model_validate(student),
-        "batches": batches,
-        "registrations": registrations
-    }
+        return {
+            "user": UserOut.model_validate(student),
+            "batches": batches,
+            "registrations": registrations
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"[get_student_details] Error: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to load user details: {str(e)}")
 
 
 @router.delete("/users/{user_id}/batches/{batch_id}")
