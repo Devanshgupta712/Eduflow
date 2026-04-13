@@ -17,7 +17,7 @@ export default function CoursesPage() {
       
       <main>
         {/* Header Section */}
-        <section className="section-padding" style={{ paddingTop: 'clamp(80px, 10vh, 120px)', paddingBottom: 'var(--space-6)' }}>
+        <section className="section-padding" style={{ paddingTop: 'clamp(100px, 12vh, 140px)', paddingBottom: 'var(--space-8)' }}>
           <div className="container-wide" style={{ maxWidth: '1200px', textAlign: 'center', padding: '0 var(--space-8)' }}>
             <h1 style={{ fontSize: 'clamp(36px, 6vw, 64px)', fontWeight: 800, marginBottom: 'var(--space-4)', letterSpacing: '-0.04em', color: 'var(--text-primary)' }}>Pick Your Career Pathway.</h1>
             <p style={{ fontSize: '18px', color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: '700px', margin: '0 auto var(--space-8)' }}>
@@ -56,7 +56,7 @@ export default function CoursesPage() {
         <div className="section-divider"></div>
 
         {/* Benefits for Students Section */}
-        <section className="section-padding" style={{ background: 'var(--bg-secondary)', padding: 'var(--space-12) 0' }}>
+        <section className="section-padding" style={{ background: 'var(--bg-secondary)', padding: 'var(--space-16) 0' }}>
           <div className="container-wide" style={{ maxWidth: '1200px', padding: '0 var(--space-8)' }}>
             <h2 style={{ fontSize: '32px', fontWeight: 800, textAlign: 'center', marginBottom: 'var(--space-12)', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>What You Get With Each Course</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-6)' }}>

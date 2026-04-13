@@ -32,19 +32,19 @@ export default function Courses({ activeCategory = 'All Courses' }: { activeCate
     : allCourses.filter(c => c.category === activeCategory);
 
   return (
-    <section style={{ padding: '40px 0 100px', background: '#fff' }}>
+    <section style={{ padding: '60px 0 100px', background: '#fff' }}>
       <div className="container-wide" style={{ maxWidth: '1280px', padding: '0 40px' }}>
-        <div style={{ marginBottom: '60px' }}>
+        <div style={{ marginBottom: '60px', textAlign: 'center' }}>
           <h2 style={{ 
             fontSize: '32px', 
             fontWeight: 800, 
             color: 'var(--text-primary)',
             letterSpacing: '-0.02em',
-            marginBottom: '20px'
+            marginBottom: '16px'
           }}>
             Master the Stack.
           </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '16px', maxWidth: '600px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '16px', maxWidth: '600px', margin: '0 auto' }}>
             Choose from our specialized career tracks. Each one is a 6-month intensive journey.
           </p>
         </div>
@@ -52,7 +52,7 @@ export default function Courses({ activeCategory = 'All Courses' }: { activeCate
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(4, 1fr)', 
-          gap: '24px'
+          gap: '28px'
         }}>
           {displayCourses.map((course) => (
             <div 

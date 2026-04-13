@@ -11,7 +11,7 @@ export default function ContactPage() {
       
       <main>
         {/* Header Section */}
-        <section className="section-padding" style={{ paddingTop: 'clamp(80px, 10vh, 120px)', background: 'var(--bg-secondary)', paddingBottom: 'var(--space-8)' }}>
+        <section className="section-padding" style={{ paddingTop: 'clamp(100px, 12vh, 140px)', background: 'var(--bg-secondary)', paddingBottom: 'var(--space-12)' }}>
           <div className="container-wide" style={{ maxWidth: '1000px', textAlign: 'center', padding: '0 var(--space-8)' }}>
             <h1 style={{ fontSize: 'clamp(36px, 6vw, 64px)', fontWeight: 800, marginBottom: 'var(--space-4)', letterSpacing: '-0.04em', color: 'var(--text-primary)' }}>We're Here to Help.</h1>
             <p style={{ fontSize: '18px', color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: '600px', margin: '0 auto' }}>
@@ -62,7 +62,7 @@ export default function ContactPage() {
               </div>
 
               {/* Contact Info & Map */}
-              <div style={{ paddingTop: 'var(--space-4)' }}>
+              <div style={{ paddingTop: '0' }}>
                 <div style={{ marginBottom: 'var(--space-10)' }}>
                   <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: 'var(--space-8)', letterSpacing: '-0.02em' }}>Visit Our Campus</h2>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-8)' }}>
@@ -99,7 +99,7 @@ export default function ContactPage() {
                 {/* Embedded Google Map */}
                 <div className="shadow-sm" style={{ 
                   width: '100%', 
-                  height: '240px', 
+                  height: '280px', 
                   borderRadius: '24px', 
                   overflow: 'hidden',
                   border: '1px solid var(--border)',
