@@ -165,12 +165,44 @@ async def delete_course(
     course = await db.get(Course, course_id)
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    # Check for active batches
-    batch_count = await db.execute(select(func.count(Batch.id)).where(Batch.course_id == course_id))
-    if (batch_count.scalar() or 0) > 0:
-        raise HTTPException(status_code=400, detail="Cannot delete course with existing batches. Delete the batches first.")
-    db.delete(course)
-    await db.flush()
+
+    # Cascade delete all batches and their dependencies first
+    from app.models.course import BatchStudent
+    from app.models.attendance import Attendance, LeaveRequest
+    from app.models.project import Project, Task, Assignment
+    from app.models.registration import Registration
+    from app.models.notification import Feedback, Video
+    from app.models.session import Session
+
+    batches_res = await db.execute(select(Batch.id).where(Batch.course_id == course_id))
+    batch_ids = batches_res.scalars().all()
+
+    for batch_id in batch_ids:
+        await db.execute(delete(BatchStudent).where(BatchStudent.batch_id == batch_id))
+        await db.execute(delete(Attendance).where(Attendance.batch_id == batch_id))
+        await db.execute(delete(LeaveRequest).where(LeaveRequest.batch_id == batch_id))
+        await db.execute(Registration.__table__.update().where(Registration.batch_id == batch_id).values(batch_id=None))
+        try:
+            await db.execute(delete(Feedback).where(Feedback.batch_id == batch_id))
+        except Exception:
+            pass
+        await db.execute(delete(Session).where(Session.batch_id == batch_id))
+        try:
+            await db.execute(delete(Video).where(Video.batch_id == batch_id))
+        except Exception:
+            pass
+        projects_res = await db.execute(select(Project.id).where(Project.batch_id == batch_id))
+        project_ids = projects_res.scalars().all()
+        if project_ids:
+            await db.execute(delete(Task).where(Task.project_id.in_(project_ids)))
+            await db.execute(delete(Assignment).where(Assignment.project_id.in_(project_ids)))
+            await db.execute(delete(Project).where(Project.batch_id == batch_id))
+
+    if batch_ids:
+        await db.execute(delete(Batch).where(Batch.course_id == course_id))
+
+    await db.delete(course)
+    await db.commit()
     return {"status": "deleted"}
 
 
@@ -350,6 +382,7 @@ async def delete_batch(
     from app.models.project import Project, Task, Assignment
     from app.models.registration import Registration
     from app.models.notification import Feedback
+    from app.models.session import Session  # Fix: import Session before using it
     
     await db.execute(delete(BatchStudent).where(BatchStudent.batch_id == batch_id))
     await db.execute(delete(Attendance).where(Attendance.batch_id == batch_id))
@@ -359,8 +392,6 @@ async def delete_batch(
     # since registration is independent now.
     await db.execute(Registration.__table__.update().where(Registration.batch_id == batch_id).values(batch_id=None))
     
-    # Feedback (if it has batch_id)
-    # Actually Feedback doesn't have batch_id directly in the current model? Wait, course_id and batch_id are in Course, Batch. I'll wrap feedback in try.
     try:
         await db.execute(delete(Feedback).where(Feedback.batch_id == batch_id))
     except Exception:
