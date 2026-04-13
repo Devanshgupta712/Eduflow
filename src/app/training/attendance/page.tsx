@@ -43,7 +43,7 @@ export default function AttendancePage() {
                 .catch(() => { })
                 .finally(() => setLoading(false));
             if (selectedBatch) {
-                apiGet(`/api/training/batches/${selectedBatch}/students`).then(setStudents).catch(() => { });
+                apiGet(`/api/training/batches/${selectedBatch}/students?date=${selectedDate}`).then(setStudents).catch(() => { });
                 apiGet(`/api/admin/leaves?batch_id=${selectedBatch}`).then(data => {
                     setPendingLeaves((data || []).filter((l: any) => l.status === 'PENDING'));
                 }).catch(() => { });

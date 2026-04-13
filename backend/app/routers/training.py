@@ -138,6 +138,7 @@ async def update_punch_settings(
 @router.get("/batches/{batch_id}/students")
 async def get_batch_students(
     batch_id: str,
+    date: str = "",
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user)
 ):
@@ -150,12 +151,27 @@ async def get_batch_students(
     b_assignment_ids = [r[0] for r in batch_assignments.all()]
     total_activities = len(b_assignment_ids)
 
+    # 1.5. Date validation logic
+    batch_obj = await db.get(Batch, batch_id)
+    if not batch_obj:
+        raise HTTPException(status_code=404, detail="Batch not found")
+        
+    day_date = None
+    if date:
+        day_date = parse_dt(date).date()
+        if batch_obj.start_date and day_date < batch_obj.start_date.date():
+            return [] # No students are eligible before the batch starts
+
     # 2. Get students
-    result = await db.execute(
+    stmt = (
         select(User).join(BatchStudent, User.id == BatchStudent.student_id)
         .where(BatchStudent.batch_id == batch_id)
         .where(User.role == Role.STUDENT)
     )
+    if day_date:
+        stmt = stmt.where(func.date(BatchStudent.joined_at) <= day_date)
+
+    result = await db.execute(stmt)
     students = result.scalars().all()
     
     out = []
@@ -266,15 +282,15 @@ async def export_attendance(
 
     # --- Fetch all students in this batch (single query) ---
     students_result = await db.execute(
-        select(User)
+        select(User, BatchStudent.joined_at)
         .join(BatchStudent, User.id == BatchStudent.student_id)
         .where(BatchStudent.batch_id == batch_id)
         .where(User.role == Role.STUDENT)
         .order_by(User.name)
     )
-    students = students_result.scalars().all()
+    students_data = students_result.all()
 
-    if not students:
+    if not students_data:
         # Return empty CSV with header
         output = io.StringIO()
         writer = csv.writer(output)
@@ -283,8 +299,6 @@ async def export_attendance(
         response = StreamingResponse(iter([output.getvalue()]), media_type="text/csv")
         response.headers["Content-Disposition"] = f"attachment; filename=attendance_{batch_id}_{start_date}_to_{end_date}.csv"
         return response
-
-    student_map = {s.id: s for s in students}
 
     # --- Fetch all attendance records in range (single query) ---
     records_result = await db.execute(
@@ -309,9 +323,23 @@ async def export_attendance(
     current_d = start_d
     while current_d <= end_d:
         day_str = current_d.strftime("%Y-%m-%d")
-        for s in students:
+        
+        # Check if entire date is predating the batch
+        is_pre_batch = batch_obj and batch_obj.start_date and current_d < batch_obj.start_date.date()
+        
+        for s, joined_at in students_data:
             rec = record_lookup.get((s.id, day_str))
-            status = rec.status.value if rec else "ABSENT"
+            
+            # Determine Chronological status
+            if rec:
+                status = rec.status.value
+            elif is_pre_batch:
+                status = "Pre-Batch"
+            elif joined_at and current_d < joined_at.date():
+                status = "Not Registered"
+            else:
+                status = "ABSENT"
+                
             remarks = rec.remarks or "" if rec else ""
             writer.writerow([
                 batch_name,
@@ -424,6 +452,24 @@ async def mark_attendance(
     for item in data:
         # Check for existing record to avoid duplicates
         day = parse_dt(item["date"])
+        
+        # Chronology Validations
+        batch_obj = await db.get(Batch, item["batch_id"])
+        if not batch_obj:
+            raise HTTPException(status_code=404, detail=f"Batch not found")
+        if batch_obj.start_date and day.date() < batch_obj.start_date.date():
+            raise HTTPException(status_code=400, detail="Attendance date cannot be before the batch start date.")
+            
+        bs_res = await db.execute(select(BatchStudent).where(
+            BatchStudent.batch_id == item["batch_id"], 
+            BatchStudent.student_id == item["student_id"]
+        ))
+        bs = bs_res.scalars().first()
+        if not bs:
+            raise HTTPException(status_code=400, detail="Student is not enrolled in this batch.")
+        if bs.joined_at and day.date() < bs.joined_at.date():
+            raise HTTPException(status_code=400, detail="Attendance date cannot be before the student's enrollment date.")
+
         existing_result = await db.execute(
             select(Attendance).where(
                 Attendance.student_id == item["student_id"],
