@@ -2851,46 +2851,50 @@ async def chatbot_proxy(
     # Add User Context if logged in — wrapped in try/except so chatbot
     # still works even if the DB session is stale (Neon cold-start / timeout)
     if user:
+        # Cache user attributes NOW before any DB ops (avoids lazy-load greenlet errors)
+        user_id = user.id
+        user_name = user.name
+        user_email = user.email
+        user_role = user.role.value if hasattr(user.role, 'value') else str(user.role)
+        
         try:
-            await db.rollback()  # Clear any stale transaction state first
-            
             # 1. Fetch Batches
             batch_res = await db.execute(
-                select(Batch.name).join(BatchStudent, BatchStudent.batch_id == Batch.id).where(BatchStudent.student_id == user.id)
+                select(Batch.name).join(BatchStudent, BatchStudent.batch_id == Batch.id).where(BatchStudent.student_id == user_id)
             )
             batches = batch_res.scalars().all()
             batch_str = ", ".join(batches) if batches else "None"
             
             # 2. Fetch Attendance
-            att_res = await db.execute(select(Attendance.status).where(Attendance.student_id == user.id))
+            att_res = await db.execute(select(Attendance.status).where(Attendance.student_id == user_id))
             all_att = att_res.scalars().all()
             present = len([s for s in all_att if (s.value if hasattr(s, 'value') else s) in ('PRESENT', 'LATE')])
             total_att = len(all_att)
             att_pct = int((present / total_att) * 100) if total_att > 0 else 0
             
             # 3. Fetch Assignments
-            batch_ids_res = await db.execute(select(BatchStudent.batch_id).where(BatchStudent.student_id == user.id))
+            batch_ids_res = await db.execute(select(BatchStudent.batch_id).where(BatchStudent.student_id == user_id))
             batch_ids = batch_ids_res.scalars().all()
             
             assign_query = select(func.count(Assignment.id))
             if batch_ids:
-                assign_query = assign_query.where(or_(Assignment.batch_id.in_(batch_ids), Assignment.student_id == user.id))
+                assign_query = assign_query.where(or_(Assignment.batch_id.in_(batch_ids), Assignment.student_id == user_id))
             else:
-                assign_query = assign_query.where(Assignment.student_id == user.id)
+                assign_query = assign_query.where(Assignment.student_id == user_id)
             
             total_assign_res = await db.execute(assign_query)
             total_assign = total_assign_res.scalar() or 0
             
-            done_assign_res = await db.execute(select(func.count(AssignmentSubmission.id)).where(AssignmentSubmission.student_id == user.id))
+            done_assign_res = await db.execute(select(func.count(AssignmentSubmission.id)).where(AssignmentSubmission.student_id == user_id))
             done_assign = done_assign_res.scalar() or 0
             
-            avg_marks_res = await db.execute(select(func.avg(AssignmentSubmission.marks)).where(AssignmentSubmission.student_id == user.id))
+            avg_marks_res = await db.execute(select(func.avg(AssignmentSubmission.marks)).where(AssignmentSubmission.student_id == user_id))
             avg_marks = avg_marks_res.scalar() or 0
             
             context_block = f"""
 [PERSONALIZED CONTEXT FOR AI ASSISTANT]
-You are now speaking with: {user.name} ({user.role.value if hasattr(user.role, 'value') else user.role})
-Email: {user.email}
+You are now speaking with: {user_name} ({user_role})
+Email: {user_email}
 Active Batches: {batch_str}
 Attendance: {att_pct}% ({present}/{total_att} days)
 Assignment Progress: {done_assign} completed out of {total_assign} assigned.
@@ -2901,14 +2905,12 @@ INSTRUCTIONS: Use this data to provide personalized mentorship. If attendance is
             system_prompt += context_block
         except Exception as db_err:
             # Gracefully degrade — chatbot works without personalization
-            import traceback
-            traceback.print_exc()
             try:
                 await db.rollback()
             except Exception:
                 pass
-            # Add minimal user context from the token (no DB needed)
-            system_prompt += f"\n[USER]: {user.name} ({user.role.value if hasattr(user.role, 'value') else user.role}). Personalized data unavailable due to a temporary issue.\n"
+            # Add minimal user context from cached values (no DB needed)
+            system_prompt += f"\n[USER]: {user_name} ({user_role}). Personalized data unavailable due to a temporary issue.\n"
 
     # Build OpenAI-compatible messages array (Groq uses OpenAI format)
     messages = [{"role": "system", "content": system_prompt}]
