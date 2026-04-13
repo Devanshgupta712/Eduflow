@@ -49,6 +49,11 @@ export default function StudentsPage() {
         }
     };
 
+    // Dynamically calculate average attendance
+    const avgAttendance = students.length > 0 
+        ? Math.round(students.reduce((acc, s) => acc + (s.attendance_percentage || 0), 0) / students.length)
+        : 0;
+
     return (
         <div className="reveal-on-scroll active">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
@@ -86,7 +91,7 @@ export default function StudentsPage() {
                 </div>
                 <div className="glass-premium" style={{ padding: '24px', borderRadius: '20px' }}>
                     <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Avg. Attendance</div>
-                    <div style={{ fontSize: '32px', fontWeight: 700 }}>88%</div>
+                    <div style={{ fontSize: '32px', fontWeight: 700 }}>{avgAttendance}%</div>
                 </div>
                 <div className="glass-premium" style={{ padding: '24px', borderRadius: '20px' }}>
                     <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Security Events</div>
