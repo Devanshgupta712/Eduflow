@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete, getStoredUser } from '@/lib/api';
+import SkeletonLoader from '@/components/SkeletonLoader';
 
 interface UserItem { id: string; name: string; email: string; role: string; phone: string | null; is_active: boolean; created_at: string; }
 
@@ -19,6 +20,10 @@ export default function UsersPage() {
     const [batches, setBatches] = useState<{ id: string; name: string }[]>([]);
     const [courses, setCourses] = useState<{ id: string; name: string }[]>([]);
     const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'TRAINER', phone: '' });
+    const [confirmDeleteUserId, setConfirmDeleteUserId] = useState<string | null>(null);
+    const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+    const [confirmRemoveBatchId, setConfirmRemoveBatchId] = useState<string | null>(null);
+    const [confirmRemoveRegId, setConfirmRemoveRegId] = useState<string | null>(null);
 
     useEffect(() => {
         const stored = getStoredUser();
@@ -98,12 +103,17 @@ export default function UsersPage() {
     };
 
     const handleDeleteUser = async (user: UserItem) => {
-        if (!confirm(`Are you absolutely sure you want to completely delete the user "${user.name}"? This cannot be undone.`)) return;
+        setDeletingUserId(user.id);
+        setConfirmDeleteUserId(null);
+        const removed = users.find(u => u.id === user.id);
+        setUsers(prev => prev.filter(u => u.id !== user.id)); // Optimistic remove
         try {
             await apiDelete(`/api/admin/users/${user.id}`);
-            loadUsers();
         } catch (err: any) {
+            if (removed) setUsers(prev => [...prev, removed]);
             alert('Error deleting user: ' + (err.message || 'Unknown error'));
+        } finally {
+            setDeletingUserId(null);
         }
     };
 
@@ -162,13 +172,27 @@ export default function UsersPage() {
     };
 
     const handleRemoveBatch = async (userId: string, batchId: string) => {
-        if (!confirm('Are you sure you want to remove this user from this batch?')) return;
-        try {
-            await apiDelete(`/api/admin/users/${userId}/batches/${batchId}`);
-            if (manageModal.targetUser) handleOpenManage(manageModal.targetUser); // Refresh
-            loadUsers();
-        } catch (err: any) {
-            alert('Error removing batch: ' + (err.message || 'Unknown error'));
+        setConfirmRemoveBatchId(null);
+        // Optimistic UI for modal
+        if (manageModal.targetUser && manageModal.details) {
+            const removedBatch = manageModal.details.batches.find((b: any) => b.id === batchId);
+            setManageModal(prev => ({
+                ...prev,
+                details: { ...prev.details, batches: prev.details.batches.filter((b: any) => b.id !== batchId) }
+            }));
+            
+            try {
+                await apiDelete(`/api/admin/users/${userId}/batches/${batchId}`);
+            } catch (err: any) {
+                // Rollback
+                if (removedBatch) {
+                    setManageModal(prev => ({
+                        ...prev,
+                        details: { ...prev.details, batches: [...prev.details.batches, removedBatch] }
+                    }));
+                }
+                alert('Error removing batch: ' + (err.message || 'Unknown error'));
+            }
         }
     };
 
@@ -192,13 +216,25 @@ export default function UsersPage() {
     };
 
     const handleRemoveRegistration = async (regId: string) => {
-        if (!confirm('Are you sure you want to delete this course registration?')) return;
-        try {
-            await apiDelete(`/api/admin/registrations/${regId}`);
-            if (manageModal.targetUser) handleOpenManage(manageModal.targetUser);
-            alert('Registration removed!');
-        } catch (err: any) {
-            alert('Error removing registration: ' + (err.message || 'Unknown error'));
+        setConfirmRemoveRegId(null);
+        if (manageModal.targetUser && manageModal.details) {
+            const removedReg = manageModal.details.registrations.find((r: any) => r.id === regId);
+            setManageModal(prev => ({
+                ...prev,
+                details: { ...prev.details, registrations: prev.details.registrations.filter((r: any) => r.id !== regId) }
+            }));
+            try {
+                await apiDelete(`/api/admin/registrations/${regId}`);
+            } catch (err: any) {
+                // Rollback
+                if (removedReg) {
+                    setManageModal(prev => ({
+                        ...prev,
+                        details: { ...prev.details, registrations: [...prev.details.registrations, removedReg] }
+                    }));
+                }
+                alert('Error removing registration: ' + (err.message || 'Unknown error'));
+            }
         }
     };
 
@@ -221,11 +257,11 @@ export default function UsersPage() {
             </div>
 
             <div className="card">
-                {loading ? <p>Loading...</p> : (
+                {loading ? <SkeletonLoader count={5} type="row" /> : (
                     <div className="table-responsive"><table className="table">
                         <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Joined</th>{(isSuperAdmin || isAdmin) && <th>Actions</th>}</tr></thead>
                         <tbody>{filtered.map(u => (
-                            <tr key={u.id}>
+                            <tr key={u.id} style={{ opacity: deletingUserId === u.id ? 0.4 : 1, transition: 'opacity 0.2s' }}>
                                 <td><strong>{u.name}</strong></td>
                                 <td>{u.email}</td><td>{u.phone || '-'}</td>
                                 <td><span className={`badge ${roleColors[u.role] || 'badge-info'}`}>{u.role.replace('_', ' ')}</span></td>
@@ -273,13 +309,21 @@ export default function UsersPage() {
                                                 {u.is_active ? 'Suspend' : 'Activate'}
                                             </button>
                                             {isSuperAdmin && (
-                                                <button
-                                                    className="btn btn-sm btn-danger"
-                                                    onClick={() => handleDeleteUser(u)}
-                                                    disabled={u.role === 'SUPER_ADMIN'}
-                                                >
-                                                    Delete
-                                                </button>
+                                                confirmDeleteUserId === u.id ? (
+                                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: 'rgba(239,68,68,0.08)', padding: '4px 8px', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                                                        <span style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: 600 }}>Sure?</span>
+                                                        <button onClick={() => handleDeleteUser(u)} style={{ padding: '2px 8px', fontSize: '11px', background: 'var(--danger)', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>Yes</button>
+                                                        <button onClick={() => setConfirmDeleteUserId(null)} className="btn btn-sm btn-ghost" style={{ padding: '2px 6px', fontSize: '11px' }}>No</button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        className="btn btn-sm btn-danger"
+                                                        onClick={() => setConfirmDeleteUserId(u.id)}
+                                                        disabled={u.role === 'SUPER_ADMIN' || deletingUserId === u.id}
+                                                    >
+                                                        {deletingUserId === u.id ? '...' : 'Delete'}
+                                                    </button>
+                                                )
                                             )}
                                         </div>
                                     </td>
@@ -362,7 +406,15 @@ export default function UsersPage() {
                                                 {manageModal.details.registrations.map((r: any) => (
                                                     <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                                                         <div style={{ fontWeight: 500 }}>{r.course_name}</div>
-                                                        <button className="btn btn-sm btn-ghost text-error" onClick={() => handleRemoveRegistration(r.id)} style={{ padding: '4px 8px' }}>Remove</button>
+                                                        {confirmRemoveRegId === r.id ? (
+                                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                                <span style={{ fontSize: '11px', color: 'var(--danger)' }}>Sure?</span>
+                                                                <button className="btn btn-sm" onClick={() => handleRemoveRegistration(r.id)} style={{ padding: '2px 6px', background: 'var(--danger)', color: '#fff', border: 'none' }}>Yes</button>
+                                                                <button className="btn btn-sm btn-ghost" onClick={() => setConfirmRemoveRegId(null)} style={{ padding: '2px 6px' }}>No</button>
+                                                            </div>
+                                                        ) : (
+                                                            <button className="btn btn-sm btn-ghost text-error" onClick={() => setConfirmRemoveRegId(r.id)} style={{ padding: '4px 8px' }}>Remove</button>
+                                                        )}
                                                     </div>
                                                 ))}
                                                 {manageModal.details.registrations.length === 0 && <p className="text-muted text-sm">No registrations found</p>}
@@ -394,7 +446,15 @@ export default function UsersPage() {
                                                         <div style={{ fontWeight: 500 }}>{b.name}</div>
                                                         <div className="text-xs text-muted">{b.course_name}</div>
                                                     </div>
-                                                    <button className="btn btn-sm btn-ghost text-error" onClick={() => handleRemoveBatch(manageModal.targetUser!.id, b.id)} style={{ padding: '4px 8px' }}>Remove</button>
+                                                    {confirmRemoveBatchId === b.id ? (
+                                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                            <span style={{ fontSize: '11px', color: 'var(--danger)' }}>Sure?</span>
+                                                            <button className="btn btn-sm" onClick={() => handleRemoveBatch(manageModal.targetUser!.id, b.id)} style={{ padding: '2px 6px', background: 'var(--danger)', color: '#fff', border: 'none' }}>Yes</button>
+                                                            <button className="btn btn-sm btn-ghost" onClick={() => setConfirmRemoveBatchId(null)} style={{ padding: '2px 6px' }}>No</button>
+                                                        </div>
+                                                    ) : (
+                                                        <button className="btn btn-sm btn-ghost text-error" onClick={() => setConfirmRemoveBatchId(b.id)} style={{ padding: '4px 8px' }}>Remove</button>
+                                                    )}
                                                 </div>
                                             ))}
                                             {manageModal.details.batches.length === 0 && <p className="text-muted text-sm">No batches assigned</p>}

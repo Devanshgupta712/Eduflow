@@ -96,6 +96,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }
     }, [pathname, router]);
 
+    // Keep-alive ping to prevent Render free-tier cold starts (every 4 minutes)
+    useEffect(() => {
+        const ping = () => fetch('/api/health', { method: 'GET' }).catch(() => {});
+        ping(); // ping immediately on load
+        const interval = setInterval(ping, 4 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, []);
+
     // Global Search Logic
     useEffect(() => {
         if (!searchQuery.trim() || searchQuery.length < 2) {

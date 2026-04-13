@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { apiGet, apiPost, apiPatch, apiDelete, getStoredUser } from '@/lib/api';
+import SkeletonLoader from '@/components/SkeletonLoader';
 
 interface Session {
     id: string; title: string; description: string;
@@ -48,6 +49,8 @@ export default function AdminSessionsPage() {
     const [form, setForm] = useState(emptyForm);
     const [editingSession, setEditingSession] = useState<Session | null>(null);
     const [error, setError] = useState('');
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     // Dependencies
     const [batches, setBatches] = useState<Batch[]>([]);
@@ -106,12 +109,17 @@ export default function AdminSessionsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Cancel this session completely?')) return;
+        setDeletingId(id);
+        setConfirmDeleteId(null);
+        const removed = sessions.find(s => s.id === id);
+        setSessions(prev => prev.filter(s => s.id !== id)); // Optimistic remove
         try {
             await apiDelete(`/api/sessions/${id}`);
-            loadData();
         } catch (err: any) {
-            alert(err.message || 'Failed to delete');
+            if (removed) setSessions(prev => [...prev, removed]);
+            alert(err.message || 'Failed to delete session.');
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -199,9 +207,7 @@ export default function AdminSessionsPage() {
 
             <div className="glass-premium" style={{ borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border)' }}>
                 {loading ? (
-                    <div style={{ padding: '80px', textAlign: 'center' }}>
-                        <div className="animate-spin" style={{ fontSize: '32px' }}>⏳</div>
-                    </div>
+                    <div style={{ padding: '24px' }}><SkeletonLoader count={3} type="row" /></div>
                 ) : sessions.length === 0 ? (
                     <div style={{ padding: '80px', textAlign: 'center' }}>
                         <div style={{ fontSize: '64px', marginBottom: '24px' }}>📅</div>
@@ -262,9 +268,17 @@ export default function AdminSessionsPage() {
                                             {s.resources_url && <a href={s.resources_url} target="_blank" rel="noreferrer" style={{ color: 'var(--info)', fontWeight: 600, display: 'block', marginTop: '4px' }}>📚 Resources</a>}
                                         </td>
                                         <td style={{ padding: '20px 24px' }}>
-                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                                 <button className="btn btn-sm btn-ghost" onClick={() => openEdit(s)}>Edit</button>
-                                                <button className="btn btn-sm btn-ghost" onClick={() => handleDelete(s.id)} style={{ color: 'var(--danger)' }}>Cancel</button>
+                                                {confirmDeleteId === s.id ? (
+                                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: 'rgba(239,68,68,0.08)', padding: '4px 8px', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                                                        <span style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: 600 }}>Sure?</span>
+                                                        <button onClick={() => handleDelete(s.id)} style={{ padding: '2px 8px', fontSize: '11px', background: 'var(--danger)', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>Yes</button>
+                                                        <button onClick={() => setConfirmDeleteId(null)} className="btn btn-sm btn-ghost" style={{ padding: '2px 6px', fontSize: '11px' }}>No</button>
+                                                    </div>
+                                                ) : (
+                                                    <button className="btn btn-sm btn-ghost" onClick={() => setConfirmDeleteId(s.id)} style={{ color: 'var(--danger)' }}>Cancel</button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

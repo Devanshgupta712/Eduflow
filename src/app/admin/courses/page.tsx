@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { apiGet, apiPost, apiPatch, apiDelete, getStoredUser } from '@/lib/api';
+import SkeletonLoader from '@/components/SkeletonLoader';
 
 interface Course {
     id: string; name: string; description: string | null;
@@ -129,9 +130,7 @@ export default function CoursesPage() {
 
             <div className="glass-premium" style={{ borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border)' }}>
                 {loading ? (
-                    <div style={{ padding: '80px', textAlign: 'center' }}>
-                        <div className="animate-spin" style={{ fontSize: '32px' }}>🔄</div>
-                    </div>
+                    <div style={{ padding: '24px' }}><SkeletonLoader count={4} type="row" /></div>
                 ) : courses.length === 0 ? (
                     <div style={{ padding: '80px', textAlign: 'center' }}>
                         <div style={{ fontSize: '64px', marginBottom: '24px' }}>📚</div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { apiGet, apiPost, apiPut, apiDelete, apiFetch, getStoredUser, API_BASE } from '@/lib/api';
+import SkeletonLoader from '@/components/SkeletonLoader';
 
 interface Batch {
     id: string; name: string; start_date: string; end_date: string;
@@ -22,6 +23,7 @@ export default function BatchesPage() {
     const [submitting, setSubmitting] = useState(false);
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
     const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     // Roster Modal State
     const [viewStudentsId, setViewStudentsId] = useState<string | null>(null);
@@ -127,52 +129,29 @@ export default function BatchesPage() {
     };
     
     const handleDelete = async (id: string, name: string) => {
-        if (!window.confirm(`Are you sure you want to permanently delete batch "${name}"? All enrolled students, scheduled sessions, and records will be completely removed.`)) return;
-        
+        setConfirmDeleteId(null);
+        // Optimistic remove
+        const removed = batches.find(b => b.id === id);
+        setBatches(prev => prev.filter(b => b.id !== id));
         try {
             setDeletingIds(prev => new Set(prev).add(id));
-            
-            // Wake-up ping for render.com free tier cold starts
             await fetch(API_BASE + '/api/health').catch(() => {});
-            
-            const res = await apiFetch(`/api/admin/batches/${id}`, {
-                method: 'DELETE'
-            });
-            
+            const res = await apiFetch(`/api/admin/batches/${id}`, { method: 'DELETE' });
             if (!res.ok) {
                 let errMsg = `Delete failed (${res.status})`;
-                try {
-                    const errData = await res.json();
-                    errMsg = errData.detail || errData.message || errMsg;
-                } catch {}
-                
-                // Real server errors (500) vs potential cold start network failures
-                if (res.status === 500) {
-                    alert(`Server Error: ${errMsg}. This often happens if the batch has complex dependencies. Please try again.`);
-                } else if (res.status === 403) {
-                    alert('Permission Denied: Only Super Admins can delete batches.');
-                } else {
-                    alert(errMsg);
-                }
-                return;
-            }
-            
-            // Success
-            loadData();
-        } catch (err: any) {
-            console.error('Delete error:', err);
-            // If the error happens during the request (e.g. timeout or network drop)
-            if (err.message === 'Failed to fetch') {
-                alert('Connection timed out or failed. The server might still be processing the deletion or warming up. Please refresh the page in a few seconds to check if the batch was deleted.');
+                try { const errData = await res.json(); errMsg = errData.detail || errMsg; } catch {}
+                if (removed) setBatches(prev => [...prev, removed]);
+                alert(`Error: ${errMsg}`);
             } else {
-                alert(err.message || 'Failed to delete batch');
+                loadData(); // Refresh count stats
             }
+        } catch (err: any) {
+            if (removed) setBatches(prev => [...prev, removed]);
+            alert(err.message === 'Failed to fetch'
+                ? 'Connection issue. Please refresh to check if the batch was deleted.'
+                : err.message || 'Failed to delete batch');
         } finally {
-            setDeletingIds(prev => {
-                const next = new Set(prev);
-                next.delete(id);
-                return next;
-            });
+            setDeletingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
         }
     };
 
@@ -226,11 +205,16 @@ export default function BatchesPage() {
     };
 
     const handleRemoveStudent = async (studentId: string) => {
-        if (!viewStudentsId || !confirm('Remove this student from the batch?')) return;
+        if (!viewStudentsId) return;
+        // Optimistic remove from UI
+        setStudentsList(prev => prev.filter(s => s.id !== studentId));
         try {
             await apiDelete(`/api/admin/users/${studentId}/batches/${viewStudentsId}`);
-            setStudentsList(studentsList.filter(s => s.id !== studentId));
-        } catch { alert('Failed to remove student.'); }
+        } catch {
+            // Rollback on failure
+            if (viewStudentsId) handleViewStudents(viewStudentsId, viewStudentsName);
+            alert('Failed to remove student.');
+        }
     };
 
     const closeRosterModal = () => {
@@ -257,7 +241,7 @@ export default function BatchesPage() {
             )}
 
             <div className="card">
-                {loading ? <p>Loading...</p> : batches.length === 0 ? (
+                {loading ? <SkeletonLoader count={3} type="card" /> : batches.length === 0 ? (
                     <div className="empty-state"><div className="empty-icon">👥</div><h3>No batches yet</h3><p>Create courses first, then create batches.</p></div>
                 ) : (
             <div className="grid-3">
@@ -304,9 +288,17 @@ export default function BatchesPage() {
                                 {['SUPER_ADMIN', 'ADMIN'].includes(currentUserRole.toUpperCase()) && (
                                     <>
                                         <button className="btn btn-sm btn-ghost" onClick={() => openEdit(b)} disabled={deletingIds.has(b.id)}>Edit</button>
-                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(b.id, b.name)} disabled={deletingIds.has(b.id)}>
-                                            {deletingIds.has(b.id) ? 'Deleting...' : 'Delete'}
-                                        </button>
+                                        {confirmDeleteId === b.id ? (
+                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: 'rgba(239,68,68,0.08)', padding: '4px 8px', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                                                <span style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: 600 }}>Sure?</span>
+                                                <button onClick={() => handleDelete(b.id, b.name)} style={{ padding: '2px 8px', fontSize: '11px', background: 'var(--danger)', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>Yes</button>
+                                                <button onClick={() => setConfirmDeleteId(null)} className="btn btn-sm btn-ghost" style={{ padding: '2px 6px', fontSize: '11px' }}>No</button>
+                                            </div>
+                                        ) : (
+                                            <button className="btn btn-sm btn-danger" onClick={() => setConfirmDeleteId(b.id)} disabled={deletingIds.has(b.id)}>
+                                                {deletingIds.has(b.id) ? 'Deleting...' : 'Delete'}
+                                            </button>
+                                        )}
                                     </>
                                 )}
                             </div>
