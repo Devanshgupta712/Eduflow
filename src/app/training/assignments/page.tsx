@@ -30,7 +30,7 @@ export default function AssignmentsPage() {
     const [selectedStudent, setSelectedStudent] = useState('');
 
     // Form
-    const [form, setForm] = useState({ title: '', description: '', type: 'CODING', total_marks: '100', due_date: '', time_limit: '0' });
+    const [form, setForm] = useState({ title: '', description: '', type: 'CODING', types: ['CODING'], total_marks: '100', due_date: '', time_limit: '0' });
     const [saving, setSaving] = useState(false);
 
     // AI generation
@@ -43,6 +43,7 @@ export default function AssignmentsPage() {
     const [generating, setGenerating] = useState(false);
 
     const [aiPreview, setAiPreview] = useState<any>(null);
+    const [aiPreviews, setAiPreviews] = useState<any[]>([]);
     const [aiError, setAiError] = useState('');
 
     // PDF upload
@@ -85,11 +86,11 @@ export default function AssignmentsPage() {
 
     const resetModal = () => {
         setStep('method');
-        setForm({ title: '', description: '', type: 'CODING', total_marks: '100', due_date: '', time_limit: '0' });
+        setForm({ title: '', description: '', type: 'CODING', types: ['CODING'], total_marks: '100', due_date: '', time_limit: '0' });
         setAiTopic(''); setAiDifficulty('Intermediate');
         setAiScheduledAt('');
         setAiQuestionCount(5); setAiTimeLimit(0); setAiRandomize(true);
-        setAiPreview(null); setAiError('');
+        setAiPreview(null); setAiPreviews([]); setAiError('');
 
         setPdfFile(null);
         setSelectedBatch(''); setSelectedStudent('');
@@ -98,42 +99,39 @@ export default function AssignmentsPage() {
 
     // ── AI Generation ─────────────────────────────────────────────────────────
     const handleGenerate = async () => {
+        const typesToGenerate = form.types && form.types.length > 0 ? form.types : [form.type];
         if (!aiTopic.trim()) { setAiError('Please enter a topic.'); return; }
-        setGenerating(true); setAiError(''); setAiPreview(null);
+        if (typesToGenerate.length === 0) { setAiError('Please select at least one assignment type.'); return; }
+        
+        setGenerating(true); setAiError(''); setAiPreviews([]); setAiPreview(null);
         try {
-            const resp = await apiFetch('/api/training/generate-task', {
-                method: 'POST',
-                body: JSON.stringify({ 
-                    topic: aiTopic, 
-                    task_type: form.type, 
-                    difficulty: aiDifficulty, 
-                    question_count: Number(aiQuestionCount),
-                    time_limit: Number(aiTimeLimit),
-                    is_randomized: aiRandomize,
-                    scheduled_at: aiScheduledAt
-                })
+            const results = await Promise.all(typesToGenerate.map(async (t) => {
+                const resp = await apiFetch('/api/training/generate-task', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        topic: aiTopic, 
+                        task_type: t, 
+                        difficulty: aiDifficulty, 
+                        question_count: Number(aiQuestionCount),
+                        time_limit: Number(aiTimeLimit),
+                        is_randomized: aiRandomize,
+                        scheduled_at: aiScheduledAt
+                    })
+                });
+                if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || `Failed to generate ${t}`); }
+                const data = await resp.json();
+                return { ...data, generatedType: t };
+            }));
 
-            });
-            if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-            const result = await resp.json();
-            setAiPreview(result);
+            setAiPreviews(results);
+            setAiPreview(results[0]); // fallback for StepIndicator
 
-            // Keep the description concise for a cleaner student UI
-            let generatedDescription = result.description || '';
+            const combinedTitle = results.map(r => r.title).join(' & ');
             
-            // If it's a coding task, we might want some detail in description, 
-            // but for MCQ the structured UI handles it better.
-            if (form.type === 'CODING' && result.questions?.[0]) {
-                const q = result.questions[0];
-                generatedDescription += `\n\nProblem: ${q.question}`;
-            }
-
             setForm(f => ({
                 ...f,
-                title: result.title || f.title,
-                description: generatedDescription,
+                title: combinedTitle || f.title,
                 time_limit: (aiTimeLimit || 0).toString(),
-                total_marks: (result.total_marks || f.total_marks).toString()
             }));
             setStep('ai_review');
         } catch (e: any) { setAiError(e?.message || 'AI generation failed.'); }
@@ -157,7 +155,7 @@ export default function AssignmentsPage() {
                 if (uploadResp.ok) { const d = await uploadResp.json(); pdfUrl = d.url; }
             }
 
-            const body: any = {
+            const baseBody: any = {
                 ...form, 
                 total_marks: parseInt(form.total_marks) || 100,
                 time_limit: parseInt(form.time_limit) || 0,
@@ -165,13 +163,31 @@ export default function AssignmentsPage() {
                 is_randomized: aiRandomize,
                 ...(selectedStudent ? { student_id: selectedStudent } : {}),
                 ...(pdfUrl ? { pdf_url: pdfUrl } : {}),
-                ...(aiPreview ? { structured_content: JSON.stringify(aiPreview) } : {})
             };
 
-            const resp = await apiFetch('/api/training/assignments', { method: 'POST', body: JSON.stringify(body) });
-            if (!resp.ok) throw new Error('Failed to create');
+            if (aiPreviews && aiPreviews.length > 0) {
+                // Loop through array of AI previews
+                await Promise.all(aiPreviews.map(async (preview: any) => {
+                    const generatedDescription = form.type === 'CODING' && preview.questions?.[0] ? `${preview.description}\n\nProblem: ${preview.questions[0].question}` : preview.description;
+                    const taskBody = {
+                        ...baseBody,
+                        title: aiPreviews.length > 1 ? `${form.title} - ${preview.generatedType}` : (preview.title || form.title),
+                        description: generatedDescription || baseBody.description,
+                        type: preview.generatedType,
+                        total_marks: preview.total_marks || baseBody.total_marks,
+                        structured_content: JSON.stringify(preview)
+                    };
+                    const resp = await apiFetch('/api/training/assignments', { method: 'POST', body: JSON.stringify(taskBody) });
+                    if (!resp.ok) throw new Error(`Failed to create ${preview.generatedType} assignment`);
+                }));
+            } else {
+                // PDF or Manual creation
+                const resp = await apiFetch('/api/training/assignments', { method: 'POST', body: JSON.stringify(baseBody) });
+                if (!resp.ok) throw new Error('Failed to create');
+            }
+
             setShowModal(false); resetModal(); loadAssignments();
-        } catch { } finally { setSaving(false); }
+        } catch (err: any) { alert(err?.message || "Failed to save assignment."); } finally { setSaving(false); }
     };
 
     const handleViewSubmissions = async (assignment: any) => {
@@ -340,14 +356,28 @@ export default function AssignmentsPage() {
                                 <StepIndicator steps={aiSteps} current={1} />
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                                        <div className="form-group" style={{ margin: 0 }}>
-                                            <label className="form-label">Assignment Type</label>
-                                            <select className="form-input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-                                                <option value="CODING">💻 Coding</option>
-                                                <option value="WRITTEN">✍️ Written</option>
-                                                <option value="MCQ">📝 MCQ</option>
-                                                <option value="PROJECT">🏗️ Project</option>
-                                            </select>
+                                        <div className="form-group" style={{ margin: 0, gridRow: 'span 2' }}>
+                                            <label className="form-label" style={{ marginBottom: '8px' }}>Assignment Types</label>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                {['CODING', 'WRITTEN', 'MCQ', 'PROJECT'].map(t => (
+                                                    <label key={t} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', background: form.types?.includes(t) || (!form.types && form.type === t) ? 'var(--primary-glow)' : 'transparent', padding: '6px 10px', borderRadius: '8px', border: form.types?.includes(t) || (!form.types && form.type === t) ? '1px solid var(--primary)' : '1px solid transparent', transition: 'all 0.2s' }}>
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={form.types?.includes(t) || (!form.types && form.type === t)}
+                                                            onChange={e => {
+                                                                const currentTypes = form.types || [form.type];
+                                                                if (e.target.checked) {
+                                                                    setForm({ ...form, types: [...currentTypes, t], type: t });
+                                                                } else {
+                                                                    setForm({ ...form, types: currentTypes.filter(x => x !== t) });
+                                                                }
+                                                            }}
+                                                            style={{ transform: 'scale(1.1)', accentColor: 'var(--primary)', cursor: 'pointer' }} 
+                                                        />
+                                                        {typeIcons[t]} {t}
+                                                    </label>
+                                                ))}
+                                            </div>
                                         </div>
                                         <div className="form-group" style={{ margin: 0 }}>
                                             <label className="form-label">Difficulty</label>
@@ -403,54 +433,49 @@ export default function AssignmentsPage() {
                         )}
 
                         {/* ─ STEP: ai_review ─ */}
-                        {step === 'ai_review' && aiPreview && (
+                        {step === 'ai_review' && aiPreviews && aiPreviews.length > 0 && (
                             <>
                                 <StepIndicator steps={aiSteps} current={2} />
-                                <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '16px', marginBottom: '16px', border: '1px solid #10b98130' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                                        <div>
-                                            <p style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>✨ AI Generated — Review & Edit</p>
-                                            <h3 style={{ margin: 0, fontSize: '16px' }}>{aiPreview.title}</h3>
-                                        </div>
-                                        <span style={{ fontSize: '11px', padding: '2px 8px', background: `${typeColors[form.type]}20`, color: typeColors[form.type], borderRadius: '99px', fontWeight: 600 }}>
-                                            {aiDifficulty}
-                                        </span>
-                                    </div>
-                                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 10px' }}>{aiPreview.description}</p>
-                                    {aiPreview.requirements?.length > 0 && (
-                                        <div>
-                                            <p style={{ fontSize: '12px', fontWeight: 600, margin: '0 0 6px' }}>Requirements:</p>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                {aiPreview.requirements.map((r: string, i: number) => (
-                                                    <div key={i} style={{ fontSize: '12px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                                                        <span style={{ color: '#10b981', fontWeight: 700 }}>{i + 1}.</span> {r}
-                                                    </div>
-                                                ))}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '50vh', overflowY: 'auto', paddingRight: '8px' }}>
+                                    {aiPreviews.map((preview: any, idx: number) => (
+                                        <div key={idx} style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '16px', border: '1px solid #10b98130' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                                                <div>
+                                                    <p style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>✨ AI Generated — {preview.generatedType}</p>
+                                                    <h3 style={{ margin: 0, fontSize: '16px' }}>{preview.title || "Generated Task"}</h3>
+                                                </div>
+                                                <span style={{ fontSize: '11px', padding: '2px 8px', background: `${typeColors[preview.generatedType]}20`, color: typeColors[preview.generatedType], borderRadius: '99px', fontWeight: 600 }}>
+                                                    {aiDifficulty}
+                                                </span>
                                             </div>
+                                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 10px' }}>{preview.description}</p>
+                                            
+                                            {preview.requirements?.length > 0 && (
+                                                <div style={{ marginBottom: '10px' }}>
+                                                    <p style={{ fontSize: '12px', fontWeight: 600, margin: '0 0 6px' }}>Requirements:</p>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        {preview.requirements.map((r: string, i: number) => (
+                                                            <div key={i} style={{ fontSize: '12px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                                                <span style={{ color: '#10b981', fontWeight: 700 }}>{i + 1}.</span> {r}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                    {aiPreview.hints?.length > 0 && (
-                                        <div style={{ marginTop: '10px' }}>
-                                            <p style={{ fontSize: '12px', fontWeight: 600, margin: '0 0 4px' }}>💡 Hints:</p>
-                                            {aiPreview.hints.map((h: string, i: number) => (
-                                                <div key={i} style={{ fontSize: '12px', color: 'var(--text-muted)' }}>• {h}</div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {aiPreview.estimated_hours && (
-                                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: 0 }}>⏱ Estimated: {aiPreview.estimated_hours} hours</p>
-                                    )}
+                                    ))}
                                 </div>
 
                                 {/* Editable fields */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
                                     <div className="form-group" style={{ margin: 0 }}>
-                                        <label className="form-label">Edit Title</label>
+                                        <label className="form-label">Base Title</label>
                                         <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>If multiple types are generated, their type will be appended.</div>
                                     </div>
                                     <div className="form-group" style={{ margin: 0 }}>
-                                        <label className="form-label">Edit Description / Instructions</label>
-                                        <textarea className="form-input" rows={5} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+                                        <label className="form-label">Base Description / Instructions</label>
+                                        <textarea className="form-input" rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>

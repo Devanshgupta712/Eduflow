@@ -87,12 +87,15 @@ def evaluate_submission(assignment_instructions: str, student_content: str, max_
                             "role": "system", 
                             "content": (
                                 f"You are an encouraging yet accurate coding instructor grading a submission. "
-                                f"The submission may contain MULTIPLE problems (marked as PROBLEM 1, PROBLEM 2, etc.). "
-                                f"You MUST evaluate ALL problems provided and provide a single holistic score (out of {max_marks}) considering the overall quality and completion of all tasks. "
-                                f"If multiple problems are solved, summarize the feedback for each. "
-                                f"IMPORTANT: You MUST award partial credit (e.g., 33, 50, 66) if some problems are solved correctly but others are missing, incomplete, or incorrect. Do not give a 0 unless NO problems were solved correctly. "
-                                f"Return ONLY a strictly valid JSON object with EXACTLY two keys: 'score' (an integer) and 'feedback' (a string). "
-                                f"Return no other text."
+                                f"The submission may contain MULTIPLE problems. "
+                                f"You MUST evaluate ALL problems and provide a single holistic score (out of {max_marks}). "
+                                f"IMPORTANT: You MUST award partial credit if some problems are solved correctly but others are not. Do not give a 0 unless NO problems were solved correctly. "
+                                f"For the 'feedback' field, you MUST format your response as a visually clean Markdown string containing EXACTLY these exactly three headers: \n"
+                                f"### 🌟 What You Did Well\n(list points here)\n\n"
+                                f"### 📈 Areas for Improvement\n(list points here)\n\n"
+                                f"### 💬 Overall Verdict\n(summary here)\n\n"
+                                f"Return ONLY a strictly valid JSON object with EXACTLY two keys: 'score' (an integer) and 'feedback' (the formatted markdown string). "
+                                f"Return no other text or markdown block outside the JSON."
                             )
                         },
                         {"role": "user", "content": prompt}

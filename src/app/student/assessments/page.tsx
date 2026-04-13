@@ -689,9 +689,14 @@ function StudentAssessmentsContent() {
                                     {reportData.my_submission.feedback && (
                                         <div>
                                             <h4 style={{ marginBottom: '12px', fontSize: '14px', textTransform: 'uppercase', opacity: 0.6 }}>AI Instructor Feedback</h4>
-                                            <div style={{ padding: '20px', background: 'var(--primary-glow)', border: '1px solid var(--primary)', borderRadius: '12px', fontSize: '15px', lineHeight: '1.6' }}>
-                                                {reportData.my_submission.feedback}
-                                            </div>
+                                            <div style={{ padding: '20px', background: 'var(--primary-glow)', border: '1px solid var(--primary)', borderRadius: '12px', fontSize: '15px', lineHeight: '1.6' }}
+                                                dangerouslySetInnerHTML={{
+                                                    __html: reportData.my_submission.feedback
+                                                        .replace(/### (.*?)(?:\n|$)/g, '<h5 style="margin-top: 16px; margin-bottom: 8px; font-size: 16px; color: var(--text-primary); font-weight: 800">$1</h5>')
+                                                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                                        .replace(/\n/g, '<br/>')
+                                                }}
+                                            />
                                         </div>
                                     )}
                                 </div>
