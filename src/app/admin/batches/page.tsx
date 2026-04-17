@@ -22,6 +22,7 @@ export default function BatchesPage() {
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
+    const [myPermissions, setMyPermissions] = useState<any>({});
     const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -42,7 +43,10 @@ export default function BatchesPage() {
     useEffect(() => { 
         loadData(); 
         const user = getStoredUser();
-        if (user?.role) setCurrentUserRole(user.role.toUpperCase());
+        if (user) {
+            setCurrentUserRole(user.role.toUpperCase());
+            setMyPermissions(user.permissions || {});
+        }
     }, []);
 
 
@@ -229,7 +233,7 @@ export default function BatchesPage() {
         <div className="animate-in">
             <div className="page-header">
                 <div><h1 className="page-title">Batches</h1><p className="page-subtitle">Manage training batches</p></div>
-                {['SUPER_ADMIN', 'ADMIN'].includes(currentUserRole) && (
+                {(currentUserRole === 'SUPER_ADMIN' || (currentUserRole === 'ADMIN' && myPermissions.manage_batches)) && (
                     <button className="btn btn-primary" onClick={() => { setError(''); setShowModal(true); }}>+ New Batch</button>
                 )}
             </div>
@@ -285,7 +289,7 @@ export default function BatchesPage() {
                             <span className={`badge ${b.is_active ? 'badge-success' : 'badge-danger'}`}>{b.is_active ? 'Active' : 'Ended'}</span>
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <button className="btn btn-sm btn-primary" onClick={() => handleViewStudents(b.id, b.name)}>Student</button>
-                                {['SUPER_ADMIN', 'ADMIN'].includes(currentUserRole.toUpperCase()) && (
+                                {(currentUserRole === 'SUPER_ADMIN' || (currentUserRole === 'ADMIN' && myPermissions.manage_batches)) && (
                                     <>
                                         <button className="btn btn-sm btn-ghost" onClick={() => openEdit(b)} disabled={deletingIds.has(b.id)}>Edit</button>
                                         {confirmDeleteId === b.id ? (
@@ -386,7 +390,7 @@ export default function BatchesPage() {
                         </div>
 
                         {/* Add Student — Searchable Picker */}
-                        {['SUPER_ADMIN', 'ADMIN'].includes(currentUserRole) && (() => {
+                        {(currentUserRole === 'SUPER_ADMIN' || (currentUserRole === 'ADMIN' && myPermissions.manage_batches)) && (() => {
                             // Students not yet in this batch
                             const available = allStudents.filter(u => !studentsList.some(s => s.id === u.id));
                             // Filter by search query (name or email)
@@ -572,7 +576,7 @@ export default function BatchesPage() {
                                             </div>
                                         </div>
 
-                                        {['SUPER_ADMIN', 'ADMIN'].includes(currentUserRole) && (
+                                        {(currentUserRole === 'SUPER_ADMIN' || (currentUserRole === 'ADMIN' && myPermissions.manage_batches)) && (
                                             <div>
                                                 <button className="btn btn-sm btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => handleRemoveStudent(s.id)}>Remove</button>
                                             </div>

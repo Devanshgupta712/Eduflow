@@ -13,6 +13,7 @@ export default function UsersPage() {
     const [showModal, setShowModal] = useState(false);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [myPermissions, setMyPermissions] = useState<any>({});
     const [passwordModal, setPasswordModal] = useState({ show: false, targetUser: null as UserItem | null, newPassword: '' });
     const [manageModal, setManageModal] = useState({ show: false, targetUser: null as UserItem | null, details: null as any });
     const [permissionsModal, setPermissionsModal] = useState({ show: false, targetUser: null as UserItem | null, permissions: { manage_users: false, manage_batches: false, manage_courses: false, manage_leaves: false }, loading: false });
@@ -30,6 +31,7 @@ export default function UsersPage() {
         if (stored) {
             setIsSuperAdmin(stored.role === 'SUPER_ADMIN');
             setIsAdmin(stored.role === 'ADMIN');
+            setMyPermissions(stored.permissions || {});
         }
         loadUsers();
         loadBatches();
@@ -253,7 +255,7 @@ export default function UsersPage() {
         <div className="animate-in">
             <div className="page-header">
                 <div><h1 className="page-title">User Management</h1><p className="page-subtitle">All system users and their roles</p></div>
-                {isSuperAdmin && <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Create User</button>}
+                {(isSuperAdmin || (isAdmin && myPermissions.manage_users)) && <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Create User</button>}
             </div>
 
             <div className="grid-4 mb-24">
@@ -296,7 +298,7 @@ export default function UsersPage() {
                                                     Manage
                                                 </button>
                                             )}
-                                            {u.role === 'STUDENT' && isSuperAdmin && (
+                                            {u.role === 'STUDENT' && (isSuperAdmin || (isAdmin && myPermissions.manage_users)) && (
                                                 <button
                                                     className={`btn btn-sm ${u.can_build_resume ? 'btn-success' : 'btn-secondary'}`}
                                                     onClick={() => handleToggleResumeAccess(u)}
@@ -312,7 +314,7 @@ export default function UsersPage() {
                                                     Assign Batches
                                                 </button>
                                             )}
-                                            {(u.role === 'ADMIN' || u.role === 'TRAINER') && isSuperAdmin && (
+                                            {(u.role === 'ADMIN' || u.role === 'TRAINER') && (isSuperAdmin || (isAdmin && myPermissions.manage_users)) && (
                                                 <button
                                                     className="btn btn-sm btn-secondary"
                                                     onClick={() => handleOpenPermissions(u)}
@@ -327,7 +329,7 @@ export default function UsersPage() {
                                             >
                                                 {u.is_active ? 'Suspend' : 'Activate'}
                                             </button>
-                                            {isSuperAdmin && (
+                                            {(isSuperAdmin || (isAdmin && myPermissions.manage_users)) && (
                                                 confirmDeleteUserId === u.id ? (
                                                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: 'rgba(239,68,68,0.08)', padding: '4px 8px', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
                                                         <span style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: 600 }}>Sure?</span>

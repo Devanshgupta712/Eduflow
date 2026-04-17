@@ -19,6 +19,7 @@ interface NavItem {
     icon: string;
     roles?: string[];
     requiresResumeAccess?: boolean;
+    permission?: string;
 }
 
 interface NavSection {
@@ -48,15 +49,15 @@ const navSections: NavSection[] = [
         title: 'Academy',
         roles: ['SUPER_ADMIN', 'ADMIN', 'TRAINER'],
         items: [
-            { label: 'Courses', href: '/admin/courses', icon: '📚', roles: ['SUPER_ADMIN', 'ADMIN'] },
-            { label: 'Batches', href: '/admin/batches', icon: '👥', roles: ['SUPER_ADMIN', 'ADMIN', 'TRAINER'] },
-            { label: 'Registrations', href: '/admin/registrations', icon: '📝', roles: ['SUPER_ADMIN', 'ADMIN'] },
+            { label: 'Courses', href: '/admin/courses', icon: '📚', roles: ['SUPER_ADMIN', 'ADMIN'], permission: 'manage_courses' },
+            { label: 'Batches', href: '/admin/batches', icon: '👥', roles: ['SUPER_ADMIN', 'ADMIN', 'TRAINER'], permission: 'manage_batches' },
+            { label: 'Registrations', href: '/admin/registrations', icon: '📝', roles: ['SUPER_ADMIN', 'ADMIN'], permission: 'manage_courses' },
             { label: 'Students', href: '/admin/students', icon: '🎓' },
-            { label: 'Leaves', href: '/admin/leaves', icon: '🗓️' },
+            { label: 'Leaves', href: '/admin/leaves', icon: '🗓️', permission: 'manage_leaves' },
             { label: 'Time Tracking', href: '/admin/time-tracking', icon: '⏱️', roles: ['SUPER_ADMIN', 'ADMIN'] },
             { label: 'Reports', href: '/admin/reports', icon: '📈', roles: ['SUPER_ADMIN', 'ADMIN'] },
             { label: 'Suggestions', href: '/admin/suggestions', icon: '💡', roles: ['SUPER_ADMIN', 'ADMIN'] },
-            { label: 'Sessions', href: '/admin/sessions', icon: '💻', roles: ['SUPER_ADMIN', 'ADMIN'] },
+            { label: 'Sessions', href: '/admin/sessions', icon: '💻', roles: ['SUPER_ADMIN', 'ADMIN'], permission: 'manage_batches' },
             { label: 'Feedback', href: '/admin/feedback', icon: '💬', roles: ['SUPER_ADMIN', 'ADMIN'] },
         ],
     },
@@ -85,6 +86,7 @@ const navSections: NavSection[] = [
             { label: 'Assessments', href: '/placement/assessments', icon: '📝' },
             { label: 'Mock Interviews', href: '/placement/mock-interviews', icon: '🎤' },
             { label: 'Practice', href: '/placement/practice', icon: '🗣️' },
+            { label: 'Resume Builder', href: '/student/resume', icon: '📄' },
             { label: 'Reports', href: '/placement/reports', icon: '📈', roles: ['SUPER_ADMIN', 'ADMIN'] },
         ],
     },
@@ -109,7 +111,7 @@ const navSections: NavSection[] = [
         title: 'System',
         roles: ['SUPER_ADMIN', 'ADMIN'],
         items: [
-            { label: 'Users', href: '/admin/users', icon: '👤', roles: ['SUPER_ADMIN'] },
+            { label: 'Users', href: '/admin/users', icon: '👤', roles: ['SUPER_ADMIN', 'ADMIN'], permission: 'manage_users' },
             { label: 'Security', href: '/reports', icon: '⚠️' },
             { label: 'Notifications', href: '/notifications', icon: '🔔' },
             { label: 'Settings', href: '/admin/settings', icon: '⚙️' },
@@ -203,6 +205,14 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
                                 </div>
                                 {section.items
                                     .filter((item) => !item.roles || item.roles.includes(userRole))
+                                    .filter((item) => {
+                                        if (userRole === 'SUPER_ADMIN') return true;
+                                        if (item.permission && userRole === 'ADMIN') {
+                                            const perms = user?.permissions || {};
+                                            return perms[item.permission] === true;
+                                        }
+                                        return true;
+                                    })
                                     .filter((item) => !item.requiresResumeAccess || canBuildResume)
                                     .map((item) => {
                                         const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
