@@ -463,7 +463,12 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
 ):
-    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.permissions))
+        .order_by(User.created_at.desc())
+    )
     users = result.scalars().all()
     return [UserOut.model_validate(u) for u in users]
 
@@ -978,7 +983,13 @@ async def get_student_details(
     _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
 ):
     try:
-        student = await db.get(User, user_id)
+        from sqlalchemy.orm import selectinload
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.permissions))
+            .where(User.id == user_id)
+        )
+        student = result.scalars().first()
         if not student:
             raise HTTPException(status_code=404, detail="Student not found")
         
