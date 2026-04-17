@@ -67,7 +67,12 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
             db.add(sa)
             await db.flush()
 
-    result = await db.execute(select(User).where(User.email == body.email))
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.permissions))
+        .where(User.email == body.email)
+    )
     user = result.scalars().first()
     if not user or not verify_password(body.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
