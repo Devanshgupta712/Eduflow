@@ -48,7 +48,8 @@ async def lifespan(app: FastAPI):
                     ("highestEducation", "TEXT"),
                     ("degree", "TEXT"),
                     ("passingYear", "TEXT"),
-                    ("dob", "TEXT")
+                    ("dob", "TEXT"),
+                    ("can_build_resume", "BOOLEAN DEFAULT false")
                 ]
                 for col_name, col_type in user_migrations:
                     if col_name not in user_cols:
@@ -187,6 +188,28 @@ async def lifespan(app: FastAPI):
                     "ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS screenshot_base64 TEXT",
                     # Batches: schedule_link for meeting link
                     "ALTER TABLE batches ADD COLUMN IF NOT EXISTS schedule_link VARCHAR",
+                    # Resume Builder
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS can_build_resume BOOLEAN DEFAULT FALSE",
+                    """CREATE TABLE IF NOT EXISTS resumes (
+                        id VARCHAR PRIMARY KEY,
+                        student_id VARCHAR REFERENCES users(id),
+                        title VARCHAR NOT NULL,
+                        mode VARCHAR DEFAULT 'visual',
+                        template VARCHAR DEFAULT 'modern',
+                        is_primary BOOLEAN DEFAULT FALSE,
+                        personal TEXT DEFAULT '{}',
+                        summary TEXT DEFAULT '',
+                        skills TEXT DEFAULT '[]',
+                        experience TEXT DEFAULT '[]',
+                        education TEXT DEFAULT '[]',
+                        projects TEXT DEFAULT '[]',
+                        certifications TEXT DEFAULT '[]',
+                        languages TEXT DEFAULT '[]',
+                        original_resume_text TEXT,
+                        job_description TEXT,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )""",
                 ]
                 for sql in pg_migrations:
                     try:
