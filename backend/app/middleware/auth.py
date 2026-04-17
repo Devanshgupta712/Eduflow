@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -40,7 +40,7 @@ async def get_current_user(
 
     result = await db.execute(
         select(User)
-        .options(selectinload(User.permissions))
+        .options(joinedload(User.permissions))
         .where(User.id == user_id)
     )
     user = result.scalars().first()
@@ -66,7 +66,7 @@ async def get_optional_user(
             
         result = await db.execute(
             select(User)
-            .options(selectinload(User.permissions))
+            .options(joinedload(User.permissions))
             .where(User.id == user_id)
         )
         return result.scalars().first()
