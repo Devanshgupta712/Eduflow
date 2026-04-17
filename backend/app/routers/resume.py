@@ -273,19 +273,24 @@ async def ai_enhance_resume(
     req: AIEnhanceRequest,
     current_user: User = Depends(get_current_user)
 ):
-    system_prompt = """You are an expert ATS resume writer and technical recruiter.
-Your objective is to take the user's existing resume text and a target Job Description, and output a highly optimized JSON resume structure.
-DO NOT hallucinate experience they do not have, but DO rephrase their existing experience to heavily feature keywords from the job description.
+    system_prompt = """You are an expert ATS resume writer.
+Your objective is to take the user's existing resume text and a target Job Description, and output a clean, professional JSON resume structure.
 
-You MUST respond with pure JSON only, matching exactly this schema:
+STRICT RULES:
+1. SUMMARY: Keep it extremely concise (MAX 2 SHORT SENTENCES). Focus on current role and top tech.
+2. EXPERIENCE: DO NOT hallucinate experience they do not have. If no experience is found in the input, return an empty array [].
+3. PROJECTS: Only include projects found in the input.
+4. TONE: Professional and factual. Avoid excessive buzzwords.
+
+You MUST respond with pure JSON only:
 {
-  "summary": "3-4 compelling sentences matching the JD",
+  "summary": "Max 2 short sentences",
   "skills": ["Skill1", "Skill2"],
-  "experience": [{"company": "Name", "role": "Title", "from": "Date", "to": "Date", "bullets": ["Action verb + result + tech", ...]}],
+  "experience": [{"company": "Name", "role": "Title", "from": "Date", "to": "Date", "bullets": ["Action verb + result + tech"]}],
   "education": [{"degree": "Name", "school": "Name", "year": "Year", "grade": ""}],
-  "projects": [{"name": "Name", "tech": "React, Node", "description": "1-2 sentences", "link": ""}]
+  "projects": [{"name": "Name", "tech": "Stack", "description": "1 sentence", "link": ""}]
 }
-Return only the raw JSON. No markdown backticks or explanations."""
+Return only raw JSON."""
 
     prompt = f"RESUME TEXT:\n{req.resume_text}\n\nTARGET JOB DESCRIPTION:\n{req.job_description}"
     
@@ -310,18 +315,23 @@ async def ai_generate_resume(
     current_user: User = Depends(get_current_user)
 ):
     system_prompt = """You are an expert ATS resume writer.
-Your objective is to generate a fully optimized resume in JSON format based on the raw details provided by the user and their target Job Description.
-Craft a powerful summary, expand on their projects/experience to highlight impact, and ensure JD keywords are integrated naturally.
+Generate a professional resume JSON based ON THE DETAILS PROVIDED.
 
-You MUST respond with pure JSON only, matching exactly this schema:
+STRICT RULES:
+1. SUMMARY: Max 2 SHORT sentences. 
+2. NO HALLUCINATION: Do not invent jobs, companies, or projects that aren't in the raw details.
+3. If a section is missing from raw details, return it as an empty array [].
+4. ATS OPTIMIZED: Use keywords from the JD, but only if they match the user's actual background.
+
+You MUST respond with pure JSON only:
 {
-  "summary": "3-4 compelling sentences",
+  "summary": "2 short sentences",
   "skills": ["Skill1", "Skill2"],
-  "experience": [{"company": "Name", "role": "Title", "from": "Date", "to": "Date", "bullets": ["Action verb + result + tech", ...]}],
+  "experience": [{"company": "Name", "role": "Title", "from": "Date", "to": "Date", "bullets": ["Action verb + impact"]}],
   "education": [{"degree": "Name", "school": "Name", "year": "Year", "grade": ""}],
-  "projects": [{"name": "Name", "tech": "React, Node", "description": "Detailed bullet or description", "link": ""}]
+  "projects": [{"name": "Name", "tech": "Stack", "description": "Description", "link": ""}]
 }
-Return only the pure JSON without markdown blocks."""
+Return only raw JSON."""
 
     prompt = f"USER RAW DETAILS:\n{json.dumps(req.basic_details, indent=2)}\n\nTARGET JOB DESCRIPTION:\n{req.job_description}"
     
