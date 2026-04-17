@@ -280,7 +280,8 @@ STRICT RULES:
 1. SUMMARY: Keep it extremely concise (MAX 2 SHORT SENTENCES). Focus on current role and top tech.
 2. EXPERIENCE: DO NOT hallucinate experience they do not have. If no experience is found in the input, return an empty array [].
 3. PROJECTS: Only include projects found in the input.
-4. TONE: Professional and factual. Avoid excessive buzzwords.
+4. TONE: Professional and factual. Use implied FIRST PERSON. 
+5. NO NAMES: Never mention the user's name or use pronouns like 'He/She' in the summary or experience. Start with verbs or adjectives (e.g., 'Detail-oriented QA engineer...' instead of 'Devansh is a...').
 
 You MUST respond with pure JSON only:
 {
@@ -322,6 +323,7 @@ STRICT RULES:
 2. NO HALLUCINATION: Do not invent jobs, companies, or projects that aren't in the raw details.
 3. If a section is missing from raw details, return it as an empty array [].
 4. ATS OPTIMIZED: Use keywords from the JD, but only if they match the user's actual background.
+5. NO THIRD PERSON: Never use 'He', 'She', or the user's name. Use implied first person (e.g., 'Motivated student...' instead of 'Devansh is a...').
 
 You MUST respond with pure JSON only:
 {
