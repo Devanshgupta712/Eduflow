@@ -36,6 +36,19 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: "UserOut"
 
+class AdminPermissionUpdate(BaseModel):
+    manage_users: bool = False
+    manage_batches: bool = False
+    manage_courses: bool = False
+    manage_leaves: bool = False
+
+class AdminPermissionOut(AdminPermissionUpdate):
+    id: str
+    user_id: str
+
+    class Config:
+        from_attributes = True
+
 class UserOut(BaseModel):
     id: str
     email: str
@@ -51,24 +64,11 @@ class UserOut(BaseModel):
     can_build_resume: bool = False
     is_active: bool
     created_at: datetime
-    permissions: "AdminPermissionOut" | None = None
+    permissions: AdminPermissionOut | None = None
 
     class Config:
         from_attributes = True
         use_enum_values = True
-
-class AdminPermissionUpdate(BaseModel):
-    manage_users: bool = False
-    manage_batches: bool = False
-    manage_courses: bool = False
-    manage_leaves: bool = False
-
-class AdminPermissionOut(AdminPermissionUpdate):
-    id: str
-    user_id: str
-
-    class Config:
-        from_attributes = True
 
 # ─── Courses ───────────────────────────────────────────
 class CourseCreate(BaseModel):
