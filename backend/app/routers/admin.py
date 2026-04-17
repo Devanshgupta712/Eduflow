@@ -10,7 +10,7 @@ import bcrypt
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.middleware.auth import get_current_user, require_roles
+from app.middleware.auth import get_current_user, require_roles, require_admin_permissions
 from app.models.user import User, Role, AdminPermission
 from app.models.course import Course, Batch, BatchStudent
 from app.models.registration import Registration, Document
@@ -681,7 +681,7 @@ async def get_all_permissions(
 async def get_admin_permissions(
     user_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN))
+    _user: User = Depends(require_admin_permissions(manage_users=True))
 ):
     target_user = await db.get(User, user_id)
     if not target_user or target_user.role not in [Role.ADMIN, Role.TRAINER]:
@@ -703,7 +703,7 @@ async def update_admin_permissions(
     user_id: str,
     body: AdminPermissionUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN))
+    _user: User = Depends(require_admin_permissions(manage_users=True))
 ):
     target_user = await db.get(User, user_id)
     if not target_user or target_user.role not in [Role.ADMIN, Role.TRAINER]:
