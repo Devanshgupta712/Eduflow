@@ -9,7 +9,9 @@ export default function ResumeBuilderLanding() {
   const user = getStoredUser();
   const [loadingMode, setLoadingMode] = useState<string | null>(null);
 
-  if (user && !user.can_build_resume) {
+  const hasAccess = user && (user.can_build_resume || user.role === 'SUPER_ADMIN' || user.role === 'ADMIN');
+
+  if (user && !hasAccess) {
     return (
       <div className="container-fluid" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
         <div className="glass-premium" style={{ padding: '40px', textAlign: 'center', maxWidth: '500px' }}>

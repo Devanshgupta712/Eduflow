@@ -124,7 +124,7 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
     const router = useRouter();
 
     const user = getStoredUser();
-    const canBuildResume = user?.can_build_resume === true;
+    const canBuildResume = user?.can_build_resume === true || userRole === 'SUPER_ADMIN' || userRole === 'ADMIN';
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
