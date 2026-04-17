@@ -267,6 +267,8 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     if body.role == "STUDENT" and body.email in _otp_store:
         del _otp_store[body.email]
 
+    # Ensure permissions is set to None for new students to avoid lazy loading crash
+    user.permissions = None
     return UserOut.model_validate(user)
 
 
