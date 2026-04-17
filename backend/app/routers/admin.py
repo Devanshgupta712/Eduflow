@@ -559,6 +559,8 @@ async def delete_user(
         from app.models.placement import JobApplication, AssessmentSubmission, MockInterview, CommunicationPractice
         from app.models.user import AdminPermission
         from app.models.course import Batch, BatchStudent
+        from app.models.resume import Resume
+        from app.models.session import Session, SessionAttendee, StudentFeedback
         
         # 1. DELETE records where user is the primary subject
         entities = [
@@ -578,6 +580,9 @@ async def delete_user(
             (AssessmentSubmission, "AssessmentSubmission", "student_id"),
             (MockInterview, "MockInterview", "student_id"),
             (CommunicationPractice, "CommunicationPractice", "student_id"),
+            (Resume, "Resume", "user_id"),
+            (SessionAttendee, "SessionAttendee", "student_id"),
+            (StudentFeedback, "StudentFeedback", "submitted_by"),
         ]
 
         for model, name, field in entities:
@@ -607,6 +612,12 @@ async def delete_user(
             report.append("Nullified Batch")
         except Exception as e:
             report.append(f"Failed Nullify Batch: {str(e)}")
+            
+        try:
+            await db.execute(Session.__table__.update().where(Session.trainer_id == user_id).values(trainer_id=None))
+            report.append("Nullified Session Trainer")
+        except Exception as e:
+            report.append(f"Failed Nullify Session: {str(e)}")
 
         try:
             await db.execute(Project.__table__.update().where(Project.trainer_id == user_id).values(trainer_id=None))
