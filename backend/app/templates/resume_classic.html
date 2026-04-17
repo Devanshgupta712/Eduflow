@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Resume</title>
+    <style>
+        @page { size: A4; margin: 0; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            margin: 0; padding: 0; color: #000; background: #fff;
+            font-size: 11pt; line-height: 1.4;
+        }
+        .container { width: 210mm; min-height: 297mm; padding: 25mm 20mm; box-sizing: border-box; }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 1px solid #000; padding-bottom: 10px; }
+        .name { font-size: 20pt; font-weight: bold; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px; }
+        .contact { font-size: 10pt; margin: 0; }
+        .section-title {
+            font-size: 12pt; font-weight: bold; text-transform: uppercase;
+            border-bottom: 2px solid #000; padding-bottom: 2px; margin: 15px 0 10px 0; letter-spacing: 0.5px;
+        }
+        .summary { font-size: 10.5pt; text-align: justify; }
+        .item { margin-bottom: 12px; }
+        .item-header { display: flex; justify-content: space-between; align-items: baseline; }
+        .item-title { font-weight: bold; font-size: 11pt; }
+        .item-subtitle { font-style: italic; font-size: 10pt; }
+        .item-date { font-weight: bold; font-size: 10pt; white-space: nowrap; text-align: right; }
+        .item-desc { margin: 4px 0 0 0; font-size: 10.5pt; }
+        .item-desc ul { margin: 4px 0 0 0; padding-left: 20px; }
+        .item-desc li { margin-bottom: 4px; text-align: justify; }
+        .skills-list { font-size: 10.5pt; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="name">{{ personal.get('name', 'Your Name') }}</h1>
+            <p class="contact">
+                {% set parts = [] %}
+                {% if personal.get('email') %}{% set _ = parts.append(personal.get('email')) %}{% endif %}
+                {% if personal.get('phone') %}{% set _ = parts.append(personal.get('phone')) %}{% endif %}
+                {% if personal.get('location') %}{% set _ = parts.append(personal.get('location')) %}{% endif %}
+                {% if personal.get('linkedin') %}{% set _ = parts.append(personal.get('linkedin')) %}{% endif %}
+                {{ parts | join(' | ') }}
+            </p>
+        </div>
+
+        {% if summary %}
+        <div class="section-title">Professional Summary</div>
+        <div class="summary">{{ summary }}</div>
+        {% endif %}
+
+        {% if experience %}
+        <div class="section-title">Professional Experience</div>
+        {% for exp in experience %}
+        <div class="item">
+            <div class="item-header">
+                <span class="item-title">{{ exp.get('role', '') }}</span>
+                <span class="item-date">{{ exp.get('from', '') }} - {{ exp.get('to', '') }}</span>
+            </div>
+            <div class="item-subtitle">{{ exp.get('company', '') }}</div>
+            <div class="item-desc">
+                {% if exp.get('bullets') %}
+                <ul>
+                    {% for point in exp.get('bullets') %}
+                    <li>{{ point }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if education %}
+        <div class="section-title">Education</div>
+        {% for edu in education %}
+        <div class="item">
+            <div class="item-header">
+                <span class="item-title">{{ edu.get('degree', '') }}</span>
+                <span class="item-date">{{ edu.get('year', '') }}</span>
+            </div>
+            <div class="item-subtitle">{{ edu.get('school', '') }}{% if edu.get('grade') %} - {{ edu.get('grade') }}{% endif %}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if projects %}
+        <div class="section-title">Projects</div>
+        {% for proj in projects %}
+        <div class="item">
+            <div class="item-header">
+                <span class="item-title">{{ proj.get('name', '') }}</span>
+                <span class="item-date">{{ proj.get('link', '') }}</span>
+            </div>
+            <div class="item-subtitle">{{ proj.get('tech', '') }}</div>
+            <div class="item-desc">
+                <p style="margin: 4px 0 0 0;">{{ proj.get('description', '') }}</p>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+        
+        {% if skills %}
+        <div class="section-title">Skills</div>
+        <div class="skills-list">
+            {{ skills | join(', ') }}
+        </div>
+        {% endif %}
+        
+        {% if certifications %}
+        <div class="section-title">Certifications</div>
+        {% for cert in certifications %}
+        <div class="item">
+            <div class="item-header">
+                <span class="item-title">{{ cert.get('name', '') }}</span>
+                <span class="item-date">{{ cert.get('date', '') }}</span>
+            </div>
+            <div class="item-subtitle">{{ cert.get('issuer', '') }}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</body>
+</html>

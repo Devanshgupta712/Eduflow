@@ -17,3 +17,7 @@ google-generativeai
 python-socketio==5.11.0
 apscheduler==3.10.4
 httpx
+pdfplumber
+python-docx
+weasyprint
+Jinja2

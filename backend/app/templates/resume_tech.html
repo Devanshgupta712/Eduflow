@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Resume</title>
+    <style>
+        @page { size: A4; margin: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; padding: 0; color: #111; background: #fff;
+            font-size: 10.5pt; line-height: 1.5;
+        }
+        .container { width: 210mm; min-height: 297mm; padding: 25mm; box-sizing: border-box; }
+        .header { margin-bottom: 20px; text-align: left; border-left: 4px solid #333; padding-left: 15px; }
+        .name { font-size: 26pt; font-weight: 800; margin: 0 0 5px 0; color: #000; letter-spacing: -1px; }
+        .contact { font-size: 9.5pt; margin: 0; color: #444; font-family: monospace; }
+        .section-title {
+            font-size: 11pt; font-weight: bold; text-transform: uppercase; font-family: monospace;
+            background: #f1f5f9; padding: 6px 12px; margin: 20px 0 12px 0; color: #0f172a; border-radius: 2px;
+            letter-spacing: 1px;
+        }
+        .summary { font-size: 10.5pt; }
+        .item { margin-bottom: 15px; }
+        .item-header { display: flex; justify-content: space-between; align-items: baseline; }
+        .item-title { font-weight: 700; font-size: 11pt; color: #000; }
+        .item-subtitle { font-weight: 600; font-size: 10pt; color: #334155; }
+        .item-date { font-size: 9.5pt; color: #64748b; font-family: monospace; text-align: right; }
+        .item-desc { margin: 6px 0 0 0; font-size: 10.5pt; }
+        .item-desc ul { margin: 6px 0 0 0; padding-left: 20px; color: #1e293b; }
+        .item-desc li { margin-bottom: 5px; }
+        .skills-list { font-size: 10.5pt; font-family: monospace; color: #0f172a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="name">{{ personal.get('name', 'Your Name') }}</h1>
+            <p class="contact">
+                {% set parts = [] %}
+                {% if personal.get('email') %}{% set _ = parts.append(personal.get('email')) %}{% endif %}
+                {% if personal.get('phone') %}{% set _ = parts.append(personal.get('phone')) %}{% endif %}
+                {% if personal.get('location') %}{% set _ = parts.append(personal.get('location')) %}{% endif %}
+                {% if personal.get('linkedin') %}{% set _ = parts.append(personal.get('linkedin')) %}{% endif %}
+                {{ parts | join(' | ') }}
+            </p>
+        </div>
+
+        {% if summary %}
+        <div class="section-title">## SUMMARY</div>
+        <div class="summary">{{ summary }}</div>
+        {% endif %}
+
+        {% if skills %}
+        <div class="section-title">## SKILLS</div>
+        <div class="skills-list">
+            > {{ skills | join(', ') }}
+        </div>
+        {% endif %}
+
+        {% if experience %}
+        <div class="section-title">## EXPERIENCE</div>
+        {% for exp in experience %}
+        <div class="item">
+            <div class="item-header">
+                <span class="item-title">{{ exp.get('role', '') }}</span>
+                <span class="item-date">[{{ exp.get('from', '') }} - {{ exp.get('to', '') }}]</span>
+            </div>
+            <div class="item-subtitle">@ {{ exp.get('company', '') }}</div>
+            <div class="item-desc">
+                {% if exp.get('bullets') %}
+                <ul>
+                    {% for point in exp.get('bullets') %}
+                    <li>{{ point }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if projects %}
+        <div class="section-title">## PROJECTS</div>
+        {% for proj in projects %}
+        <div class="item">
+            <div class="item-header">
+                <span class="item-title">{{ proj.get('name', '') }}</span>
+                <span class="item-date">{% if proj.get('link') %}[ {{ proj.get('link') }} ]{% endif %}</span>
+            </div>
+            <div class="item-subtitle">> {{ proj.get('tech', '') }}</div>
+            <div class="item-desc">
+                <p style="margin: 4px 0 0 0;">{{ proj.get('description', '') }}</p>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if education %}
+        <div class="section-title">## EDUCATION</div>
+        {% for edu in education %}
+        <div class="item" style="margin-bottom: 8px;">
+            <div class="item-header">
+                <span class="item-title">{{ edu.get('degree', '') }}</span>
+                <span class="item-date">[{{ edu.get('year', '') }}]</span>
+            </div>
+            <div class="item-subtitle">{{ edu.get('school', '') }}{% if edu.get('grade') %} ({{ edu.get('grade') }}){% endif %}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+        
+        {% if certifications %}
+        <div class="section-title">## CERTIFICATIONS</div>
+        {% for cert in certifications %}
+        <div class="item" style="margin-bottom: 8px;">
+            <div class="item-header">
+                <span class="item-title">{{ cert.get('name', '') }}</span>
+                <span class="item-date">[{{ cert.get('date', '') }}]</span>
+            </div>
+            <div class="item-subtitle">{{ cert.get('issuer', '') }}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</body>
+</html>

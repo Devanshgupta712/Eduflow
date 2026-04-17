@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete, getStoredUser } from '@/lib/api';
 import SkeletonLoader from '@/components/SkeletonLoader';
 
-interface UserItem { id: string; name: string; email: string; role: string; phone: string | null; is_active: boolean; created_at: string; }
+interface UserItem { id: string; name: string; email: string; role: string; phone: string | null; is_active: boolean; can_build_resume: boolean; created_at: string; }
 
 export default function UsersPage() {
     const [users, setUsers] = useState<UserItem[]>([]);
@@ -85,6 +85,17 @@ export default function UsersPage() {
             loadUsers();
         } catch (err: any) {
             alert('Error updating status: ' + (err.message || 'Unknown error'));
+        }
+    };
+
+    const handleToggleResumeAccess = async (user: UserItem) => {
+        try {
+            await apiPatch(`/api/admin/users/${user.id}/resume-access`, {
+                can_build_resume: !user.can_build_resume
+            });
+            loadUsers();
+        } catch (err: any) {
+            alert('Error updating resume access: ' + (err.message || 'Unknown error'));
         }
     };
 
@@ -283,6 +294,14 @@ export default function UsersPage() {
                                                     onClick={() => handleOpenManage(u)}
                                                 >
                                                     Manage
+                                                </button>
+                                            )}
+                                            {u.role === 'STUDENT' && isSuperAdmin && (
+                                                <button
+                                                    className={`btn btn-sm ${u.can_build_resume ? 'btn-success' : 'btn-secondary'}`}
+                                                    onClick={() => handleToggleResumeAccess(u)}
+                                                >
+                                                    📄 Resume: {u.can_build_resume ? 'ON' : 'OFF'}
                                                 </button>
                                             )}
                                             {u.role === 'TRAINER' && (

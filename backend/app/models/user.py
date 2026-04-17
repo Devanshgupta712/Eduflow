@@ -47,6 +47,7 @@ class User(Base):
     highest_education: Mapped[str | None] = mapped_column(String, nullable=True)
     degree: Mapped[str | None] = mapped_column(String, nullable=True)
     passing_year: Mapped[str | None] = mapped_column(String, nullable=True)
+    can_build_resume: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     verification_code: Mapped[str | None] = mapped_column(String, nullable=True)

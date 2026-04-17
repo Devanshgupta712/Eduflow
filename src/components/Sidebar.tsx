@@ -18,6 +18,7 @@ interface NavItem {
     href: string;
     icon: string;
     roles?: string[];
+    requiresResumeAccess?: boolean;
 }
 
 interface NavSection {
@@ -98,6 +99,7 @@ const navSections: NavSection[] = [
             { label: 'Work Hour', href: '/student/time-tracking', icon: '⏱️' },
             { label: 'Tasks', href: '/student/tasks', icon: '📋' },
             { label: 'Assignments', href: '/student/assessments', icon: '📝' },
+            { label: 'Resume Builder', href: '/student/resume', icon: '📄', requiresResumeAccess: true },
             { label: 'Apply Leave', href: '/student/leaves', icon: '🗓️' },
             { label: 'Job Board', href: '/student/jobs', icon: '💼' },
             { label: 'Warnings', href: '/student/violations', icon: '⚠️' },
@@ -118,6 +120,9 @@ const navSections: NavSection[] = [
 export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
+
+    const user = getStoredUser();
+    const canBuildResume = user?.can_build_resume === true;
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
@@ -198,6 +203,7 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
                                 </div>
                                 {section.items
                                     .filter((item) => !item.roles || item.roles.includes(userRole))
+                                    .filter((item) => !item.requiresResumeAccess || canBuildResume)
                                     .map((item) => {
                                         const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                                         return (
@@ -291,6 +297,7 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
                     .filter((section) => section.roles.includes(userRole))
                     .flatMap(s => s.items)
                     .filter(item => !item.roles || item.roles.includes(userRole))
+                    .filter(item => !item.requiresResumeAccess || canBuildResume)
                     .slice(0, 4)
                     .map((item) => {
                         const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
@@ -362,6 +369,7 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                     {section.items
                                         .filter((item) => !item.roles || item.roles.includes(userRole))
+                                        .filter((item) => !item.requiresResumeAccess || canBuildResume)
                                         .map((item) => {
                                             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                                             return (

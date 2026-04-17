@@ -314,7 +314,7 @@ async def update_profile(
         user.degree = body["degree"]
     if "passing_year" in body:
         user.passing_year = body["passing_year"]
-    await db.flush()
+    await db.commit()
     return {"status": "updated", "name": user.name, "phone": user.phone}
 
 

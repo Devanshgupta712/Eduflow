@@ -487,6 +487,24 @@ async def update_user_status(
     await db.flush()
     return {"status": "updated", "is_active": target_user.is_active}
 
+class UserResumeAccessUpdate(BaseModel):
+    can_build_resume: bool
+
+@router.patch("/users/{user_id}/resume-access")
+async def update_user_resume_access(
+    user_id: str,
+    body: UserResumeAccessUpdate,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+):
+    target_user = await db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    target_user.can_build_resume = body.can_build_resume
+    await db.commit()
+    return {"status": "updated", "can_build_resume": target_user.can_build_resume}
+
 
 @router.patch("/users/{user_id}/password")
 async def update_user_password(

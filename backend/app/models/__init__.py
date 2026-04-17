@@ -10,6 +10,7 @@ from app.models.registration import Registration, Document
 from app.models.notification import Notification, Message, Video, Feedback, Suggestion
 from app.models.setting import SystemSetting
 from app.models.session import Session, StudentFeedback
+from app.models.resume import Resume
 
 __all__ = [
     "User",
@@ -21,6 +22,7 @@ __all__ = [
     "Registration", "Document",
     "Notification", "Message", "Video", "Feedback", "Suggestion",
     "SystemSetting",
+    "Resume",
 ]
 
 

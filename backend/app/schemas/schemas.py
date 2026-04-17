@@ -48,6 +48,7 @@ class UserOut(BaseModel):
     highest_education: str | None = None
     degree: str | None = None
     passing_year: str | None = None
+    can_build_resume: bool = False
     is_active: bool
     created_at: datetime
 
@@ -139,6 +140,7 @@ class StudentOut(BaseModel):
     phone: str | None
     student_id: str | None
     role: str
+    can_build_resume: bool = False
     is_active: bool
     created_at: datetime
     attendance_percentage: int | None = None
