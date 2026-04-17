@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getToken } from '@/lib/api';
+import { getToken, API_BASE } from '@/lib/api';
 import Navbar from '@/components/marketing/Navbar';
 
 export default function ResumeEnhanceMode() {
@@ -35,7 +35,7 @@ export default function ResumeEnhanceMode() {
     formData.append('file', file);
     
     try {
-      const res = await fetch('/api/resume/extract-text', {
+      const res = await fetch(`${API_BASE}/api/resume/extract-text`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${getToken()}`
@@ -86,7 +86,7 @@ export default function ResumeEnhanceMode() {
     setIsEnhancing(true);
     try {
         // 1. Call AI to generate enhanced JSON
-        const aiRes = await fetch('/api/resume/enhance', {
+        const aiRes = await fetch(`${API_BASE}/api/resume/enhance`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ export default function ResumeEnhanceMode() {
 
         // 2. Save the enhanced JSON back to the Resume object
         if (enhancedData && resumeId) {
-            const updateRes = await fetch(`/api/resume/${resumeId}`, {
+            const updateRes = await fetch(`${API_BASE}/api/resume/${resumeId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

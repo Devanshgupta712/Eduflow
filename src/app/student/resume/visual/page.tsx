@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getToken } from '@/lib/api';
+import { getToken, API_BASE } from '@/lib/api';
 import Navbar from '@/components/marketing/Navbar';
 
 export default function VisualResumeEditor() {
@@ -32,7 +32,7 @@ export default function VisualResumeEditor() {
 
   const fetchResume = async () => {
     try {
-      const res = await fetch(`/api/resume/${resumeId}`, {
+      const res = await fetch(`${API_BASE}/api/resume/${resumeId}`, {
         headers: { 'Authorization': `Bearer ${getToken()}` }
       });
       if (res.ok) {
@@ -58,7 +58,7 @@ export default function VisualResumeEditor() {
     if (!resume) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/resume/${resumeId}`, {
+      const res = await fetch(`${API_BASE}/api/resume/${resumeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -112,7 +112,7 @@ export default function VisualResumeEditor() {
     if (!content.trim()) return;
     setRewritingIndex(index !== null ? index : -1);
     try {
-      const res = await fetch(`/api/resume/${resumeId}/ai-rewrite-section`, {
+      const res = await fetch(`${API_BASE}/api/resume/${resumeId}/ai-rewrite-section`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -190,7 +190,7 @@ export default function VisualResumeEditor() {
           <button onClick={() => handleSave(true)} className="btn btn-outline" disabled={saving}>
             {saving ? 'Saving...' : '💾 Save'}
           </button>
-          <button onClick={() => window.open(`/api/resume/${resumeId}/export?template=${resume.template}`, '_blank')} className="btn btn-primary">
+          <button onClick={() => window.open(`${API_BASE}/api/resume/${resumeId}/export?template=${resume.template}&token=${getToken()}`, '_blank')} className="btn btn-primary">
             📥 Export PDF
           </button>
         </div>

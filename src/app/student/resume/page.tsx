@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getStoredUser, getToken } from '@/lib/api';
+import { getStoredUser, getToken, API_BASE } from '@/lib/api';
 
 export default function ResumeBuilderLanding() {
   const router = useRouter();
@@ -30,7 +30,7 @@ export default function ResumeBuilderLanding() {
     setLoadingMode(mode);
     try {
       const token = getToken();
-      const res = await fetch('/api/resume', {
+      const res = await fetch(`${API_BASE}/api/resume`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ function SavedResumesList() {
 
   const fetchResumes = async () => {
     try {
-      const res = await fetch('/api/resume', {
+      const res = await fetch(`${API_BASE}/api/resume`, {
         headers: { 'Authorization': `Bearer ${getToken()}` }
       });
       if (res.ok) {
@@ -206,7 +206,7 @@ function SavedResumesList() {
     // Basic inline confirmation
     if (!window.confirm("Are you sure you want to delete this resume?")) return;
     try {
-      const res = await fetch(`/api/resume/${id}`, {
+      const res = await fetch(`${API_BASE}/api/resume/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${getToken()}` }
       });
@@ -222,7 +222,7 @@ function SavedResumesList() {
 
   const handleSetPrimary = async (id: string) => {
     try {
-      const res = await fetch(`/api/resume/${id}/set-primary`, {
+      const res = await fetch(`${API_BASE}/api/resume/${id}/set-primary`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${getToken()}` }
       });
@@ -271,7 +271,7 @@ function SavedResumesList() {
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <button onClick={() => router.push(`/student/resume/visual?id=${r.id}`)} className="btn btn-primary btn-sm" style={{ padding: '8px', fontSize: '12px' }}>✏️ Edit</button>
-            <button onClick={() => window.open(`/api/resume/${r.id}/export?template=${r.template}`, '_blank')} className="btn btn-outline btn-sm" style={{ padding: '8px', fontSize: '12px' }}>📥 PDF</button>
+            <button onClick={() => window.open(`${API_BASE}/api/resume/${r.id}/export?template=${r.template}&token=${getToken()}`, '_blank')} className="btn btn-outline btn-sm" style={{ padding: '8px', fontSize: '12px' }}>📥 PDF</button>
             <button onClick={() => handleSetPrimary(r.id)} className="btn btn-outline btn-sm" style={{ padding: '8px', fontSize: '12px', gridColumn: 'span 1' }} disabled={r.is_primary}>⭐ Star</button>
             <button onClick={() => handleDelete(r.id)} className="btn btn-outline btn-sm" style={{ padding: '8px', fontSize: '12px', color: 'var(--danger)', borderColor: 'var(--danger)' }}>🗑️ Delete</button>
           </div>

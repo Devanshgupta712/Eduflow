@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getToken } from '@/lib/api';
+import { getToken, API_BASE } from '@/lib/api';
 import Navbar from '@/components/marketing/Navbar';
 
 export default function ResumeGenerateMode() {
@@ -39,7 +39,7 @@ export default function ResumeGenerateMode() {
     
     setIsGenerating(true);
     try {
-        const aiRes = await fetch('/api/resume/generate', {
+        const aiRes = await fetch(`${API_BASE}/api/resume/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -73,7 +73,7 @@ export default function ResumeGenerateMode() {
 
         // Save generated JSON to Resume object
         if (generatedData && resumeId) {
-            const updateRes = await fetch(`/api/resume/${resumeId}`, {
+            const updateRes = await fetch(`${API_BASE}/api/resume/${resumeId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
