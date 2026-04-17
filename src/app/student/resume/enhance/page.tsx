@@ -2,14 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import { getToken } from '@/lib/api';
 import Navbar from '@/components/marketing/Navbar';
 
 export default function ResumeEnhanceMode() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const resumeId = searchParams.get('id');
-  const { getToken } = useAuth();
   
   const [step, setStep] = useState(1);
   const [resumeText, setResumeText] = useState('');

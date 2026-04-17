@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import { getStoredUser, getToken } from '@/lib/api';
 
 export default function ResumeBuilderLanding() {
   const router = useRouter();
-  const { user, getToken } = useAuth();
+  const user = getStoredUser();
   const [loadingMode, setLoadingMode] = useState<string | null>(null);
 
   if (user && !user.can_build_resume) {
@@ -164,6 +164,7 @@ export default function ResumeBuilderLanding() {
         </div>
 
       </div>
+    </div>
 
       <div style={{ marginTop: 'var(--space-12)', padding: '0 var(--space-6)' }}>
         <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: 'var(--space-4)' }}>Saved Resumes</h3>
@@ -176,7 +177,6 @@ export default function ResumeBuilderLanding() {
 // Subcomponent to list previously created resumes
 function SavedResumesList() {
   const router = useRouter();
-  const { getToken } = useAuth();
   const [resumes, setResumes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
