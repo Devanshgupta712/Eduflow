@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -37,7 +38,11 @@ async def get_current_user(
             raise HTTPException(status_code=401, detail="Session expired. Please log out and log in again.")
         raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.permissions))
+        .where(User.id == user_id)
+    )
     user = result.scalars().first()
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
@@ -59,7 +64,11 @@ async def get_optional_user(
         if not user_id:
             return None
             
-        result = await db.execute(select(User).where(User.id == user_id))
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.permissions))
+            .where(User.id == user_id)
+        )
         return result.scalars().first()
     except:
         return None

@@ -28,7 +28,7 @@ class AdminPermission(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    user = relationship("User", back_populates="admin_permission")
+    user = relationship("User", back_populates="permissions")
 
 
 class User(Base):
@@ -77,5 +77,5 @@ class User(Base):
     comm_practice = relationship("CommunicationPractice", back_populates="student")
     time_tracking = relationship("TimeTracking", back_populates="user")
     lead_activities = relationship("LeadActivity", back_populates="user")
-    admin_permission = relationship("AdminPermission", back_populates="user", uselist=False)
+    permissions = relationship("AdminPermission", back_populates="user", uselist=False)
 

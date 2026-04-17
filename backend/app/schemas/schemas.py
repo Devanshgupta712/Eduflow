@@ -51,6 +51,7 @@ class UserOut(BaseModel):
     can_build_resume: bool = False
     is_active: bool
     created_at: datetime
+    permissions: AdminPermissionOut | None = None
 
     class Config:
         from_attributes = True
