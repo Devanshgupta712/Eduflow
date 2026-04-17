@@ -68,7 +68,7 @@ async def get_groq_completion(prompt: str, system_prompt: str = "You are an expe
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
                 json={
-                    "model": "llama3-70b-8192",
+                    "model": "llama-3.3-70b-versatile",
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt}
@@ -76,12 +76,22 @@ async def get_groq_completion(prompt: str, system_prompt: str = "You are an expe
                     "temperature": 0.7,
                     "max_tokens": 4000
                 },
-                timeout=30.0
+                timeout=60.0
             )
-            response.raise_for_status()
+            if response.status_code != 200:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get("error", {}).get("message", response.text)
+                except:
+                    pass
+                raise HTTPException(status_code=500, detail=f"Groq API Error: {error_detail}")
+                
             data = response.json()
             return data["choices"][0]["message"]["content"]
         except Exception as e:
+            if isinstance(e, HTTPException):
+                raise e
             raise HTTPException(status_code=500, detail=f"LLM Generation failed: {str(e)}")
 
 
