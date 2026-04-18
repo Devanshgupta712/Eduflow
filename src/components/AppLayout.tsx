@@ -35,6 +35,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [isSearching, setIsSearching] = useState(false);
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+    const [saturdayStatus, setSaturdayStatus] = useState({ is_saturday: false, has_submitted: false, should_block: false });
+
 
     // WebSocket Integration
     // For simplicity, we'll try to join a batch room if the user is a trainer or student
@@ -100,6 +102,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     if (Array.isArray(data)) setNotifications(data);
                 })
                 .catch(() => { });
+
+            // Check Saturday Feedback Status
+            apiGet('/api/sessions/feedback/saturday-status')
+                .then(setSaturdayStatus)
+                .catch(() => {});
         } else if (!PUBLIC_PATHS.includes(pathname)) {
             router.push('/');
         }
@@ -430,6 +437,47 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     studentId={selectedStudentId}
                     onClose={() => setSelectedStudentId(null)}
                 />
+            )}
+
+            {/* Saturday Feedback Block Overlay */}
+            {saturdayStatus.should_block && pathname !== '/student/feedback' && user?.role === 'STUDENT' && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(15, 23, 42, 0.98)',
+                    backdropFilter: 'blur(12px)',
+                    zIndex: 9999,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '20px'
+                }}>
+                    <div className="glass-premium" style={{ 
+                        maxWidth: '500px', width: '100%', padding: '48px 32px', 
+                        textAlign: 'center', borderRadius: '32px',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+                    }}>
+                        <div style={{ fontSize: '72px', marginBottom: '24px' }}>📝</div>
+                        <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#fff', marginBottom: '16px', letterSpacing: '-0.02em' }}>
+                            Weekly Feedback Required
+                        </h2>
+                        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '16px', lineHeight: 1.6, marginBottom: '32px' }}>
+                            Today is Saturday! As per institute policy, you must provide feedback for your trainers to continue using the portal.
+                        </p>
+                        <button 
+                            onClick={() => router.push('/student/feedback')}
+                            className="btn-primary"
+                            style={{ 
+                                width: '100%', padding: '16px', borderRadius: '14px', 
+                                fontSize: '16px', fontWeight: 700,
+                                background: 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)'
+                            }}
+                        >
+                            Give Feedback Now →
+                        </button>
+                        <p style={{ marginTop: '20px', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+                            Skipping feedback will result in an automated policy violation.
+                        </p>
+                    </div>
+                </div>
             )}
         </div>
     );

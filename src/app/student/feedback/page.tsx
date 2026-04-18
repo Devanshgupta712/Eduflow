@@ -43,6 +43,15 @@ const SECTIONS = [
     }
 ];
 
+const TRAINEE_QUESTIONS = [
+    { id: "t_consistency", label: "My consistency in attending classes this week" },
+    { id: "t_practice", label: "My daily practice hours (at least 2-4 hours)" },
+    { id: "t_assignments", label: "Timely completion of all assignments/tasks" },
+    { id: "t_confidence", label: "Confidence in topics covered this week" },
+    { id: "t_participation", label: "My active participation in class discussions" },
+];
+
+
 export default function StudentFeedbackPage() {
     const [trainers, setTrainers] = useState<any[]>([]);
     const [selectedTrainer, setSelectedTrainer] = useState<string>('');
@@ -113,6 +122,17 @@ export default function StudentFeedbackPage() {
                 comments: formattedComments,
                 is_anonymous: false // Hardcoded per user request
             });
+
+            // 3. Submit Trainee Feedback (Self-Evaluation)
+            const tSum = TRAINEE_QUESTIONS.reduce((a, q) => a + (ratings[q.id] || 0), 0);
+            const tAvg = Math.round(tSum / TRAINEE_QUESTIONS.length);
+            
+            await apiPost('/api/sessions/trainee-feedback', {
+                rating: tAvg,
+                comments: `Self-Evaluation: ${qUseful}\nImprovement Plan: ${qImprove}`,
+                week: 1 // Could be calculated
+            });
+
             
             setSubmitted(true);
             setRatings({});
@@ -200,60 +220,58 @@ export default function StudentFeedbackPage() {
                     )}
                 </div>
 
-                {/* Rating Matrices */}
-                {SECTIONS.map((section, sIdx) => (
-                    <div key={sIdx} className="glass-premium" style={{ padding: '32px', borderRadius: '24px', border: '1px solid var(--border)', overflowX: 'auto' }}>
-                        <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '24px' }}>
-                            {section.title} <span style={{ color: 'var(--danger)' }}>*</span>
-                        </h3>
+                    </div>
+                ))}
+
+                {/* Trainee Self-Evaluation Matrix */}
+                <div className="glass-premium" style={{ padding: '32px', borderRadius: '24px', border: '1px solid var(--primary-glow)', overflowX: 'auto', background: 'var(--primary-glow)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
+                        <span style={{ fontSize: '24px' }}>👤</span>
+                        <div>
+                            <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                                Trainee Self-Evaluation <span style={{ color: 'var(--danger)' }}>*</span>
+                            </h3>
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0' }}>Evaluate your own progress and performance this week</p>
+                        </div>
+                    </div>
+                    
+                    <div style={{ minWidth: '600px' }}>
+                        <div style={{ display: 'flex', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ width: '40%' }}></div>
+                            <div style={{ width: '60%', display: 'flex', justifyContent: 'space-between', padding: '0 16px' }}>
+                                {["Poor", "Fair", "Satisfactory", "Good", "Excellent"].map((label, i) => (
+                                    <div key={i} style={{ width: '20%', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>
+                                        {label}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                         
-                        <div style={{ minWidth: '600px' }}>
-                            {/* Matrix Header */}
-                            <div style={{ display: 'flex', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
-                                <div style={{ width: '40%' }}></div>
+                        {TRAINEE_QUESTIONS.map((q, qIdx) => (
+                            <div key={q.id} style={{ 
+                                display: 'flex', padding: '16px 0', 
+                                borderBottom: qIdx === TRAINEE_QUESTIONS.length - 1 ? 'none' : '1px solid rgba(0,0,0,0.05)',
+                                alignItems: 'center'
+                            }}>
+                                <div style={{ width: '40%', fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', paddingRight: '16px' }}>
+                                    {q.label}
+                                </div>
                                 <div style={{ width: '60%', display: 'flex', justifyContent: 'space-between', padding: '0 16px' }}>
-                                    {section.scale.map((label, i) => (
-                                        <div key={i} style={{ width: '20%', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
-                                            {label}
+                                    {[1, 2, 3, 4, 5].map((val) => (
+                                        <div key={val} style={{ width: '20%', display: 'flex', justifyContent: 'center' }}>
+                                            <input 
+                                                type="radio" name={q.id} value={val}
+                                                checked={ratings[q.id] === val}
+                                                onChange={() => handleRatingChange(q.id, val)}
+                                                style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                                            />
                                         </div>
                                     ))}
                                 </div>
                             </div>
-                            
-                            {/* Matrix Rows */}
-                            {section.questions.map((q, qIdx) => (
-                                <div key={q.id} style={{ 
-                                    display: 'flex', 
-                                    padding: '16px 0', 
-                                    borderBottom: qIdx === section.questions.length - 1 ? 'none' : '1px solid rgba(0,0,0,0.05)',
-                                    alignItems: 'center',
-                                    background: qIdx % 2 !== 0 ? 'var(--bg-tertiary)' : 'transparent',
-                                    margin: qIdx % 2 !== 0 ? '0 -16px' : '0',
-                                    paddingLeft: qIdx % 2 !== 0 ? '16px' : '0',
-                                    paddingRight: qIdx % 2 !== 0 ? '16px' : '0',
-                                }}>
-                                    <div style={{ width: '40%', fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', paddingRight: '16px' }}>
-                                        {q.label}
-                                    </div>
-                                    <div style={{ width: '60%', display: 'flex', justifyContent: 'space-between', padding: '0 16px' }}>
-                                        {[1, 2, 3, 4, 5].map((val) => (
-                                            <div key={val} style={{ width: '20%', display: 'flex', justifyContent: 'center' }}>
-                                                <input 
-                                                    type="radio"
-                                                    name={q.id}
-                                                    value={val}
-                                                    checked={ratings[q.id] === val}
-                                                    onChange={() => handleRatingChange(q.id, val)}
-                                                    style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--primary)' }}
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        ))}
                     </div>
-                ))}
+                </div>
 
                 {/* Open Ended Questions */}
                 <div className="glass-premium" style={{ padding: '32px', borderRadius: '24px', border: '1px solid var(--border)' }}>

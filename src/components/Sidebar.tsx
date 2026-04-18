@@ -129,29 +129,61 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
     const canBuildResume = user?.can_build_resume === true || userRole === 'SUPER_ADMIN' || userRole === 'ADMIN';
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+    const [notifications, setNotifications] = React.useState<any[]>([]);
+    const [traineeRating, setTraineeRating] = React.useState<number | null>(null);
 
-    // Auto-close mobile menu on route change
     React.useEffect(() => {
-        setIsMobileMenuOpen(false);
-    }, [pathname]);
+        const fetchSidebarData = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) return;
 
-    const getInitials = (name: string) => {
-        return name
-            .split(' ')
-            .map((n) => n[0])
-            .join('')
-            .toUpperCase()
-            .slice(0, 2);
-    };
+            try {
+                // Fetch Notifications
+                const notifResp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com'}/api/auth/notifications`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (notifResp.ok) {
+                    const data = await notifResp.json();
+                    setNotifications(Array.isArray(data) ? data.slice(0, 5) : []);
+                }
 
-    const formatRole = (role: string) => {
-        return role.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-    };
+                // Fetch Trainee Rating (only for students)
+                if (userRole === 'STUDENT') {
+                    const ratingResp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com'}/api/sessions/feedback/trainee-rating`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (ratingResp.ok) {
+                        const data = await ratingResp.json();
+                        setTraineeRating(data.rating);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch sidebar data", err);
+            }
+        };
+
+        fetchSidebarData();
+        const interval = setInterval(fetchSidebarData, 60000); // refresh every minute
+        return () => clearInterval(interval);
+    }, [userRole]);
 
     const handleLogout = () => {
         clearToken();
         router.push('/');
     };
+
+    const markAsRead = async (id: string) => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        try {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com'}/api/auth/notifications/${id}/read`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+        } catch (e) { }
+    };
+
 
     return (
         <>
@@ -247,6 +279,50 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
                                     })}
                             </div>
                         ))}
+
+                    {/* Live Notifications Section */}
+                    {notifications.length > 0 && (
+                        <div style={{ marginTop: '12px' }}>
+                            <div style={{ 
+                                padding: '0 12px', 
+                                fontSize: '11px', 
+                                fontWeight: 700, 
+                                color: 'var(--text-muted)', 
+                                textTransform: 'uppercase', 
+                                letterSpacing: '0.05em',
+                                marginBottom: '12px',
+                                display: 'flex',
+                                justifyContent: 'space-between'
+                            }}>
+                                Live Updates
+                                <Link href="/student/notifications" style={{ textTransform: 'none', color: 'var(--primary)', fontSize: '10px' }}>View All</Link>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {notifications.map((n: any) => (
+                                    <div 
+                                        key={n.id}
+                                        onClick={() => {
+                                            markAsRead(n.id);
+                                            if (n.link) router.push(n.link);
+                                            else router.push('/student/notifications');
+                                            if (onClose) onClose();
+                                        }}
+                                        style={{
+                                            padding: '8px 12px',
+                                            borderRadius: '8px',
+                                            background: n.read ? 'transparent' : 'var(--primary-glow)',
+                                            border: `1px solid ${n.read ? 'var(--border)' : 'var(--primary-glow)'}`,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '2px' }}>{n.title}</div>
+                                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{n.message}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </nav>
 
                 {/* User Section */}
@@ -267,7 +343,14 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
                             {getInitials(userName)}
                         </div>
                         <div style={{ overflow: 'hidden' }}>
-                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{userName}</div>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {userName}
+                                {traineeRating !== null && (
+                                    <span style={{ fontSize: '11px', padding: '1px 6px', background: 'var(--primary-glow)', color: 'var(--primary)', borderRadius: '99px', fontWeight: 700 }}>
+                                        ⭐ {traineeRating.toFixed(1)}
+                                    </span>
+                                )}
+                            </div>
                             <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{userRole.toLowerCase()}</div>
                         </div>
                     </div>

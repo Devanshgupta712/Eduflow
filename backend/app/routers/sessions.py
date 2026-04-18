@@ -356,3 +356,109 @@ async def get_all_feedback(
             entry["student_name"] = u_name or "Unknown"
         data.append(entry)
     return data
+@router.get("/feedback/saturday-status")
+async def get_saturday_feedback_status(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    if user.role != "STUDENT":
+        return {"is_saturday": False, "has_submitted": True, "should_block": False}
+
+    from app.models.session import StudentFeedback
+    from app.models.project import Violation, ViolationType
+    
+    now = datetime.utcnow()
+    # 5 is Saturday in Python's weekday() (0=Monday, 6=Sunday)
+    is_saturday = now.weekday() == 5
+    
+    # Calculate current week's Saturday start and end
+    # Week starts Monday. Saturday is day 5.
+    days_to_saturday = (5 - now.weekday()) % 7
+    if days_to_saturday > 0: # It's Sun-Fri, Saturday was in the past or future
+        # Get the PREVIOUS Saturday
+        last_saturday = (now - timedelta(days=(now.weekday() - 5) % 7)).replace(hour=0, minute=0, second=0, microsecond=0)
+    else: # It's Saturday
+        last_saturday = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Check if feedback exists for this week's Saturday (or the period since last Saturday)
+    res = await db.execute(
+        select(StudentFeedback).where(
+            StudentFeedback.submitted_by == user.id,
+            StudentFeedback.created_at >= last_saturday
+        )
+    )
+    has_submitted = res.scalars().first() is not None
+    
+    should_block = is_saturday and not has_submitted
+    
+    # Automatic Violation Logic:
+    # If it's Sunday (day 6) and they haven't submitted feedback for the Saturday just passed
+    if now.weekday() == 6 and not has_submitted:
+        # Check if violation already exists for this week
+        v_res = await db.execute(
+            select(Violation).where(
+                Violation.student_id == user.id,
+                Violation.type == ViolationType.MISSED_FEEDBACK,
+                Violation.created_at >= last_saturday
+            )
+        )
+        if not v_res.scalars().first():
+            v = Violation(
+                student_id=user.id,
+                type=ViolationType.MISSED_FEEDBACK,
+                title="⚠️ Saturday Feedback Missed",
+                description=f"System detected missed feedback for Saturday {last_saturday.strftime('%d %b %Y')}.",
+                severity="LOW"
+            )
+            db.add(v)
+            await db.commit()
+
+    return {
+        "is_saturday": is_saturday,
+        "has_submitted": has_submitted,
+        "should_block": should_block,
+        "current_day": now.strftime("%A")
+    }
+
+@router.get("/feedback/trainee-rating")
+async def get_trainee_rating(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    from app.models.notification import Feedback
+    # Calculate average rating for this student from Feedback model
+    res = await db.execute(
+        select(func.avg(Feedback.rating)).where(Feedback.student_id == user.id)
+    )
+    avg_rating = res.scalar() or 0.0
+    return {"rating": float(avg_rating)}
+
+@router.post("/trainee-feedback")
+async def submit_trainee_feedback(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    if user.role != "STUDENT":
+        raise HTTPException(status_code=403, detail="Only students can submit self-feedback")
+    
+    from app.models.notification import Feedback as TraineeFeedback
+    from app.models.course import BatchStudent
+    
+    # Get student's batch
+    batch_res = await db.execute(select(BatchStudent.batch_id).where(BatchStudent.student_id == user.id))
+    batch_id = batch_res.scalar()
+    
+    f = TraineeFeedback(
+        student_id=user.id,
+        batch_id=batch_id or "NO_BATCH",
+        week=int(body.get("week", 1)),
+        rating=int(body.get("rating", 0)),
+        comments=body.get("comments"),
+        created_by_id=user.id # Self-evaluation
+    )
+    db.add(f)
+    await db.commit()
+    return {"status": "success"}
+
+

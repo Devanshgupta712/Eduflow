@@ -78,13 +78,24 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     from app.models.session import StudentFeedback
+    from app.models.notification import Feedback as TraineeFeedback
     from sqlalchemy import func
     
-    rating_result = await db.execute(
-        select(func.avg(StudentFeedback.rating))
-        .where(StudentFeedback.target_id == user.id, StudentFeedback.target_type == 'TRAINER')
-    )
-    avg_rating = rating_result.scalar()
+    if user.role.value == 'TRAINER':
+        rating_result = await db.execute(
+            select(func.avg(StudentFeedback.rating))
+            .where(StudentFeedback.target_id == user.id, StudentFeedback.target_type == 'TRAINER')
+        )
+        avg_rating = rating_result.scalar()
+    elif user.role.value == 'STUDENT':
+        rating_result = await db.execute(
+            select(func.avg(TraineeFeedback.rating))
+            .where(TraineeFeedback.student_id == user.id)
+        )
+        avg_rating = rating_result.scalar()
+    else:
+        avg_rating = 0.0
+
     user.average_rating = float(avg_rating) if avg_rating else 0.0
 
     token = create_access_token({"sub": user.id, "role": user.role.value})
@@ -318,14 +329,24 @@ async def get_public_courses(db: AsyncSession = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 async def get_me(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     from app.models.session import StudentFeedback
+    from app.models.notification import Feedback as TraineeFeedback
     from sqlalchemy import func
     
-    # Calculate average rating
-    result = await db.execute(
-        select(func.avg(StudentFeedback.rating))
-        .where(StudentFeedback.target_id == user.id, StudentFeedback.target_type == 'TRAINER')
-    )
-    avg_rating = result.scalar()
+    if user.role.value == 'TRAINER':
+        rating_result = await db.execute(
+            select(func.avg(StudentFeedback.rating))
+            .where(StudentFeedback.target_id == user.id, StudentFeedback.target_type == 'TRAINER')
+        )
+        avg_rating = rating_result.scalar()
+    elif user.role.value == 'STUDENT':
+        rating_result = await db.execute(
+            select(func.avg(TraineeFeedback.rating))
+            .where(TraineeFeedback.student_id == user.id)
+        )
+        avg_rating = rating_result.scalar()
+    else:
+        avg_rating = 0.0
+
     user.average_rating = float(avg_rating) if avg_rating else 0.0
     
     return UserOut.model_validate(user)
