@@ -164,7 +164,7 @@ export default function StudentFeedbackPage() {
 
     if (submitted) {
         return (
-            <div className="reveal-on-scroll" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center', paddingTop: '40px' }}>
+            <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center', paddingTop: '40px' }}>
                 <div className="glass-premium" style={{ padding: '60px 40px', borderRadius: '24px', border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '64px', marginBottom: '24px' }}>🎉</div>
                     <h2 style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '16px' }}>Thank You!</h2>

@@ -69,6 +69,7 @@ export async function apiPost(path: string, body: any) {
         method: 'POST',
         body: JSON.stringify(body),
     });
+    if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`);
     return res;
 }
 
