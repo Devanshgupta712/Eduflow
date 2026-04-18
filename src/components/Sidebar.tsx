@@ -105,6 +105,8 @@ const navSections: NavSection[] = [
             { label: 'Apply Leave', href: '/student/leaves', icon: '🗓️' },
             { label: 'Job Board', href: '/student/jobs', icon: '💼' },
             { label: 'Warnings', href: '/student/violations', icon: '⚠️' },
+            { label: 'Notifications', href: '/student/notifications', icon: '🔔' },
+            { label: 'Feedback', href: '/student/feedback', icon: '💬' },
         ],
     },
     {

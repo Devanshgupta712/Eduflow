@@ -365,8 +365,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                                         }
                                                         if (n.link) {
                                                             router.push(n.link);
-                                                            setShowNotifs(false);
+                                                        } else {
+                                                            router.push('/student/notifications');
                                                         }
+                                                        setShowNotifs(false);
                                                     }}
                                                     style={{
                                                         padding: '16px', 

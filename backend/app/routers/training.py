@@ -41,6 +41,42 @@ def parse_dt(dt_str: str):
     except:
         return None
 
+@router.get("/my-trainers")
+async def get_my_trainers(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    from app.models.course import Batch, BatchStudent
+    
+    # Get batches where student is enrolled
+    bs_query = select(BatchStudent.batch_id).where(BatchStudent.student_id == user.id)
+    bs_result = await db.execute(bs_query)
+    batch_ids = [r[0] for r in bs_result.fetchall()]
+    
+    if not batch_ids:
+        return []
+        
+    # Get trainers for those batches
+    t_query = (
+        select(User.id, User.name, Batch.name.label("batch_name"))
+        .join(Batch, User.id == Batch.trainer_id)
+        .where(Batch.id.in_(batch_ids))
+    )
+    t_result = await db.execute(t_query)
+    trainers = t_result.all()
+    
+    out = []
+    seen_trainers = set()
+    for t_id, t_name, b_name in trainers:
+        if t_id not in seen_trainers:
+            seen_trainers.add(t_id)
+            out.append({
+                "id": t_id,
+                "name": t_name,
+                "batch_name": b_name
+            })
+    return out
+
 @router.get("/qr-config")
 async def get_qr_config(
     db: AsyncSession = Depends(get_db),
