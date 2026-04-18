@@ -57,8 +57,24 @@ async def get_my_trainers(
         return []
         
     # Get trainers for those batches
+    from app.models.session import StudentFeedback
+    
+    # Calculate current week's Saturday start
+    now = datetime.utcnow()
+    last_saturday = (now - timedelta(days=(now.weekday() - 5) % 7)).replace(hour=0, minute=0, second=0, microsecond=0)
+    if now.weekday() == 5: # It is Saturday
+         last_saturday = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Get already submitted feedbacks for this week
+    f_query = select(StudentFeedback.target_id, StudentFeedback.batch_id).where(
+        StudentFeedback.submitted_by == user.id,
+        StudentFeedback.created_at >= last_saturday
+    )
+    f_result = await db.execute(f_query)
+    completed = {(r[0], r[1]) for r in f_result.fetchall()}
+    
     t_query = (
-        select(User.id, User.name, Batch.name.label("batch_name"))
+        select(User.id, User.name, Batch.id.label("batch_id"), Batch.name.label("batch_name"))
         .join(Batch, User.id == Batch.trainer_id)
         .where(Batch.id.in_(batch_ids))
     )
@@ -66,12 +82,11 @@ async def get_my_trainers(
     trainers = t_result.all()
     
     out = []
-    seen_trainers = set()
-    for t_id, t_name, b_name in trainers:
-        if t_id not in seen_trainers:
-            seen_trainers.add(t_id)
+    for t_id, t_name, b_id, b_name in trainers:
+        if (t_id, b_id) not in completed:
             out.append({
                 "id": t_id,
+                "batch_id": b_id,
                 "name": t_name,
                 "batch_name": b_name
             })

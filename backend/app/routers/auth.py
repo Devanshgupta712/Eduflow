@@ -98,6 +98,9 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
     user.average_rating = float(avg_rating) if avg_rating else 0.0
 
+    if user.is_blocked:
+        raise HTTPException(status_code=403, detail="Your portal is blocked due to repeated policy violations. Please contact Super Admin.")
+
     token = create_access_token({"sub": user.id, "role": user.role.value})
     return TokenResponse(
         access_token=token,
@@ -328,6 +331,9 @@ async def get_public_courses(db: AsyncSession = Depends(get_db)):
 
 @router.get("/me", response_model=UserOut)
 async def get_me(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if user.is_blocked:
+        raise HTTPException(status_code=403, detail="Your portal is blocked.")
+    
     from app.models.session import StudentFeedback
     from app.models.notification import Feedback as TraineeFeedback
     from sqlalchemy import func
@@ -400,6 +406,23 @@ async def change_own_password(
     user.password = get_password_hash(new_password)
     await db.flush()
     return {"status": "password_changed"}
+
+@router.patch("/users/{user_id}/unblock")
+async def unblock_user(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_roles(Role.SUPER_ADMIN))
+):
+    """Only SUPER_ADMIN can unblock a user."""
+    from app.models.user import User as UserModel
+    res = await db.execute(select(UserModel).where(UserModel.id == user_id))
+    target = res.scalars().first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    target.is_blocked = False
+    await db.commit()
+    return {"status": "unblocked"}
 
 # ─── Document endpoints ──────────────────────────────
 @router.get("/documents")

@@ -362,61 +362,77 @@ async def get_saturday_feedback_status(
     user: User = Depends(get_current_user)
 ):
     if user.role != "STUDENT":
-        return {"is_saturday": False, "has_submitted": True, "should_block": False}
+        return {"is_saturday": False, "has_submitted": True, "should_block": False, "pending_count": 0}
 
     from app.models.session import StudentFeedback
     from app.models.project import Violation, ViolationType
+    from app.models.course import BatchStudent
     
     now = datetime.utcnow()
-    # 5 is Saturday in Python's weekday() (0=Monday, 6=Sunday)
     is_saturday = now.weekday() == 5
     
-    # Calculate current week's Saturday start and end
-    # Week starts Monday. Saturday is day 5.
-    days_to_saturday = (5 - now.weekday()) % 7
-    if days_to_saturday > 0: # It's Sun-Fri, Saturday was in the past or future
-        # Get the PREVIOUS Saturday
-        last_saturday = (now - timedelta(days=(now.weekday() - 5) % 7)).replace(hour=0, minute=0, second=0, microsecond=0)
-    else: # It's Saturday
+    # Calculate current week's Saturday start
+    last_saturday = (now - timedelta(days=(now.weekday() - 5) % 7)).replace(hour=0, minute=0, second=0, microsecond=0)
+    if is_saturday:
         last_saturday = now.replace(hour=0, minute=0, second=0, microsecond=0)
     
-    # Check if feedback exists for this week's Saturday (or the period since last Saturday)
-    res = await db.execute(
-        select(StudentFeedback).where(
+    # 1. Get total required feedbacks (count of active batches)
+    batch_res = await db.execute(select(func.count(BatchStudent.batch_id)).where(BatchStudent.student_id == user.id))
+    total_required = batch_res.scalar() or 0
+    
+    # 2. Get submitted feedbacks for this week
+    f_res = await db.execute(
+        select(func.count(StudentFeedback.id)).where(
             StudentFeedback.submitted_by == user.id,
             StudentFeedback.created_at >= last_saturday
         )
     )
-    has_submitted = res.scalars().first() is not None
+    submitted_count = f_res.scalar() or 0
     
-    should_block = is_saturday and not has_submitted
+    # Logic: Block if Saturday AND ZERO feedbacks submitted
+    should_block = is_saturday and submitted_count == 0
     
-    # Automatic Violation Logic:
-    # If it's Sunday (day 6) and they haven't submitted feedback for the Saturday just passed
-    if now.weekday() == 6 and not has_submitted:
-        # Check if violation already exists for this week
-        v_res = await db.execute(
+    # 3. Automatic Consolidated Violation Logic (Sunday Check)
+    if now.weekday() == 6 and submitted_count < total_required:
+        # Check if violation already exists for THIS week
+        v_check = await db.execute(
             select(Violation).where(
                 Violation.student_id == user.id,
                 Violation.type == ViolationType.MISSED_FEEDBACK,
                 Violation.created_at >= last_saturday
             )
         )
-        if not v_res.scalars().first():
+        if not v_check.scalars().first():
             v = Violation(
                 student_id=user.id,
                 type=ViolationType.MISSED_FEEDBACK,
-                title="⚠️ Saturday Feedback Missed",
-                description=f"System detected missed feedback for Saturday {last_saturday.strftime('%d %b %Y')}.",
-                severity="LOW"
+                title="⚠️ Weekly Feedback Incomplete",
+                description=f"System detected {total_required - submitted_count} missing feedback(s) for last Saturday. A violation has been recorded.",
+                severity="MEDIUM"
             )
             db.add(v)
+            await db.flush()
+            
+            # 4. Auto-Block Trigger: If 3 missed feedback violations exist, block user
+            v_count_res = await db.execute(
+                select(func.count(Violation.id)).where(
+                    Violation.student_id == user.id,
+                    Violation.type == ViolationType.MISSED_FEEDBACK
+                )
+            )
+            total_violations = v_count_res.scalar() or 0
+            if total_violations >= 3:
+                user.is_blocked = True
+                db.add(user)
+            
             await db.commit()
 
     return {
         "is_saturday": is_saturday,
-        "has_submitted": has_submitted,
+        "submitted_count": submitted_count,
+        "total_required": total_required,
         "should_block": should_block,
+        "is_blocked": user.is_blocked,
         "current_day": now.strftime("%A")
     }
 

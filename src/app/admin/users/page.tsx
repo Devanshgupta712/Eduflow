@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete, getStoredUser } from '@/lib/api';
 import SkeletonLoader from '@/components/SkeletonLoader';
 
-interface UserItem { id: string; name: string; email: string; role: string; phone: string | null; is_active: boolean; can_build_resume: boolean; created_at: string; }
+interface UserItem { id: string; name: string; email: string; role: string; phone: string | null; is_active: boolean; is_blocked: boolean; can_build_resume: boolean; created_at: string; }
 
 export default function UsersPage() {
     const [users, setUsers] = useState<UserItem[]>([]);
@@ -112,6 +112,16 @@ export default function UsersPage() {
             alert('Password updated successfully!');
         } catch (err: any) {
             alert('Error updating password: ' + (err.message || 'Unknown error'));
+        }
+    };
+
+    const handleUnblockUser = async (user: UserItem) => {
+        try {
+            await apiPatch(`/api/auth/users/${user.id}/unblock`, {});
+            alert('User unblocked successfully!');
+            loadUsers();
+        } catch (err: any) {
+            alert('Error unblocking user: ' + (err.message || 'Unknown error'));
         }
     };
 
@@ -278,7 +288,12 @@ export default function UsersPage() {
                                 <td><strong>{u.name}</strong></td>
                                 <td>{u.email}</td><td>{u.phone || '-'}</td>
                                 <td><span className={`badge ${roleColors[u.role] || 'badge-info'}`}>{u.role.replace('_', ' ')}</span></td>
-                                <td><span className={`badge ${u.is_active ? 'badge-success' : 'badge-danger'}`}>{u.is_active ? 'Active' : 'Suspended'}</span></td>
+                                <td>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <span className={`badge ${u.is_active ? 'badge-success' : 'badge-danger'}`}>{u.is_active ? 'Active' : 'Suspended'}</span>
+                                        {u.is_blocked && <span className="badge badge-danger" style={{ background: '#7f1d1d' }}>Blocked</span>}
+                                    </div>
+                                </td>
                                 <td className="text-sm text-muted">{new Date(u.created_at).toLocaleDateString()}</td>
                                 {(isSuperAdmin || isAdmin) && (
                                     <td>
@@ -312,6 +327,15 @@ export default function UsersPage() {
                                                     onClick={() => handleOpenManage(u)}
                                                 >
                                                     Assign Batches
+                                                </button>
+                                            )}
+                                            {u.is_blocked && isSuperAdmin && (
+                                                <button
+                                                    className="btn btn-sm btn-success"
+                                                    onClick={() => handleUnblockUser(u)}
+                                                    style={{ background: 'var(--success)', border: 'none' }}
+                                                >
+                                                    🔓 Unblock
                                                 </button>
                                             )}
                                             {(u.role === 'ADMIN' || u.role === 'TRAINER') && (isSuperAdmin || (isAdmin && myPermissions.manage_users)) && (

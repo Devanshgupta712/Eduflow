@@ -50,6 +50,7 @@ class User(Base):
     can_build_resume: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
     verification_code: Mapped[str | None] = mapped_column(String, nullable=True)
     verification_expiry: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

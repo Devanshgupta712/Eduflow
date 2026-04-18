@@ -142,10 +142,22 @@ export default function StudentFeedbackPage() {
             });
 
             
-            setSubmitted(true);
             setRatings({});
             setQUseful('');
             setQImprove('');
+            
+            // Re-fetch trainers to see if any are left
+            const updatedTrainers = await apiGet('/api/training/my-trainers');
+            setTrainers(updatedTrainers || []);
+            
+            if (updatedTrainers && updatedTrainers.length > 0) {
+                // More pending! Stay on page but show partial success
+                setSelectedTrainer(updatedTrainers[0].id);
+                alert(`Feedback submitted for this batch! ${updatedTrainers.length} more pending.`);
+            } else {
+                // All done!
+                setSubmitted(true);
+            }
         } catch (error) {
             console.error('Failed to submit feedback:', error);
             alert('Failed to submit feedback. Please try again.');
@@ -222,7 +234,7 @@ export default function StudentFeedbackPage() {
                         >
                             <option value="" disabled>Choose your trainer...</option>
                             {trainers.map(t => (
-                                <option key={t.id} value={t.id}>{t.name} (Batch: {t.batch_name})</option>
+                                <option key={`${t.id}-${t.batch_id}`} value={t.id}>{t.name} (Batch: {t.batch_name})</option>
                             ))}
                         </select>
                     )}
