@@ -3,12 +3,53 @@
 import { useState, useEffect } from 'react';
 import { apiGet, apiPost } from '@/lib/api';
 
+const SECTIONS = [
+    {
+        title: "Instructor Feedback",
+        scale: ["Poor", "Fair", "Satisfactory", "Very good", "Excellent"],
+        questions: [
+            { id: "s1_effort", label: "Level of effort trainer" },
+            { id: "s1_punctuality", label: "Punctuality Of Trainer" },
+        ]
+    },
+    {
+        title: "Contribution to your learning everyday",
+        scale: ["Poor", "Fair", "Satisfactory", "Very good", "Excellent"],
+        questions: [
+            { id: "s2_knowledge", label: "Improvement in Your Knowledge" },
+            { id: "s2_confidence", label: "Your confidence level to take up interviews now" },
+        ]
+    },
+    {
+        title: "Skill and responsiveness of the instructor",
+        scale: ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"],
+        questions: [
+            { id: "s3_comm", label: "Instructor communication" },
+            { id: "s3_org", label: "Instructor organises the concepts in an understandable order" },
+            { id: "s3_encourage", label: "Instructor encourages student interest to learn more" },
+            { id: "s3_time", label: "Instructor effectively used time" },
+            { id: "s3_doubts", label: "Instructor availability for doubts" },
+        ]
+    },
+    {
+        title: "Course content",
+        scale: ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"],
+        questions: [
+            { id: "s4_obj", label: "Instructor explained the Learning objectives of each topic" },
+            { id: "s4_examples", label: "Instructor gave real time examples in the class" },
+            { id: "s4_assignments", label: "Instructor gave assignments and made you to work" },
+            { id: "s4_interaction", label: "Instructor had personal interaction with you in the class" },
+        ]
+    }
+];
+
 export default function StudentFeedbackPage() {
     const [trainers, setTrainers] = useState<any[]>([]);
     const [selectedTrainer, setSelectedTrainer] = useState<string>('');
-    const [rating, setRating] = useState<number>(0);
-    const [comments, setComments] = useState<string>('');
-    const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
+    const [ratings, setRatings] = useState<Record<string, number>>({});
+    const [qUseful, setQUseful] = useState<string>('');
+    const [qImprove, setQImprove] = useState<string>('');
+    
     const [loading, setLoading] = useState<boolean>(true);
     const [submitting, setSubmitting] = useState<boolean>(false);
     const [submitted, setSubmitted] = useState<boolean>(false);
@@ -25,25 +66,58 @@ export default function StudentFeedbackPage() {
             .finally(() => setLoading(false));
     }, []);
 
+    const handleRatingChange = (qId: string, val: number) => {
+        setRatings(prev => ({ ...prev, [qId]: val }));
+    };
+
+    // Calculate if all multiple choice questions are answered
+    const totalQuestions = SECTIONS.reduce((acc, section) => acc + section.questions.length, 0);
+    const answeredCount = Object.keys(ratings).length;
+    const isComplete = answeredCount === totalQuestions && selectedTrainer && qUseful.trim() && qImprove.trim();
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedTrainer || rating === 0) {
-            alert('Please select a trainer and provide a rating.');
+        if (!isComplete) {
+            alert('Please answer all questions before submitting.');
             return;
         }
 
         setSubmitting(true);
+        
         try {
+            // 1. Calculate Average Rating (out of 5)
+            const sum = Object.values(ratings).reduce((a, b) => a + b, 0);
+            const averageRating = Math.round(sum / totalQuestions);
+
+            // 2. Format detailed responses into Markdown
+            let formattedComments = `## Detailed Feedback Report\n\n`;
+            
+            SECTIONS.forEach(sec => {
+                formattedComments += `### ${sec.title}\n`;
+                sec.questions.forEach(q => {
+                    const score = ratings[q.id];
+                    const label = sec.scale[score - 1]; // 1-indexed to 0-indexed array
+                    formattedComments += `- **${q.label}**: ${label} (${score}/5)\n`;
+                });
+                formattedComments += `\n`;
+            });
+
+            formattedComments += `### Open Feedback\n`;
+            formattedComments += `**What aspects of this course were most useful or valuable?**\n${qUseful}\n\n`;
+            formattedComments += `**How we can improve this course?**\n${qImprove}\n`;
+
             await apiPost('/api/sessions/feedback', {
                 target_type: 'TRAINER',
                 target_id: selectedTrainer,
-                rating: rating,
-                comments: comments,
-                is_anonymous: isAnonymous
+                rating: averageRating,
+                comments: formattedComments,
+                is_anonymous: false // Hardcoded per user request
             });
+            
             setSubmitted(true);
-            setRating(0);
-            setComments('');
+            setRatings({});
+            setQUseful('');
+            setQImprove('');
         } catch (error) {
             console.error('Failed to submit feedback:', error);
             alert('Failed to submit feedback. Please try again.');
@@ -67,7 +141,7 @@ export default function StudentFeedbackPage() {
                     <div style={{ fontSize: '64px', marginBottom: '24px' }}>🎉</div>
                     <h2 style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '16px' }}>Thank You!</h2>
                     <p style={{ fontSize: '16px', color: 'var(--text-muted)', marginBottom: '32px', lineHeight: 1.6 }}>
-                        Your weekly feedback has been successfully submitted. We appreciate your input as it helps us improve the training experience.
+                        Your comprehensive feedback has been successfully submitted. We deeply appreciate your time and insights to help us improve the program.
                     </p>
                     <button 
                         onClick={() => setSubmitted(false)}
@@ -82,20 +156,20 @@ export default function StudentFeedbackPage() {
     }
 
     return (
-        <div style={{ maxWidth: '700px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
             <div style={{ marginBottom: '40px' }}>
-                <h1 style={{ fontSize: '36px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', marginBottom: '12px' }}>Weekly Feedback</h1>
+                <h1 style={{ fontSize: '36px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', marginBottom: '12px' }}>Course Feedback</h1>
                 <p style={{ fontSize: '16px', color: 'var(--text-muted)', fontWeight: 500 }}>
-                    Please evaluate your trainer's performance this week. Your feedback helps us maintain a high quality of education and is mandatory to avoid policy violations.
+                    Please evaluate your trainer's performance this week. Your honest feedback is highly valuable and is mandatory to avoid policy violations.
                 </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="glass-premium" style={{ padding: '40px', borderRadius: '24px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                 
-                {/* Trainer Selection */}
-                <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>
-                        Select Trainer
+                {/* Trainer Selection Card */}
+                <div className="glass-premium" style={{ padding: '32px', borderRadius: '24px', border: '1px solid var(--border)' }}>
+                    <label style={{ display: 'block', fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>
+                        Select Trainer *
                     </label>
                     {trainers.length === 0 ? (
                         <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '12px', color: 'var(--text-muted)', fontSize: '14px', fontWeight: 600 }}>
@@ -126,99 +200,140 @@ export default function StudentFeedbackPage() {
                     )}
                 </div>
 
-                {/* Star Rating */}
-                <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>
-                        Overall Rating
-                    </label>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        {[1, 2, 3, 4, 5].map(star => (
-                            <button
-                                key={star}
-                                type="button"
-                                onClick={() => setRating(star)}
-                                style={{
-                                    width: '56px',
-                                    height: '56px',
-                                    borderRadius: '16px',
-                                    background: star <= rating ? 'var(--primary-glow)' : 'var(--bg-tertiary)',
-                                    border: star <= rating ? '2px solid var(--primary)' : '2px solid transparent',
-                                    color: star <= rating ? 'var(--primary)' : 'var(--text-muted)',
-                                    fontSize: '24px',
-                                    display: 'flex',
+                {/* Rating Matrices */}
+                {SECTIONS.map((section, sIdx) => (
+                    <div key={sIdx} className="glass-premium" style={{ padding: '32px', borderRadius: '24px', border: '1px solid var(--border)', overflowX: 'auto' }}>
+                        <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '24px' }}>
+                            {section.title} <span style={{ color: 'var(--danger)' }}>*</span>
+                        </h3>
+                        
+                        <div style={{ minWidth: '600px' }}>
+                            {/* Matrix Header */}
+                            <div style={{ display: 'flex', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+                                <div style={{ width: '40%' }}></div>
+                                <div style={{ width: '60%', display: 'flex', justifyContent: 'space-between', padding: '0 16px' }}>
+                                    {section.scale.map((label, i) => (
+                                        <div key={i} style={{ width: '20%', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                            {label}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {/* Matrix Rows */}
+                            {section.questions.map((q, qIdx) => (
+                                <div key={q.id} style={{ 
+                                    display: 'flex', 
+                                    padding: '16px 0', 
+                                    borderBottom: qIdx === section.questions.length - 1 ? 'none' : '1px solid rgba(0,0,0,0.05)',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    transform: star <= rating ? 'scale(1.05)' : 'scale(1)'
-                                }}
-                            >
-                                ★
-                            </button>
-                        ))}
+                                    background: qIdx % 2 !== 0 ? 'var(--bg-tertiary)' : 'transparent',
+                                    margin: qIdx % 2 !== 0 ? '0 -16px' : '0',
+                                    paddingLeft: qIdx % 2 !== 0 ? '16px' : '0',
+                                    paddingRight: qIdx % 2 !== 0 ? '16px' : '0',
+                                }}>
+                                    <div style={{ width: '40%', fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', paddingRight: '16px' }}>
+                                        {q.label}
+                                    </div>
+                                    <div style={{ width: '60%', display: 'flex', justifyContent: 'space-between', padding: '0 16px' }}>
+                                        {[1, 2, 3, 4, 5].map((val) => (
+                                            <div key={val} style={{ width: '20%', display: 'flex', justifyContent: 'center' }}>
+                                                <input 
+                                                    type="radio"
+                                                    name={q.id}
+                                                    value={val}
+                                                    checked={ratings[q.id] === val}
+                                                    onChange={() => handleRatingChange(q.id, val)}
+                                                    style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+
+                {/* Open Ended Questions */}
+                <div className="glass-premium" style={{ padding: '32px', borderRadius: '24px', border: '1px solid var(--border)' }}>
+                    <div style={{ marginBottom: '24px' }}>
+                        <label style={{ display: 'block', fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>
+                            What aspects of this course were most useful or valuable? <span style={{ color: 'var(--danger)' }}>*</span>
+                        </label>
+                        <textarea 
+                            value={qUseful}
+                            onChange={(e) => setQUseful(e.target.value)}
+                            placeholder="Your answer"
+                            style={{
+                                width: '100%',
+                                minHeight: '120px',
+                                padding: '16px',
+                                borderRadius: '16px',
+                                background: 'var(--bg-tertiary)',
+                                border: '1px solid var(--border)',
+                                color: 'var(--text-primary)',
+                                fontSize: '15px',
+                                resize: 'vertical',
+                                outline: 'none',
+                                fontFamily: 'inherit'
+                            }}
+                        />
+                    </div>
+
+                    <div>
+                        <label style={{ display: 'block', fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>
+                            How we can improve this course? <span style={{ color: 'var(--danger)' }}>*</span>
+                        </label>
+                        <textarea 
+                            value={qImprove}
+                            onChange={(e) => setQImprove(e.target.value)}
+                            placeholder="Your answer"
+                            style={{
+                                width: '100%',
+                                minHeight: '120px',
+                                padding: '16px',
+                                borderRadius: '16px',
+                                background: 'var(--bg-tertiary)',
+                                border: '1px solid var(--border)',
+                                color: 'var(--text-primary)',
+                                fontSize: '15px',
+                                resize: 'vertical',
+                                outline: 'none',
+                                fontFamily: 'inherit'
+                            }}
+                        />
                     </div>
                 </div>
 
-                {/* Comments */}
-                <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>
-                        Additional Comments (Optional)
-                    </label>
-                    <textarea 
-                        value={comments}
-                        onChange={(e) => setComments(e.target.value)}
-                        placeholder="What went well? What could be improved?"
-                        style={{
-                            width: '100%',
-                            minHeight: '140px',
-                            padding: '16px',
-                            borderRadius: '16px',
-                            background: 'var(--bg-tertiary)',
-                            border: '1px solid var(--border)',
-                            color: 'var(--text-primary)',
-                            fontSize: '15px',
-                            resize: 'vertical',
-                            outline: 'none',
-                            fontFamily: 'inherit'
-                        }}
-                    />
-                </div>
-
-                {/* Anonymous Toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <input 
-                        type="checkbox" 
-                        id="anonymous"
-                        checked={isAnonymous}
-                        onChange={(e) => setIsAnonymous(e.target.checked)}
-                        style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--primary)' }}
-                    />
-                    <label htmlFor="anonymous" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                        Submit anonymously (Trainer won't see your name)
-                    </label>
-                </div>
+                {/* Missing required warning */}
+                {!isComplete && (
+                    <div style={{ textAlign: 'right', color: 'var(--danger)', fontSize: '14px', fontWeight: 600, paddingRight: '16px' }}>
+                        * Please complete all required fields
+                    </div>
+                )}
 
                 {/* Submit Button */}
-                <div style={{ marginTop: '16px' }}>
+                <div style={{ marginBottom: '60px' }}>
                     <button 
                         type="submit" 
-                        disabled={submitting || trainers.length === 0 || rating === 0}
+                        disabled={submitting || !isComplete}
                         className="btn-primary"
                         style={{
                             width: '100%',
-                            padding: '18px',
+                            padding: '20px',
                             borderRadius: '16px',
-                            fontSize: '16px',
+                            fontSize: '18px',
                             fontWeight: 700,
                             display: 'flex',
                             justifyContent: 'center',
                             alignItems: 'center',
                             gap: '12px',
-                            opacity: (submitting || trainers.length === 0 || rating === 0) ? 0.6 : 1,
-                            cursor: (submitting || trainers.length === 0 || rating === 0) ? 'not-allowed' : 'pointer',
+                            opacity: (submitting || !isComplete) ? 0.6 : 1,
+                            cursor: (submitting || !isComplete) ? 'not-allowed' : 'pointer',
                         }}
                     >
-                        {submitting ? 'Submitting...' : 'Submit Feedback'}
+                        {submitting ? 'Submitting Responses...' : 'Submit Form'}
                     </button>
                 </div>
             </form>
