@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { apiGet, apiPost } from '@/lib/api';
+import { API_BASE, getToken } from '@/lib/api';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -59,12 +59,12 @@ export default function VoiceAssistant() {
         setIsThinking(true);
 
         try {
-            // Use streaming fetch
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/ai/chat`, {
+            // Use streaming fetch with correct API base and token
+            const response = await fetch(`${API_BASE}/api/ai/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${getToken()}`
                 },
                 body: JSON.stringify({
                     message: text,
@@ -80,25 +80,34 @@ export default function VoiceAssistant() {
             
             setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
+            if (!reader) throw new Error('Response body is empty');
+
             while (true) {
-                const { done, value } = await reader!.read();
+                const { done, value } = await reader.read();
                 if (done) break;
                 
-                const chunk = decoder.decode(value);
+                const chunk = decoder.decode(value, { stream: true });
                 assistantContent += chunk;
                 
                 setMessages(prev => {
                     const last = prev[prev.length - 1];
-                    return [...prev.slice(0, -1), { ...last, content: assistantContent }];
+                    const others = prev.slice(0, -1);
+                    return [...others, { role: 'assistant', content: assistantContent }];
                 });
             }
 
-            // Speak the response
-            speakResponse(assistantContent);
+            // Final decode
+            decoder.decode();
 
-        } catch (error) {
+            // Speak the response
+            if (assistantContent) speakResponse(assistantContent);
+
+        } catch (error: any) {
             console.error('Chat error:', error);
-            setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
+            setMessages(prev => [...prev, { 
+                role: 'assistant', 
+                content: `⚠️ Error: ${error.message || 'Could not connect to AI'}. Make sure GROQ_API_KEY is set.` 
+            }]);
         } finally {
             setIsThinking(false);
         }

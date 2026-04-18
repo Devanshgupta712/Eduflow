@@ -30,7 +30,7 @@ async def chat_with_assistant(
 
     system_prompt = f"""You are AppTechno AI, the official student success assistant for AppTechno Software Solutions.
 Your goal is to help students with their technical doubts, platform navigation, and career guidance.
-Current User: {user.name} ({user.role.value})
+Current User: {user.name} ({user.role})
 Institute Context: AppTechno is a premium software training institute specializing in Full Stack Development, Data Science, and AI.
 
 Instructions:
@@ -50,6 +50,7 @@ Instructions:
     async def generate():
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:
+                print(f"DEBUG: AI Request for {user.name} - Message: {body.message}")
                 async with client.stream(
                     "POST",
                     "https://api.groq.com/openai/v1/chat/completions",
@@ -66,7 +67,9 @@ Instructions:
                     }
                 ) as response:
                     if response.status_code != 200:
-                        yield f"Error: AI service returned {response.status_code}"
+                        err_body = await response.aread()
+                        print(f"ERROR: Groq API returned {response.status_code} - {err_body}")
+                        yield f"Error: AI service returned {response.status_code}. Details: {err_body.decode()}"
                         return
 
                     async for line in response.aiter_lines():
@@ -82,6 +85,7 @@ Instructions:
                             except:
                                 continue
             except Exception as e:
+                print(f"ERROR in AI generate: {str(e)}")
                 yield f"Error: {str(e)}"
 
     return StreamingResponse(generate(), media_type="text/plain")
