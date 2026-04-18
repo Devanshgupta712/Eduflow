@@ -10,7 +10,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.registration import Document
 from app.schemas.schemas import LoginRequest, RegisterRequest, TokenResponse, UserOut, SendOTPRequest, VerifyOTPRequest, VerifyEmailRequest
-from app.middleware.auth import create_access_token, get_current_user
+from app.middleware.auth import create_access_token, get_current_user, require_roles
 from app.config import settings
 from app.utils.email import send_verification_email
 

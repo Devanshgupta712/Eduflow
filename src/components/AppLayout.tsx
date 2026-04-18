@@ -35,7 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [isSearching, setIsSearching] = useState(false);
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-    const [saturdayStatus, setSaturdayStatus] = useState({ is_saturday: false, has_submitted: false, should_block: false });
+    const [saturdayStatus, setSaturdayStatus] = useState<any>({ is_saturday: false, has_submitted: false, should_block: false, submitted_count: 0, total_required: 0, is_blocked: false });
 
 
     // WebSocket Integration
@@ -249,7 +249,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     setTimeout(() => setShowSearchResults(false), 200);
                                 }}
                             />
-
+<ChatbotFAQ />
                             {/* Dropdown Results */}
                             {showSearchResults && searchResults.length > 0 && (
                                 <div style={{
