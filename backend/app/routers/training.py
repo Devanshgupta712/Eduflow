@@ -2009,10 +2009,9 @@ Please tailor the complexity, vocabulary, and scenarios specifically to the {bod
         end_idx = raw.rfind('}')
         if start_idx != -1 and end_idx != -1:
             raw = raw[start_idx:end_idx+1]
-        import json as json_lib
-        task = json_lib.loads(raw)
+        task = json.loads(raw)
         return task
-    except json_lib.JSONDecodeError:
+    except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="AI returned invalid format. Please try again.")
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="AI timed out. Please try again.")
@@ -2032,7 +2031,6 @@ async def start_assessment_session(
     user: User = Depends(get_current_user),
 ):
     from app.models.project import AssessmentSession, Task, Assignment
-    import json as json_lib
     import random
     import uuid
     from datetime import datetime
@@ -2063,7 +2061,7 @@ async def start_assessment_session(
     # Prepare frozen question list (Snapshot)
     questions = []
     if item.structured_content:
-        content = json_lib.loads(item.structured_content)
+        content = json.loads(item.structured_content)
         if "questions" in content:
             questions = content["questions"]
             # Shuffle ONLY if randomization is enabled in the assignment/task
@@ -2094,7 +2092,7 @@ async def start_assessment_session(
         student_id=user.id,
         reference_id=ref_id,
         reference_type=ref_type.upper(),
-        responses=json_lib.dumps({"questions": questions}),
+        responses=json.dumps({"questions": questions}),
         start_time=datetime.utcnow()
     )
     db.add(session)
@@ -2116,7 +2114,7 @@ async def get_session_questions(
     user: User = Depends(get_current_user),
 ):
     from app.models.project import AssessmentSession
-    import json as json_lib
+    # Get session questions
 
     session = await db.get(AssessmentSession, session_id)
     if not session or session.student_id != user.id:
@@ -2154,7 +2152,7 @@ async def get_session_questions(
     content_raw = None
     if session.responses:
         try:
-            sess_data = json_lib.loads(session.responses)
+            sess_data = json.loads(session.responses)
             if isinstance(sess_data, dict) and "questions" in sess_data:
                 # This is a randomized question snapshot — use it
                 content_raw = session.responses
@@ -2169,7 +2167,7 @@ async def get_session_questions(
     content = {}
     if content_raw:
         try:
-            content = json_lib.loads(content_raw)
+            content = json.loads(content_raw)
         except Exception:
             pass
 
@@ -2216,7 +2214,7 @@ async def get_session_questions(
     ai_status = "n/a"
     if session.responses:
         try:
-            resp_data = json_lib.loads(session.responses)
+            resp_data = json.loads(session.responses)
             session_results = resp_data.get("results", [])
             ai_status = resp_data.get("ai_grading", "n/a")
         except Exception:
@@ -2247,7 +2245,7 @@ async def session_heartbeat(
     user: User = Depends(get_current_user),
 ):
     from app.models.project import AssessmentSession
-    import json as json_lib
+    # Session heartbeat
 
     session = await db.get(AssessmentSession, session_id)
     if not session or session.student_id != user.id:
@@ -2269,15 +2267,14 @@ async def session_heartbeat(
     if "answers" in body:
         existing_resp = session.responses or "{}"
         try:
-            import json as json_lib
-            resp_data = json_lib.loads(existing_resp)
+            resp_data = json.loads(existing_resp)
             if isinstance(resp_data, dict) and "questions" in resp_data:
                 # Preserve question data, merge saved answers
                 resp_data["saved_answers"] = body["answers"]
-                session.responses = json_lib.dumps(resp_data)
+                session.responses = json.dumps(resp_data)
             else:
                 # No question data yet, just save answers
-                session.responses = json_lib.dumps({"saved_answers": body["answers"]})
+                session.responses = json.dumps({"saved_answers": body["answers"]})
         except Exception:
             pass
 
@@ -2355,7 +2352,7 @@ async def submit_assessment(
     user: User = Depends(get_current_user),
 ):
     from app.models.project import AssessmentSession
-    import json as json_lib
+    # Submit assessment
 
     session = await db.get(AssessmentSession, session_id)
     if not session or session.student_id != user.id:
@@ -2376,7 +2373,7 @@ async def submit_assessment(
         content_val = student_answers["content"]
         if isinstance(content_val, str) and content_val.strip().startswith('{'):
             try:
-                student_answers = json_lib.loads(content_val)
+                student_answers = json.loads(content_val)
             except:
                 pass
     score = 0.0
@@ -2387,7 +2384,7 @@ async def submit_assessment(
     questions_source = None
     if session.responses and session.responses.strip().startswith('{'):
         try:
-            sess_content = json_lib.loads(session.responses)
+            sess_content = json.loads(session.responses)
             if "questions" in sess_content:
                 questions_source = sess_content["questions"]
         except Exception:
@@ -2396,7 +2393,7 @@ async def submit_assessment(
     # Fallback to original structured content only if session snapshot is missing
     if questions_source is None and item and item.structured_content:
         try:
-            item_content = json_lib.loads(item.structured_content)
+            item_content = json.loads(item.structured_content)
             questions_source = item_content.get("questions", [])
         except Exception:
             pass
@@ -2457,7 +2454,7 @@ async def submit_assessment(
     existing_responses = {}
     if session.responses and session.responses.strip().startswith('{'):
         try:
-            existing_responses = json_lib.loads(session.responses)
+            existing_responses = json.loads(session.responses)
         except:
             pass
             
@@ -2468,7 +2465,7 @@ async def submit_assessment(
         "total_questions": len(questions_source) if questions_source else 0,
         "ai_grading": "pending" if is_pure_coding else "n/a"
     })
-    session.responses = json_lib.dumps(existing_responses)
+    session.responses = json.dumps(existing_responses)
     
     # ── Map to AssignmentSubmission for UI compatibility ──
     if session.reference_type == "ASSIGNMENT":
