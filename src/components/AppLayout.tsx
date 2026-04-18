@@ -70,8 +70,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }, ...prev]);
     };
 
+    const handleDirectNotification = (data: any) => {
+        setNotifications(prev => [{
+            id: data.id || `ws-notif-${Date.now()}`,
+            title: data.title,
+            message: data.message,
+            read: false,
+            created_at: data.created_at || new Date().toISOString(),
+            type: data.type
+        }, ...prev]);
+
+        if (typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission === 'granted') {
+            new window.Notification(data.title, { body: data.message });
+        }
+    };
+
     // Initialize Socket at top level
-    useSocket(user?.id ? batchId : null, handleViolation, handleUnlock);
+    useSocket(
+        user?.id ? batchId : null, 
+        user?.id ? user.id : null,
+        handleViolation, 
+        handleUnlock,
+        handleDirectNotification
+    );
 
 
     // Scroll reveal observer

@@ -1246,10 +1246,12 @@ async def global_search(
 @router.get("/leaves")
 async def list_leaves(
     batch_id: Optional[str] = None,
+    q: Optional[str] = None,
+    date: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN, Role.TRAINER))
 ):
-    query = select(LeaveRequest)
+    query = select(LeaveRequest).join(User, User.id == LeaveRequest.user_id)
 
     if current_user.role == Role.TRAINER:
         # Only show leaves from students in the trainer's assigned batches
@@ -1275,6 +1277,26 @@ async def list_leaves(
         )
     elif batch_id:
         query = query.where(LeaveRequest.batch_id == batch_id)
+
+    if q:
+        query = query.where(
+            or_(
+                User.name.ilike(f"%{q}%"),
+                User.student_id.ilike(f"%{q}%")
+            )
+        )
+
+    if date:
+        try:
+            target_date = datetime.strptime(date, "%Y-%m-%d").date()
+            query = query.where(
+                and_(
+                    func.date(LeaveRequest.start_date) <= target_date,
+                    func.date(LeaveRequest.end_date) >= target_date
+                )
+            )
+        except Exception as e:
+            print(f"Date filter error: {e}")
 
     result = await db.execute(query.order_by(LeaveRequest.created_at.desc()))
     leaves = result.scalars().all()
@@ -1521,6 +1543,21 @@ async def send_notification(
 
         db.add(n)
         await db.flush()
+        
+        # Real-time emission
+        try:
+            from app.ws.socket_manager import emit_new_notification
+            await emit_new_notification(user.id, {
+                "id": n.id,
+                "title": n.title,
+                "message": n.message,
+                "type": "SYSTEM",
+                "created_at": datetime.now().isoformat()
+            })
+        except Exception as e:
+            print(f"WS Notification Error: {e}")
+
+        await db.commit()
         return {"status": "sent", "count": 1}
         
     raise HTTPException(status_code=400, detail="Invalid target or missing parameters")

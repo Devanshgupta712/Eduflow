@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from app.middleware.auth import get_current_user
-from app.models.user import User
+from app.middleware.auth import get_optional_user
+from app.models.user import User, Role
+from app.models.attendance import Attendance, LeaveRequest
+from app.models.project import Task
+from app.models.course import Batch
+from sqlalchemy import func, select, or_, and_
+from app.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 import os
 import httpx
 import json
@@ -22,23 +28,39 @@ class ChatRequest(BaseModel):
 @router.post("/chat")
 async def chat_with_assistant(
     body: ChatRequest,
-    user: User = Depends(get_current_user)
+    user: Optional[User] = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db)
 ):
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
-        raise HTTPException(status_code=503, detail="AI Assistant not configured.")
+        return StreamingResponse(iter(["Error: GROQ_API_KEY is not set. Please check server environment variables."]), media_type="text/plain")
 
-    system_prompt = f"""You are AppTechno AI, the official student success assistant for AppTechno Software Solutions.
-Your goal is to help students with their technical doubts, platform navigation, and career guidance.
-Current User: {user.name} ({user.role})
-Institute Context: AppTechno is a premium software training institute specializing in Full Stack Development, Data Science, and AI.
+    # Persona & Context
+    persona = "GUEST"
+    context = ""
+    
+    if user:
+        if user.role == Role.SUPER_ADMIN:
+            persona = "ADMIN"
+            studs = await db.execute(select(func.count(User.id)).where(User.role == Role.STUDENT))
+            active_batches = await db.execute(select(func.count(Batch.id)).where(Batch.is_active == True))
+            context = f"Platform Stats: {studs.scalar()} students, {active_batches.scalar()} active batches."
+        elif user.role == Role.STUDENT:
+            persona = "STUDENT"
+            att = await db.execute(select(func.count(Attendance.id)).where(Attendance.student_id == user.id, Attendance.status == "PRESENT"))
+            tasks = await db.execute(select(func.count(Task.id)).where(Task.assigned_to == user.id, Task.status != "COMPLETED"))
+            context = f"Student Profile: {user.name}, Attendance: {att.scalar()} sessions present, Pending Tasks: {tasks.scalar()}."
+        else:
+            persona = "STAFF"
 
-Instructions:
-1. Be concise, professional, and encouraging.
-2. If the student asks about platform features, guide them clearly.
-3. Keep responses short enough for comfortable speech synthesis (2-3 sentences per point).
-4. Do not mention that you are an AI unless asked. You are the 'AppTechno Success Agent'.
-"""
+    if persona == "GUEST":
+        system_prompt = "You are the AppTechno AI Guide. Tone: Friendly, welcoming. Goal: Help visitors learn about courses and register."
+    elif persona == "ADMIN":
+        system_prompt = f"You are the AppTechno Data Assistant. Tone: Precise, analytical. Context: {context}. Help the admin with system insights."
+    elif persona == "STUDENT":
+        system_prompt = f"You are the AppTechno Strict Mentor. Tone: Firm, results-driven. Context: {context}. Goal: Push the student to complete tasks and attend sessions. Mention stats if they are low."
+    else:
+        system_prompt = f"You are the AppTechno Professional Assistant. Help {user.name if user else 'user'} with their duties."
 
     messages = [{"role": "system", "content": system_prompt}]
     if body.history:
@@ -50,7 +72,8 @@ Instructions:
     async def generate():
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:
-                print(f"DEBUG: AI Request for {user.name} - Message: {body.message}")
+                username = user.name if user else "Guest"
+                print(f"DEBUG: AI Request for {username} ({persona}) - Message: {body.message}")
                 async with client.stream(
                     "POST",
                     "https://api.groq.com/openai/v1/chat/completions",

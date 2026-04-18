@@ -34,6 +34,8 @@ export default function LeavesPage() {
     const [showProofModal, setShowProofModal] = useState<string | null>(null);
 
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [dateFilter, setDateFilter] = useState('');
 
     const user = getStoredUser();
     const isSuperAdmin = user?.role === 'SUPER_ADMIN';
@@ -47,10 +49,16 @@ export default function LeavesPage() {
             fetch(`${API_BASE}/api/health`).catch(() => {});
         }, 30 * 1000); // every 30 seconds
         return () => clearInterval(keepAlive);
-    }, []);
+    }, [searchQuery, dateFilter]);
 
     const loadLeaves = async () => {
-        try { setLeaves(await apiGet('/api/admin/leaves')); } catch { } finally { setLoading(false); }
+        setLoading(true);
+        try { 
+            const params = new URLSearchParams();
+            if (searchQuery) params.append('q', searchQuery);
+            if (dateFilter) params.append('date', dateFilter);
+            setLeaves(await apiGet(`/api/admin/leaves?${params.toString()}`)); 
+        } catch { } finally { setLoading(false); }
     };
 
     const handleAction = async (id: string, status: string, reason: string | null = null) => {
@@ -180,6 +188,39 @@ export default function LeavesPage() {
                                 {t.replace(/_/g, ' ')}
                             </button>
                         ))}
+                    </div>
+                </div>
+
+                {/* Advanced Search */}
+                <div style={{ flex: 1, minWidth: '300px' }}>
+                    <label className="text-sm text-muted mb-8 block">Advanced Search</label>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ position: 'relative', flex: 2 }}>
+                            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>🔍</span>
+                            <input 
+                                type="text" 
+                                placeholder="Search by name or ID..." 
+                                className="form-input" 
+                                style={{ paddingLeft: '38px', borderRadius: '10px' }}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                            <input 
+                                type="date" 
+                                className="form-input" 
+                                style={{ borderRadius: '10px' }}
+                                value={dateFilter}
+                                onChange={(e) => setDateFilter(e.target.value)}
+                            />
+                            {dateFilter && (
+                                <button 
+                                    onClick={() => setDateFilter('')}
+                                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                                >✕</button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
