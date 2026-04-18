@@ -456,10 +456,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
                     }}>
                         <div style={{ fontSize: '72px', marginBottom: '24px' }}>📝</div>
-                        <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#fff', marginBottom: '16px', letterSpacing: '-0.02em' }}>
+                        <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#111827', marginBottom: '16px', letterSpacing: '-0.02em' }}>
                             Weekly Feedback Required
                         </h2>
-                        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '16px', lineHeight: 1.6, marginBottom: '32px' }}>
+                        <p style={{ color: '#4b5563', fontSize: '16px', lineHeight: 1.6, marginBottom: '32px' }}>
                             Today is Saturday! As per institute policy, you must provide feedback for your trainers to continue using the portal.
                         </p>
                         <button 
@@ -473,7 +473,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         >
                             Give Feedback Now →
                         </button>
-                        <p style={{ marginTop: '20px', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+                        <p style={{ marginTop: '20px', fontSize: '12px', color: '#9ca3af' }}>
                             Skipping feedback will result in an automated policy violation.
                         </p>
                     </div>

@@ -79,10 +79,13 @@ export default function StudentFeedbackPage() {
         setRatings(prev => ({ ...prev, [qId]: val }));
     };
 
-    // Calculate if all multiple choice questions are answered
-    const totalQuestions = SECTIONS.reduce((acc, section) => acc + section.questions.length, 0);
-    const answeredCount = Object.keys(ratings).length;
-    const isComplete = answeredCount === totalQuestions && selectedTrainer && qUseful.trim() && qImprove.trim();
+    // Calculate if all multiple choice questions (Trainer + Trainee) are answered
+    const totalTrainerQuestions = SECTIONS.reduce((acc, section) => acc + section.questions.length, 0);
+    const totalTraineeQuestions = TRAINEE_QUESTIONS.length;
+    const totalRequiredRatings = totalTrainerQuestions + totalTraineeQuestions;
+    
+    const answeredRatingsCount = Object.keys(ratings).length;
+    const isComplete = answeredRatingsCount >= totalRequiredRatings && selectedTrainer && qUseful.trim() && qImprove.trim();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -94,9 +97,14 @@ export default function StudentFeedbackPage() {
         setSubmitting(true);
         
         try {
-            // 1. Calculate Average Rating (out of 5)
-            const sum = Object.values(ratings).reduce((a, b) => a + b, 0);
-            const averageRating = Math.round(sum / totalQuestions);
+            // 1. Calculate Average Rating (Trainer Feedback only)
+            const trainerQuestionIds = SECTIONS.flatMap(s => s.questions.map(q => q.id));
+            const trainerRatings = Object.entries(ratings)
+                .filter(([id]) => trainerQuestionIds.includes(id))
+                .map(([, val]) => val);
+            
+            const sum = trainerRatings.reduce((a, b) => a + b, 0);
+            const averageRating = Math.round(sum / trainerQuestionIds.length) || 0;
 
             // 2. Format detailed responses into Markdown
             let formattedComments = `## Detailed Feedback Report\n\n`;
