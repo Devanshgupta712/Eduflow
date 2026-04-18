@@ -229,11 +229,6 @@ export default function AssignmentsPage() {
 
             setShowModal(false); resetModal(); loadAssignments();
         } catch (err: any) { alert(err?.message || "Failed to save assignment."); } finally { setSaving(false); }
-    };(!resp.ok) throw new Error('Failed to create');
-            }
-
-            setShowModal(false); resetModal(); loadAssignments();
-        } catch (err: any) { alert(err?.message || "Failed to save assignment."); } finally { setSaving(false); }
     };
 
     const handleViewSubmissions = async (assignment: any) => {
