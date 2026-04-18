@@ -1986,7 +1986,13 @@ Please tailor the complexity, vocabulary, and scenarios specifically to the {bod
 {format_instr}"""
 
     # Retry logic for Rate Limits (429)
-    models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768", "llama3-70b-8192"]
+    # Priority: High Intelligence -> Reliability -> High Rate Limit
+    models = [
+        "llama-3.3-70b-versatile", 
+        "llama-3.1-70b-versatile", 
+        "mixtral-8x7b-32768", 
+        "llama-3.1-8b-instant"
+    ]
     last_status = 200
     error_detail = "Unknown error"
 
