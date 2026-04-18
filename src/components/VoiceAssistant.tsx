@@ -232,25 +232,55 @@ export default function VoiceAssistant() {
                         {messages.length === 0 && (
                             <div style={{ textAlign: 'center', marginTop: '40px', opacity: 0.6 }}>
                                 <div style={{ fontSize: '32px', marginBottom: '12px' }}>👋</div>
-                                <p style={{ fontSize: '14px' }}>Hi! I'm your learning assistant. How can I help you today?</p>
+                                <p style={{ fontSize: '14px', marginBottom: '20px' }}>Hi! I'm your learning assistant. How can I help you today?</p>
+                                
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+                                    {[
+                                        "What courses do you offer?",
+                                        "How do I mark attendance?",
+                                        "Tell me about placements",
+                                        "How to submit assignments?"
+                                    ].map(q => (
+                                        <button
+                                            key={q}
+                                            onClick={() => handleSendMessage(q)}
+                                            style={{
+                                                padding: '8px 12px',
+                                                borderRadius: '20px',
+                                                border: '1px solid var(--border)',
+                                                background: '#fff',
+                                                fontSize: '12px',
+                                                cursor: 'pointer',
+                                                color: 'var(--text-secondary)',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
+                                            onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                                        >
+                                            {q}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         )}
                         {messages.map((m, i) => (
                             <div key={i} style={{
                                 alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                                maxWidth: '80%',
-                                padding: '10px 14px',
-                                borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                                maxWidth: '85%',
+                                padding: '12px 16px',
+                                borderRadius: m.role === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
                                 background: m.role === 'user' ? 'var(--primary)' : '#f3f4f6',
                                 color: m.role === 'user' ? '#fff' : '#111827',
                                 fontSize: '14px',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                                lineHeight: '1.5',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                                border: m.role === 'assistant' ? '1px solid var(--border)' : 'none'
                             }}>
                                 {m.content}
                             </div>
                         ))}
                         {isThinking && (
-                            <div style={{ alignSelf: 'flex-start', padding: '10px 14px', background: '#f3f4f6', borderRadius: '16px', fontSize: '14px' }}>
+                            <div style={{ alignSelf: 'flex-start', padding: '12px 16px', background: '#f3f4f6', borderRadius: '20px', fontSize: '14px' }}>
                                 <div className="typing-indicator">
                                     <span></span><span></span><span></span>
                                 </div>

@@ -1,19 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from app.middleware.auth import get_optional_user
-from app.models.user import User, Role
-from app.models.attendance import Attendance, LeaveRequest
-from app.models.project import Task
-from app.models.course import Batch
-from sqlalchemy import func, select, or_, and_
-from app.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
-import os
-import httpx
-import json
-import asyncio
 from pydantic import BaseModel
 from typing import List, Optional
+import httpx
+import os
+import json
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, or_
+from app.database import get_db
+from app.middleware.auth import get_optional_user
+from app.models.user import User, Role
+from app.models.attendance import Attendance
+from app.models.course import Batch, BatchStudent
+from app.models.project import Assignment, AssignmentSubmission, Task
+from app.utils.ai_prompts import SYSTEM_CONTEXT
 
 router = APIRouter(prefix="/api/ai", tags=["AI Assistant"])
 
@@ -35,80 +35,102 @@ async def chat_with_assistant(
     if not api_key:
         return StreamingResponse(iter(["Error: GROQ_API_KEY is not set. Please check server environment variables."]), media_type="text/plain")
 
-    # Persona & Context
-    persona = "GUEST"
-    context = ""
-    
-    if user:
-        if user.role == Role.SUPER_ADMIN:
-            persona = "ADMIN"
-            studs = await db.execute(select(func.count(User.id)).where(User.role == Role.STUDENT))
-            active_batches = await db.execute(select(func.count(Batch.id)).where(Batch.is_active == True))
-            context = f"Platform Stats: {studs.scalar()} students, {active_batches.scalar()} active batches."
-        elif user.role == Role.STUDENT:
-            persona = "STUDENT"
-            att = await db.execute(select(func.count(Attendance.id)).where(Attendance.student_id == user.id, Attendance.status == "PRESENT"))
-            tasks = await db.execute(select(func.count(Task.id)).where(Task.assigned_to == user.id, Task.status != "COMPLETED"))
-            context = f"Student Profile: {user.name}, Attendance: {att.scalar()} sessions present, Pending Tasks: {tasks.scalar()}."
-        else:
-            persona = "STAFF"
+    # Start with the shared platform knowledge
+    system_prompt = SYSTEM_CONTEXT
 
-    if persona == "GUEST":
-        system_prompt = "You are the AppTechno AI Guide. Tone: Friendly, welcoming. Goal: Help visitors learn about courses and register."
-    elif persona == "ADMIN":
-        system_prompt = f"You are the AppTechno Data Assistant. Tone: Precise, analytical. Context: {context}. Help the admin with system insights."
-    elif persona == "STUDENT":
-        system_prompt = f"You are the AppTechno Strict Mentor. Tone: Firm, results-driven. Context: {context}. Goal: Push the student to complete tasks and attend sessions. Mention stats if they are low."
+    # Add role-specific personality and real-time context
+    if not user:
+        system_prompt += "\n\n[PERSONA]: You are currently in 'Friendly Guide' mode. Focus on welcoming visitors and explaining courses."
     else:
-        system_prompt = f"You are the AppTechno Professional Assistant. Help {user.name if user else 'user'} with their duties."
+        # Fetch real-time student context (mirroring training.py chatbot logic)
+        user_id = user.id
+        user_name = user.name
+        user_role = user.role.value if hasattr(user.role, 'value') else str(user.role)
+        
+        try:
+            # 1. Fetch Batches
+            batch_res = await db.execute(
+                select(Batch.name).join(BatchStudent, BatchStudent.batch_id == Batch.id).where(BatchStudent.student_id == user_id)
+            )
+            batches = batch_res.scalars().all()
+            batch_str = ", ".join(batches) if batches else "None"
+            
+            # 2. Fetch Attendance
+            att_res = await db.execute(select(Attendance.status).where(Attendance.student_id == user_id))
+            all_att = att_res.scalars().all()
+            present = len([s for s in all_att if (s.value if hasattr(s, 'value') else s) in ('PRESENT', 'LATE')])
+            total_att = len(all_att)
+            att_pct = int((present / total_att) * 100) if total_att > 0 else 0
+            
+            # 3. Fetch Assignments
+            batch_ids_res = await db.execute(select(BatchStudent.batch_id).where(BatchStudent.student_id == user_id))
+            batch_ids = batch_ids_res.scalars().all()
+            
+            assign_query = select(func.count(Assignment.id))
+            if batch_ids:
+                assign_query = assign_query.where(or_(Assignment.batch_id.in_(batch_ids), Assignment.student_id == user_id))
+            else:
+                assign_query = assign_query.where(Assignment.student_id == user_id)
+            
+            total_assign_res = await db.execute(assign_query)
+            total_assign = total_assign_res.scalar() or 0
+            
+            done_assign_res = await db.execute(select(func.count(AssignmentSubmission.id)).where(AssignmentSubmission.student_id == user_id))
+            done_assign = done_assign_res.scalar() or 0
+            
+            context_block = f"""
+[PERSONALIZED CONTEXT FOR VOICE AI]
+User: {user_name} ({user_role})
+Batches: {batch_str}
+Attendance: {att_pct}%
+Assignments: {done_assign}/{total_assign}
+"""
+            if user.role == Role.STUDENT:
+                system_prompt += f"\n{context_block}\n[PERSONA]: You are a 'Strict Mentor'. If attendance is < 85% or assignments are pending, mention it firmly but with care."
+            elif user.role in [Role.SUPER_ADMIN, Role.ADMIN]:
+                # Add platform-wide stats for admin
+                s_count = await db.execute(select(func.count(User.id)).where(User.role == Role.STUDENT))
+                b_count = await db.execute(select(func.count(Batch.id)))
+                system_prompt += f"\n[PLATFORM STATS]: {s_count.scalar()} students, {b_count.scalar()} active batches.\n[PERSONA]: You are a 'Data Analytics Assistant'. Provide concise, data-driven insights."
+        except Exception as e:
+            print(f"DB Error in AI persona: {e}")
+            await db.rollback()
+            system_prompt += f"\n[USER]: {user_name} ({user_role})."
 
+    # Build messages for Groq
     messages = [{"role": "system", "content": system_prompt}]
     if body.history:
-        for msg in body.history[-5:]: # Keep last 5 messages for context
+        for msg in body.history[-10:]: # Keep last 10 turns
             messages.append({"role": msg.role, "content": msg.content})
-    
     messages.append({"role": "user", "content": body.message})
 
     async def generate():
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             try:
-                username = user.name if user else "Guest"
-                print(f"DEBUG: AI Request for {username} ({persona}) - Message: {body.message}")
                 async with client.stream(
                     "POST",
                     "https://api.groq.com/openai/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
+                    headers={"Authorization": f"Bearer {api_key}"},
                     json={
-                        "model": "llama-3.3-70b-versatile",
+                        "model": "llama-3.1-8b-instant",
                         "messages": messages,
                         "temperature": 0.7,
-                        "max_tokens": 1024,
                         "stream": True
                     }
-                ) as response:
-                    if response.status_code != 200:
-                        err_body = await response.aread()
-                        print(f"ERROR: Groq API returned {response.status_code} - {err_body}")
-                        yield f"Error: AI service returned {response.status_code}. Details: {err_body.decode()}"
+                ) as resp:
+                    if resp.status_code != 200:
+                        yield f"Error: AI service returned {resp.status_code}"
                         return
-
-                    async for line in response.aiter_lines():
+                    async for line in resp.aiter_lines():
                         if line.startswith("data: "):
-                            data_str = line[6:]
-                            if data_str == "[DONE]":
-                                break
+                            data = line[6:]
+                            if data == "[DONE]": break
                             try:
-                                chunk = json.loads(data_str)
+                                chunk = json.loads(data)
                                 content = chunk["choices"][0]["delta"].get("content", "")
-                                if content:
-                                    yield content
-                            except:
-                                continue
+                                if content: yield content
+                            except: continue
             except Exception as e:
-                print(f"ERROR in AI generate: {str(e)}")
-                yield f"Error: {str(e)}"
+                yield f"Connection Error: {str(e)}"
 
     return StreamingResponse(generate(), media_type="text/plain")
