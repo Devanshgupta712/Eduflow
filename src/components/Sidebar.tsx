@@ -167,6 +167,19 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
         return () => clearInterval(interval);
     }, [userRole]);
 
+    const getInitials = (name: string) => {
+        return name
+            .split(' ')
+            .map((n) => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
+    };
+
+    const formatRole = (role: string) => {
+        return role.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+    };
+
     const handleLogout = () => {
         clearToken();
         router.push('/');
