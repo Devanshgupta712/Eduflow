@@ -9,6 +9,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import Student360Report from './Student360Report';
 import SuggestionBox from './SuggestionBox';
 import { useSocket } from '@/hooks/useSocket';
+import VoiceAssistant from './VoiceAssistant';
 
 
 const PUBLIC_PATHS = [
@@ -518,6 +519,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                 </div>
             )}
+            <VoiceAssistant />
         </div>
     );
 }

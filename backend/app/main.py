@@ -12,7 +12,7 @@ from app.database import engine, Base, AsyncSessionLocal
 # Import all models so tables can be created
 from app.models import *  # noqa: F401, F403
 
-from app.routers import auth, admin, marketing, training, placement
+from app.routers import auth, admin, marketing, training, placement, ai
 from app.ws.socket_manager import sio_app
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.tasks.feedback_cron import check_missed_feedback
@@ -311,6 +311,7 @@ app.include_router(admin.router)
 app.include_router(marketing.router)
 app.include_router(training.router)
 app.include_router(placement.router)
+app.include_router(ai.router)
 app.include_router(sessions.router)
 app.include_router(resume.router)
 
