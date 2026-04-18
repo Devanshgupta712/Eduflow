@@ -17,8 +17,12 @@ export default function NotificationsPage() {
     const markAllRead = async () => {
         // Optimistic update
         setNotifications(notifications.map(n => ({ ...n, read: true })));
-        // Could call an endpoint here if we had one:
-        // await apiPost('/api/auth/notifications/read-all', {});
+        try {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com'}/api/auth/notifications/read-all`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            });
+        } catch (e) { console.error(e); }
     };
 
     const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
@@ -68,6 +72,11 @@ export default function NotificationsPage() {
                                                 const idx = newNotifs.findIndex(x => x.id === n.id);
                                                 newNotifs[idx].read = true;
                                                 setNotifications(newNotifs);
+                                                
+                                                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com'}/api/auth/notifications/${n.id}/read`, {
+                                                    method: 'PUT',
+                                                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                                                }).catch(() => {});
                                             }
                                         }}
                                         style={{

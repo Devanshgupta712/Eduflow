@@ -295,12 +295,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <div style={{ position: 'relative' }}>
                             <button
                                 onClick={() => {
-                                    const opening = !showNotifs;
-                                    setShowNotifs(opening);
-                                    if (opening && unreadCount > 0) {
-                                        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-                                        apiPost('/api/auth/notifications/read-all', {}).catch(() => { });
-                                    }
+                                    setShowNotifs(!showNotifs);
                                 }}
                                 style={{ 
                                     width: '40px',
@@ -353,10 +348,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                                 <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No notifications</p>
                                             </div>
                                         ) : (
-                                            notifications.slice(0, 5).map(n => (
+                                            notifications.map(n => (
                                                 <div
                                                     key={n.id}
                                                     onClick={() => {
+                                                        if (!n.read) {
+                                                            setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, read: true } : notif));
+                                                            apiPost(`/api/auth/notifications/${n.id}/read`, { _method: 'PUT' })
+                                                                .catch(err => {
+                                                                    // Fallback if PUT doesn't work via _method workaround, try standard fetch
+                                                                    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com'}/api/auth/notifications/${n.id}/read`, {
+                                                                        method: 'PUT',
+                                                                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                                                                    });
+                                                                });
+                                                        }
                                                         if (n.link) {
                                                             router.push(n.link);
                                                             setShowNotifs(false);
@@ -374,6 +380,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                                 </div>
                                             ))
                                         )}
+                                    </div>
+                                    <div style={{ borderTop: '1px solid var(--border)' }}>
+                                        <button 
+                                            style={{ width: '100%', padding: '12px', background: 'var(--bg-secondary)', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}
+                                            onClick={() => { router.push('/student/notifications'); setShowNotifs(false); }}
+                                        >
+                                            View All Notifications
+                                        </button>
                                     </div>
                                 </div>
                             )}

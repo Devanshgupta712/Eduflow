@@ -10,6 +10,7 @@ interface UserProfile {
     highest_education: string | null; degree: string | null;
     passing_year: string | null;
     is_active: boolean; created_at: string;
+    average_rating: number | null;
 }
 
 interface DocItem {
@@ -254,6 +255,9 @@ export default function StudentProfilePage() {
                                         <InfoItem icon="📱" label="Phone" value={profile?.phone || 'Not provided'} />
                                         <InfoItem icon="🆔" label="Student ID" value={profile?.student_id || 'N/A'} />
                                         <InfoItem icon="📅" label="Joined" value={profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : ''} />
+                                        {(profile?.role === 'TRAINER' || profile?.average_rating) && (
+                                            <InfoItem icon="⭐" label="Rating" value={profile?.average_rating ? `${profile.average_rating.toFixed(1)} / 5.0` : 'No rating yet'} />
+                                        )}
                                     </div>
 
                                     {/* Education Info */}

@@ -15,11 +15,12 @@ from app.models import *  # noqa: F401, F403
 from app.routers import auth, admin, marketing, training, placement
 from app.ws.socket_manager import sio_app
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from app.tasks.feedback_cron import check_missed_feedback
 
 # Initialize Scheduler
 scheduler = AsyncIOScheduler()
-
-
+# Run every Saturday at 23:59
+scheduler.add_job(check_missed_feedback, 'cron', day_of_week='sat', hour=23, minute=59)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

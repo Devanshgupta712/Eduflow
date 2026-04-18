@@ -77,6 +77,16 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user or not verify_password(body.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    from app.models.session import StudentFeedback
+    from sqlalchemy import func
+    
+    rating_result = await db.execute(
+        select(func.avg(StudentFeedback.rating))
+        .where(StudentFeedback.target_id == user.id, StudentFeedback.target_type == 'TRAINER')
+    )
+    avg_rating = rating_result.scalar()
+    user.average_rating = float(avg_rating) if avg_rating else 0.0
+
     token = create_access_token({"sub": user.id, "role": user.role.value})
     return TokenResponse(
         access_token=token,
@@ -93,6 +103,17 @@ async def mark_notifications_read(db: AsyncSession = Depends(get_db), user: User
     )
     await db.flush()
     return {"status": "success"}
+
+@router.put("/notifications/{notif_id}/read")
+async def mark_notification_read(notif_id: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    from app.models.notification import Notification
+    result = await db.execute(select(Notification).where(Notification.id == notif_id, Notification.user_id == user.id))
+    notif = result.scalars().first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    notif.read = True
+    await db.commit()
+    return {"status": "success", "id": notif.id}
 
 
 
@@ -295,7 +316,18 @@ async def get_public_courses(db: AsyncSession = Depends(get_db)):
     return out
 
 @router.get("/me", response_model=UserOut)
-async def get_me(user: User = Depends(get_current_user)):
+async def get_me(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from app.models.session import StudentFeedback
+    from sqlalchemy import func
+    
+    # Calculate average rating
+    result = await db.execute(
+        select(func.avg(StudentFeedback.rating))
+        .where(StudentFeedback.target_id == user.id, StudentFeedback.target_type == 'TRAINER')
+    )
+    avg_rating = result.scalar()
+    user.average_rating = float(avg_rating) if avg_rating else 0.0
+    
     return UserOut.model_validate(user)
 
 

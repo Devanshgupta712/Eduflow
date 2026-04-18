@@ -51,6 +51,7 @@ class ViolationType(str, enum.Enum):
     FACE_LOSS = "FACE_LOSS"
     FULLSCREEN_EXIT = "FULLSCREEN_EXIT"
     MIC_OFF = "MIC_OFF"
+    MISSED_FEEDBACK = "MISSED_FEEDBACK"
 
 
 class ViolationSeverity(str, enum.Enum):

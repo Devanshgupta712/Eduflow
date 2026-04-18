@@ -65,6 +65,7 @@ class UserOut(BaseModel):
     is_active: bool
     created_at: datetime
     permissions: AdminPermissionOut | None = None
+    average_rating: float | None = None
 
     class Config:
         from_attributes = True
