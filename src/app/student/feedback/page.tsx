@@ -220,6 +220,49 @@ export default function StudentFeedbackPage() {
                     )}
                 </div>
 
+                {/* Trainer Evaluation Matrices */}
+                {SECTIONS.map((section, sIdx) => (
+                    <div key={sIdx} className="glass-premium" style={{ padding: '32px', borderRadius: '24px', border: '1px solid var(--border)', overflowX: 'auto' }}>
+                        <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '24px' }}>
+                            {section.title} <span style={{ color: 'var(--danger)' }}>*</span>
+                        </h3>
+                        
+                        <div style={{ minWidth: '600px' }}>
+                            <div style={{ display: 'flex', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+                                <div style={{ width: '40%' }}></div>
+                                <div style={{ width: '60%', display: 'flex', justifyContent: 'space-between', padding: '0 16px' }}>
+                                    {section.scale.map((label, i) => (
+                                        <div key={i} style={{ width: '20%', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                            {label}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {section.questions.map((q, qIdx) => (
+                                <div key={q.id} style={{ 
+                                    display: 'flex', padding: '16px 0', 
+                                    borderBottom: qIdx === section.questions.length - 1 ? 'none' : '1px solid rgba(0,0,0,0.05)',
+                                    alignItems: 'center'
+                                }}>
+                                    <div style={{ width: '40%', fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', paddingRight: '16px' }}>
+                                        {q.label}
+                                    </div>
+                                    <div style={{ width: '60%', display: 'flex', justifyContent: 'space-between', padding: '0 16px' }}>
+                                        {[1, 2, 3, 4, 5].map((val) => (
+                                            <div key={val} style={{ width: '20%', display: 'flex', justifyContent: 'center' }}>
+                                                <input 
+                                                    type="radio" name={q.id} value={val}
+                                                    checked={ratings[q.id] === val}
+                                                    onChange={() => handleRatingChange(q.id, val)}
+                                                    style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 ))}
 
