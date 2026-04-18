@@ -1986,8 +1986,9 @@ Please tailor the complexity, vocabulary, and scenarios specifically to the {bod
 {format_instr}"""
 
     # Retry logic for Rate Limits (429)
-    models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768", "llama-3.1-70b-versatile"]
+    models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768", "llama3-70b-8192"]
     last_status = 200
+    error_detail = "Unknown error"
 
     for model_name in models:
         for attempt in range(2):
@@ -2010,7 +2011,6 @@ Please tailor the complexity, vocabulary, and scenarios specifically to the {bod
                 
                 last_status = resp.status_code
                 if resp.status_code == 429:
-                    # Rate limited: wait and retry once, then try next model
                     if attempt == 0:
                         await asyncio.sleep(2)
                         continue
@@ -2018,15 +2018,19 @@ Please tailor the complexity, vocabulary, and scenarios specifically to the {bod
                         break 
                 
                 if not resp.is_success:
-                    # Other API error: try next model immediately
-                    break
+                    try:
+                        err_json = resp.json()
+                        error_detail = err_json.get("error", {}).get("message", resp.text)
+                    except:
+                        error_detail = resp.text
+                    break # Try next model
 
                 data = resp.json()
                 if not data.get("choices"):
+                    error_detail = "AI returned no choices"
                     break
                     
                 raw = data["choices"][0]["message"]["content"].strip()
-                # Robust JSON extraction
                 start_idx = raw.find('{')
                 end_idx = raw.rfind('}')
                 if start_idx != -1 and end_idx != -1:
@@ -2035,17 +2039,19 @@ Please tailor the complexity, vocabulary, and scenarios specifically to the {bod
                 task = json.loads(raw)
                 return task
 
-            except (httpx.TimeoutException, json.JSONDecodeError):
+            except (httpx.TimeoutException, json.JSONDecodeError) as e:
+                error_detail = str(e)
                 if attempt == 0:
                     continue
                 break
-            except Exception:
+            except Exception as e:
+                error_detail = str(e)
                 break
     
-    # If all models/attempts fail
     if last_status == 429:
         raise HTTPException(status_code=429, detail="AI rate limit reached. Please wait 10 seconds and try again.")
-    raise HTTPException(status_code=502, detail=f"AI service unavailable (Error {last_status}). Please try again later.")
+    raise HTTPException(status_code=last_status if last_status >= 400 else 502, 
+                        detail=f"AI Error ({last_status}): {error_detail}")
 
 # ─── Assessment Session APIs ───────────────────────────────────────────────────
 import random
