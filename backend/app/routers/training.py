@@ -3,6 +3,7 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone, date
 import json
+import asyncio
 
 from app.database import get_db
 from app.middleware.auth import get_current_user, require_roles, get_optional_user
@@ -1984,41 +1985,67 @@ Please tailor the complexity, vocabulary, and scenarios specifically to the {bod
 
 {format_instr}"""
 
-    try:
-        async with httpx.AsyncClient(timeout=40.0) as client:
-            resp = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [
-                        {"role": "system", "content": "You are an expert software trainer. Return ONLY valid JSON. No markdown, no explanation."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.5,
-                    "max_tokens": 4096,
-                    "response_format": {"type": "json_object"}
-                }
-            )
-        if not resp.is_success:
-            raise HTTPException(status_code=502, detail=f"AI error: {resp.status_code}")
-        data = resp.json()
-        raw = data["choices"][0]["message"]["content"].strip()
-        # Robust JSON extraction
-        start_idx = raw.find('{')
-        end_idx = raw.rfind('}')
-        if start_idx != -1 and end_idx != -1:
-            raw = raw[start_idx:end_idx+1]
-        task = json.loads(raw)
-        return task
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="AI returned invalid format. Please try again.")
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="AI timed out. Please try again.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Task generation error: {str(e)}")
+    # Retry logic for Rate Limits (429)
+    models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768", "llama-3.1-70b-versatile"]
+    last_status = 200
+
+    for model_name in models:
+        for attempt in range(2):
+            try:
+                async with httpx.AsyncClient(timeout=45.0) as client:
+                    resp = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": model_name,
+                            "messages": [
+                                {"role": "system", "content": "You are an expert software trainer. Return ONLY valid JSON. No markdown, no explanation."},
+                                {"role": "user", "content": prompt}
+                            ],
+                            "temperature": 0.5,
+                            "max_tokens": 4096,
+                            "response_format": {"type": "json_object"}
+                        }
+                    )
+                
+                last_status = resp.status_code
+                if resp.status_code == 429:
+                    # Rate limited: wait and retry once, then try next model
+                    if attempt == 0:
+                        await asyncio.sleep(2)
+                        continue
+                    else:
+                        break 
+                
+                if not resp.is_success:
+                    # Other API error: try next model immediately
+                    break
+
+                data = resp.json()
+                if not data.get("choices"):
+                    break
+                    
+                raw = data["choices"][0]["message"]["content"].strip()
+                # Robust JSON extraction
+                start_idx = raw.find('{')
+                end_idx = raw.rfind('}')
+                if start_idx != -1 and end_idx != -1:
+                    raw = raw[start_idx:end_idx+1]
+                
+                task = json.loads(raw)
+                return task
+
+            except (httpx.TimeoutException, json.JSONDecodeError):
+                if attempt == 0:
+                    continue
+                break
+            except Exception:
+                break
+    
+    # If all models/attempts fail
+    if last_status == 429:
+        raise HTTPException(status_code=429, detail="AI rate limit reached. Please wait 10 seconds and try again.")
+    raise HTTPException(status_code=502, detail=f"AI service unavailable (Error {last_status}). Please try again later.")
 
 # ─── Assessment Session APIs ───────────────────────────────────────────────────
 import random
