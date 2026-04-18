@@ -143,7 +143,7 @@ export default function VoiceAssistant() {
     }, [isListening, isSpeaking]);
 
     return (
-        <div className="voice-assistant-container" style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 10000 }}>
+        <div className="voice-assistant-container" style={{ position: 'fixed', bottom: '24px', right: '100px', zIndex: 10000 }}>
             {/* Pulsing AI Orb Button */}
             <button 
                 onClick={() => setIsOpen(!isOpen)}
