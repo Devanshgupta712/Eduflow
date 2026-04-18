@@ -35,10 +35,12 @@ export default function TasksPage() {
     // Shared form fields
     const [form, setForm] = useState({ title: '', description: '', priority: 'MEDIUM', due_date: '' });
     const [saving, setSaving] = useState(false);
+    const [editingTask, setEditingTask] = useState<any>(null);
+    const [editingAiPreview, setEditingAiPreview] = useState<any>(null);
 
     const [aiTopic, setAiTopic] = useState('');
     const [aiDifficulty, setAiDifficulty] = useState('Intermediate');
-    const [aiTaskType, setAiTaskType] = useState('CODING');
+    const [aiTaskTypes, setAiTaskTypes] = useState<string[]>(['CODING']);
     const [aiQuestionCount, setAiQuestionCount] = useState(5);
     const [aiTimeLimit, setAiTimeLimit] = useState(0);
     const [aiRandomize, setAiRandomize] = useState(true);
@@ -74,12 +76,32 @@ export default function TasksPage() {
         setStep('method');
         setForm({ title: '', description: '', priority: 'MEDIUM', due_date: '' });
         setAiTopic(''); setAiDifficulty('Intermediate');
+        setAiTaskTypes(['CODING']);
         setAiScheduledAt('');
         setAiPreview(null); setAiError('');
-
         setPdfFile(null);
         setSelectedBatch(''); setSelectedStudent('');
         setAssignTarget('batch'); setBatchStudents([]);
+        setEditingTask(null); setEditingAiPreview(null);
+    };
+
+    const openEditModal = (task: any) => {
+        setEditingTask(task);
+        setForm({
+            title: task.title || '',
+            description: task.description || '',
+            priority: task.priority || 'MEDIUM',
+            due_date: task.due_date ? task.due_date.slice(0, 16) : '',
+        });
+        setSelectedBatch(task.batch_id || '');
+        if (task.batch_id) loadStudents(task.batch_id);
+        setSelectedStudent(task.student_id || '');
+        setAssignTarget(task.student_id ? 'student' : 'batch');
+        if (task.structured_content) {
+            try { setEditingAiPreview(JSON.parse(task.structured_content)); } catch {}
+        }
+        setStep('common');
+        setShowModal(true);
     };
 
     const handleDelete = async (id: string) => {
@@ -97,53 +119,37 @@ export default function TasksPage() {
     // ── AI Generation ────────────────────────────────────────────────────────
     const handleGenerate = async () => {
         if (!aiTopic.trim()) { setAiError('Please enter a topic.'); return; }
+        if (aiTaskTypes.length === 0) { setAiError('Select at least one type.'); return; }
         setGenerating(true); setAiError(''); setAiPreview(null);
         try {
-            const resp = await apiFetch('/api/training/generate-task', {
-                method: 'POST',
-                body: JSON.stringify({ 
-                    topic: aiTopic, task_type: aiTaskType, 
-                    difficulty: aiDifficulty, question_count: Number(aiQuestionCount),
-                    time_limit: Number(aiTimeLimit), is_randomized: aiRandomize,
-                    scheduled_at: aiScheduledAt
-                })
-            });
-            if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-            const result = await resp.json();
-            setAiPreview(result);
-
-            // Format description based on task type and returned structure
-            let generatedDescription = result.description || '';
-            
-            if (result.questions && result.questions.length > 0) {
-                const qList = result.questions.map((q: any, i: number) => {
-                    if (aiTaskType === 'MCQ') {
-                        const opts = q.options?.map((opt: string, idx: number) => `${String.fromCharCode(65 + idx)}) ${opt}`).join('\n') || '';
-                        return `Question ${i + 1}: ${q.question}\n${opts}\n(Correct Answer: Option ${String.fromCharCode(65 + (q.answer || 0))})\n${q.explanation ? `Explanation: ${q.explanation}\n` : ''}`;
-                    } else if (aiTaskType === 'CODING') {
-                        return `Problem ${i+1}: ${q.question}\n\nStarter Code:\n\`\`\`\n${q.initial_code || ''}\n\`\`\`\n\nConstraints:\n${q.constraints?.map((c: string) => `- ${c}`).join('\n') || 'None'}`;
-                    }
-                    return `Item ${i+1}: ${q.question || q.text || ''}`;
-                }).join('\n\n---\n\n');
-                generatedDescription += `\n\n${qList}`;
-            }
-
-            if (result.requirements && result.requirements.length > 0) {
-                generatedDescription += '\n\nRequirements:\n' + result.requirements.map((r: string, i: number) => `${i + 1}. ${r}`).join('\n');
-            }
-
-            if (result.hints && result.hints.length > 0) {
-                generatedDescription += '\n\nHints:\n' + result.hints.map((h: string) => `• ${h}`).join('\n');
-            }
-
-            if (result.estimated_hours) {
-                generatedDescription += `\n\nEstimated Time: ${result.estimated_hours} hours`;
-            }
-
+            const results = await Promise.all(aiTaskTypes.map(async (t) => {
+                const resp = await apiFetch('/api/training/generate-task', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        topic: aiTopic, task_type: t, 
+                        difficulty: aiDifficulty, question_count: Number(aiQuestionCount),
+                        time_limit: Number(aiTimeLimit), is_randomized: aiRandomize,
+                        scheduled_at: aiScheduledAt
+                    })
+                });
+                if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
+                const data = await resp.json();
+                return { ...data, generatedType: t };
+            }));
+            // Merge all questions into a single structured_content
+            const merged = {
+                title: results[0].title,
+                description: results[0].description,
+                questions: results.flatMap((r: any) => (r.questions || []).map((q: any) => ({ ...q, _type: r.generatedType }))),
+                types: aiTaskTypes,
+                time_limit: aiTimeLimit,
+                is_randomized: aiRandomize,
+            };
+            setAiPreview(merged);
             setForm(f => ({
                 ...f,
-                title: result.title || f.title,
-                description: generatedDescription
+                title: results.map(r => r.title).join(' & ') || f.title,
+                description: merged.description || f.description,
             }));
             setStep('ai_review');
         } catch (e: any) { setAiError(e?.message || 'AI generation failed.'); }
@@ -157,7 +163,6 @@ export default function TasksPage() {
         setSaving(true);
         try {
             let pdfUrl: string | undefined;
-
             if (pdfFile) {
                 const fd = new FormData();
                 fd.append('file', pdfFile);
@@ -180,14 +185,15 @@ export default function TasksPage() {
                 } : {})
             };
 
-            const resp = await apiFetch('/api/training/tasks', { method: 'POST', body: JSON.stringify(body) });
-            if (!resp.ok) {
-                const errJson = await resp.json().catch(() => ({}));
-                throw new Error(errJson.detail || 'Failed to create');
+            if (editingTask) {
+                const resp = await apiFetch(`/api/training/tasks/${editingTask.id}`, { method: 'PATCH', body: JSON.stringify(body) });
+                if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || 'Failed to update');
+            } else {
+                const resp = await apiFetch('/api/training/tasks', { method: 'POST', body: JSON.stringify(body) });
+                if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || 'Failed to create');
             }
             setShowModal(false); resetModal(); loadTasks();
         } catch (e: any) {
-            console.error('Task creation error:', e);
             alert(`Error: ${e.message}`);
         } finally { setSaving(false); }
     };
@@ -256,10 +262,8 @@ export default function TasksPage() {
                                     <span className="badge" style={{ background: `${statusColors[task.status]}20`, color: statusColors[task.status], fontSize: '11px' }}>
                                         {task.status.replace(/_/g, ' ')}
                                     </span>
-                                    {/* Delete Button */}
-                                    <button className="btn btn-sm btn-ghost" onClick={() => handleDelete(task.id)} style={{ color: '#ef4444', padding: '4px', height: '24px', minHeight: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Delete Task">
-                                        🗑️
-                                    </button>
+                                    <button className="btn btn-sm btn-ghost" onClick={() => openEditModal(task)} style={{ color: 'var(--primary)', padding: '4px', height: '24px', minHeight: '24px' }} title="Edit Task">✏️</button>
+                                    <button className="btn btn-sm btn-ghost" onClick={() => handleDelete(task.id)} style={{ color: '#ef4444', padding: '4px', height: '24px', minHeight: '24px' }} title="Delete Task">🗑️</button>
                                 </div>
                             </div>
                             
@@ -289,7 +293,7 @@ export default function TasksPage() {
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '620px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <h2 className="modal-title" style={{ margin: 0 }}>New Task</h2>
+                        <h2 className="modal-title" style={{ margin: 0 }}>{editingTask ? '✏️ Edit Task' : 'New Task'}</h2>
                             <button className="btn btn-sm btn-ghost" onClick={() => setShowModal(false)}>✕</button>
                         </div>
 
@@ -317,56 +321,48 @@ export default function TasksPage() {
                             <>
                                 <StepIndicator steps={aiSteps} current={1} />
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                                        <div className="form-group" style={{ margin: 0 }}>
-                                            <label className="form-label">Task Format</label>
-                                            <select className="form-input" value={aiTaskType} onChange={e => setAiTaskType(e.target.value)}>
-                                                <option value="CODING">💻 Coding</option>
-                                                <option value="WRITTEN">✍️ Written</option>
-                                                <option value="MCQ">📝 MCQ</option>
-                                                <option value="PROJECT">🏗️ Project</option>
-                                            </select>
-                                        </div>
-                                        <div className="form-group" style={{ margin: 0 }}>
-                                            <label className="form-label">Difficulty</label>
-                                            <select className="form-input" value={aiDifficulty} onChange={e => setAiDifficulty(e.target.value)}>
-                                                <option>Introductory</option>
-                                                <option>Beginner</option>
-                                                <option>Intermediate</option>
-                                                <option>Advanced</option>
-                                                <option>Professional</option>
-                                                <option>Expert</option>
-                                                <option>Master</option>
-                                            </select>
-                                        </div>
-                                        <div className="form-group" style={{ margin: 0 }}>
-                                            <label className="form-label">Items Count</label>
-                                            <input type="number" min={1} max={25} className="form-input" value={aiQuestionCount} onChange={e => setAiQuestionCount(parseInt(e.target.value) || 5)} />
-                                        </div>
-                                    </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                         <div className="form-group" style={{ margin: 0 }}>
-                                            <label className="form-label">Time Limit (mins, 0=none)</label>
-                                            <input type="number" min={0} className="form-input" value={aiTimeLimit} onChange={e => setAiTimeLimit(parseInt(e.target.value) || 0)} />
+                                            <label className="form-label">Task Types (select multiple)</label>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                {[['CODING','💻'],['WRITTEN','✍️'],['MCQ','📝'],['PROJECT','🏗️']].map(([t, icon]) => (
+                                                    <label key={t} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', padding: '6px 10px', borderRadius: '8px', background: aiTaskTypes.includes(t) ? 'var(--primary-glow)' : 'transparent', border: aiTaskTypes.includes(t) ? '1px solid var(--primary)' : '1px solid transparent', transition: 'all 0.2s' }}>
+                                                        <input type="checkbox" checked={aiTaskTypes.includes(t)} onChange={e => setAiTaskTypes(prev => e.target.checked ? [...prev, t] : prev.filter(x => x !== t))} style={{ accentColor: 'var(--primary)' }} />
+                                                        {icon} {t}
+                                                    </label>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <div className="form-group" style={{ margin: 0, display: 'flex', alignItems: 'center', paddingTop: '28px' }}>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <div className="form-group" style={{ margin: 0 }}>
+                                                <label className="form-label">Difficulty</label>
+                                                <select className="form-input" value={aiDifficulty} onChange={e => setAiDifficulty(e.target.value)}>
+                                                    <option>Introductory</option><option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Expert</option>
+                                                </select>
+                                            </div>
+                                            <div className="form-group" style={{ margin: 0 }}>
+                                                <label className="form-label">Items per type</label>
+                                                <input type="number" min={1} max={25} className="form-input" value={aiQuestionCount} onChange={e => setAiQuestionCount(parseInt(e.target.value) || 5)} />
+                                            </div>
+                                            <div className="form-group" style={{ margin: 0 }}>
+                                                <label className="form-label">Time Limit (mins, 0=none)</label>
+                                                <input type="number" min={0} className="form-input" value={aiTimeLimit} onChange={e => setAiTimeLimit(parseInt(e.target.value) || 0)} />
+                                            </div>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
                                                 <input type="checkbox" checked={aiRandomize} onChange={e => setAiRandomize(e.target.checked)} style={{ transform: 'scale(1.2)' }} />
-                                                Shuffle questions per student
+                                                Shuffle questions
                                             </label>
                                         </div>
                                     </div>
                                     <div className="form-group" style={{ margin: 0 }}>
                                         <label className="form-label">Topic / Subject *</label>
-                                        <input className="form-input" value={aiTopic} onChange={e => { setAiTopic(e.target.value); setAiError(''); }} placeholder="e.g. Set up a PostgreSQL Database..." />
+                                        <input className="form-input" value={aiTopic} onChange={e => { setAiTopic(e.target.value); setAiError(''); }} placeholder="e.g. Python OOP Concepts, SQL Joins..." />
                                         {aiError && <p style={{ color: '#ef4444', fontSize: '13px', marginTop: '6px' }}>⚠️ {aiError}</p>}
                                     </div>
                                     <div className="form-group" style={{ margin: 0 }}>
                                         <label className="form-label">Schedule Deployment (Optional)</label>
                                         <input type="datetime-local" className="form-input" value={aiScheduledAt} onChange={e => setAiScheduledAt(e.target.value)} />
-                                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Leave blank to deploy immediately.</p>
                                     </div>
-
                                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                                         <button type="button" className="btn btn-ghost" onClick={() => setStep('method')}>← Back</button>
                                         <button type="button" className="btn btn-primary" onClick={handleGenerate} disabled={generating}>
@@ -381,27 +377,42 @@ export default function TasksPage() {
                         {step === 'ai_review' && aiPreview && (
                             <>
                                 <StepIndicator steps={aiSteps} current={2} />
-                                <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '16px', marginBottom: '16px', border: '1px solid #10b98130' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                                        <div>
-                                            <p style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>✨ AI Generated — Review</p>
-                                            <h3 style={{ margin: 0, fontSize: '16px' }}>{aiPreview.title}</h3>
-                                        </div>
-                                    </div>
-                                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 10px' }}>{aiPreview.description}</p>
+                                <div style={{ marginBottom: '12px' }}>
+                                    <p style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, margin: '0 0 4px', textTransform: 'uppercase' }}>✨ AI Generated — Question Preview</p>
+                                    <h3 style={{ margin: '0 0 4px', fontSize: '16px' }}>{aiPreview.title}</h3>
+                                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>{(aiPreview.questions || []).length} questions · {(aiPreview.types || []).join(' + ')}</p>
                                 </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    <div className="form-group" style={{ margin: 0 }}>
-                                        <label className="form-label">Edit Title</label>
-                                        <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-                                    </div>
-                                    <div className="form-group" style={{ margin: 0 }}>
-                                        <label className="form-label">Edit Description</label>
-                                        <textarea className="form-input" rows={5} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-                                    </div>
+                                <div style={{ maxHeight: '45vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px', marginBottom: '16px' }}>
+                                    {(aiPreview.questions || []).map((q: any, i: number) => {
+                                        const isMCQ = q._type === 'MCQ' || !!q.options;
+                                        return (
+                                            <div key={i} style={{ padding: '14px', background: 'var(--bg-secondary)', borderRadius: '10px', border: `1px solid ${isMCQ ? '#f59e0b30' : '#6366f130'}` }}>
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '6px', background: isMCQ ? '#f59e0b20' : '#6366f120', color: isMCQ ? '#f59e0b' : '#6366f1', whiteSpace: 'nowrap', marginTop: '2px' }}>{isMCQ ? '📝 MCQ' : '💻 CODE'}</span>
+                                                    <span style={{ fontSize: '13px', fontWeight: 600 }}>Q{i+1}. {q.question}</span>
+                                                </div>
+                                                {isMCQ && q.options && (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
+                                                        {q.options.map((opt: string, oi: number) => (
+                                                            <div key={oi} style={{ fontSize: '12px', padding: '4px 8px', borderRadius: '6px', background: q.answer === oi ? '#10b98115' : 'transparent', border: q.answer === oi ? '1px solid #10b981' : '1px solid transparent', color: q.answer === oi ? '#10b981' : 'var(--text-secondary)' }}>
+                                                                {String.fromCharCode(65+oi)}. {opt} {q.answer === oi ? '✓' : ''}
+                                                            </div>
+                                                        ))}
+                                                        {q.explanation && <p style={{ fontSize: '11px', color: 'var(--primary)', margin: '6px 0 0', paddingLeft: '4px' }}>💡 {q.explanation}</p>}
+                                                    </div>
+                                                )}
+                                                {!isMCQ && q.initial_code && (
+                                                    <pre style={{ fontSize: '11px', background: '#1e1e1e', color: '#4ade80', padding: '8px', borderRadius: '6px', overflow: 'auto', margin: '4px 0 0' }}>{q.initial_code.slice(0, 200)}</pre>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                                <div className="form-group" style={{ margin: '0 0 12px' }}>
+                                    <label className="form-label">Edit Title</label>
+                                    <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                                     <button type="button" className="btn btn-ghost" onClick={() => setStep('ai_config')}>← Regenerate</button>
                                     <button type="button" className="btn btn-primary" onClick={() => setStep('assign')}>Next: Assign To →</button>
                                 </div>

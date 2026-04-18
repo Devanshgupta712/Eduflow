@@ -178,7 +178,14 @@ function StudentAssessmentsContent() {
                 setSessionId(data.session_id);
                 // Store randomized questions and RESUME partial answers if found
                 const sessionContent = data.responses ? JSON.parse(data.responses) : null;
-                const activeQs = sessionContent?.questions;
+                // Prefer session questions (randomized order), fall back to structured_content from the assignment
+                let activeQs = sessionContent?.questions;
+                if (!activeQs && assignment.structured_content) {
+                    try {
+                        const sc = JSON.parse(assignment.structured_content);
+                        activeQs = sc.questions || null;
+                    } catch(e) { console.error("Could not parse structured_content", e); }
+                }
                 
                 // LOAD PREVIOUS PROGRESS (if any)
                 let savedAnsMap = {};

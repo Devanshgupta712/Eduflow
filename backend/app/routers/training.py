@@ -939,6 +939,8 @@ async def update_task(
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(404, "Task not found")
+    if user.role == Role.TRAINER and task.assigned_by != user.id:
+        raise HTTPException(403, "You can only edit your own tasks")
     if "title" in body:
         task.title = body["title"]
     if "description" in body:
@@ -951,6 +953,14 @@ async def update_task(
         task.due_date = parse_dt(body["due_date"])
     elif "due_date" in body and not body["due_date"]:
         task.due_date = None
+    if "structured_content" in body:
+        task.structured_content = body["structured_content"]
+    if "time_limit" in body:
+        task.time_limit = body["time_limit"]
+    if "is_randomized" in body:
+        task.is_randomized = body["is_randomized"]
+    if "pdf_url" in body:
+        task.pdf_url = body["pdf_url"]
     await db.flush()
     return {"status": "updated"}
 
@@ -1111,6 +1121,40 @@ async def create_assignment(
         await db.flush()
 
     return {"id": assignment.id, "status": "created"}
+
+
+@router.patch("/assignments/{assignment_id}")
+async def update_assignment(
+    assignment_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN, Role.TRAINER)),
+):
+    assignment = await db.get(Assignment, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if user.role == Role.TRAINER and assignment.assigned_by != user.id:
+        raise HTTPException(status_code=403, detail="You can only edit your own assignments")
+    if "title" in body:
+        assignment.title = body["title"]
+    if "description" in body:
+        assignment.description = body["description"]
+    if "type" in body:
+        assignment.type = body["type"]
+    if "total_marks" in body:
+        assignment.total_marks = body["total_marks"]
+    if "due_date" in body and body["due_date"]:
+        assignment.due_date = parse_dt(body["due_date"])
+    elif "due_date" in body and not body["due_date"]:
+        assignment.due_date = None
+    if "time_limit" in body:
+        assignment.time_limit = body["time_limit"]
+    if "is_randomized" in body:
+        assignment.is_randomized = body["is_randomized"]
+    if "structured_content" in body:
+        assignment.structured_content = body["structured_content"]
+    await db.flush()
+    return {"status": "updated"}
 
 
 @router.delete("/assignments/{assignment_id}")

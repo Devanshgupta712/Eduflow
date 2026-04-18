@@ -32,6 +32,7 @@ export default function AssignmentsPage() {
     // Form
     const [form, setForm] = useState({ title: '', description: '', type: 'CODING', types: ['CODING'], total_marks: '100', due_date: '', time_limit: '0' });
     const [saving, setSaving] = useState(false);
+    const [editingAssignment, setEditingAssignment] = useState<any>(null);
 
     // AI generation
     const [aiTopic, setAiTopic] = useState('');
@@ -91,10 +92,36 @@ export default function AssignmentsPage() {
         setAiScheduledAt('');
         setAiQuestionCount(5); setAiTimeLimit(0); setAiRandomize(true);
         setAiPreview(null); setAiPreviews([]); setAiError('');
-
         setPdfFile(null);
         setSelectedBatch(''); setSelectedStudent('');
         setAssignTarget('batch'); setBatchStudents([]);
+        setEditingAssignment(null);
+    };
+
+    const openEditModal = (a: any) => {
+        setEditingAssignment(a);
+        setForm({
+            title: a.title || '',
+            description: a.description || '',
+            type: a.type || 'CODING',
+            types: [a.type || 'CODING'],
+            total_marks: String(a.total_marks || 100),
+            due_date: a.due_date ? a.due_date.slice(0, 16) : '',
+            time_limit: String(a.time_limit || 0),
+        });
+        setSelectedBatch(a.batch_id || '');
+        if (a.batch_id) loadStudents(a.batch_id);
+        setSelectedStudent(a.student_id || '');
+        setAssignTarget(a.student_id ? 'student' : 'batch');
+        if (a.structured_content) {
+            try {
+                const sc = JSON.parse(a.structured_content);
+                setAiPreviews([{ ...sc, generatedType: a.type }]);
+                setAiPreview(sc);
+            } catch {}
+        }
+        setStep('common');
+        setShowModal(true);
     };
 
     // ── AI Generation ─────────────────────────────────────────────────────────
@@ -138,7 +165,7 @@ export default function AssignmentsPage() {
         finally { setGenerating(false); }
     };
 
-    // ── Save Assignment ────────────────────────────────────────────────────────
+    // ── Save Assignment ───────────────────────────────────────────────────────
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.title.trim()) return;
@@ -155,6 +182,22 @@ export default function AssignmentsPage() {
                 if (uploadResp.ok) { const d = await uploadResp.json(); pdfUrl = d.url; }
             }
 
+            // EDIT MODE
+            if (editingAssignment) {
+                const body: any = {
+                    title: form.title, description: form.description,
+                    type: form.type, total_marks: parseInt(form.total_marks) || 100,
+                    due_date: form.due_date || null, time_limit: parseInt(form.time_limit) || 0,
+                    is_randomized: aiRandomize,
+                    ...(aiPreviews.length > 0 ? { structured_content: JSON.stringify(aiPreviews[0]) } : {}),
+                    ...(pdfUrl ? { pdf_url: pdfUrl } : {}),
+                };
+                const resp = await apiFetch(`/api/training/assignments/${editingAssignment.id}`, { method: 'PATCH', body: JSON.stringify(body) });
+                if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || 'Failed to update');
+                setShowModal(false); resetModal(); loadAssignments();
+                return;
+            }
+
             const baseBody: any = {
                 ...form, 
                 total_marks: parseInt(form.total_marks) || 100,
@@ -166,7 +209,6 @@ export default function AssignmentsPage() {
             };
 
             if (aiPreviews && aiPreviews.length > 0) {
-                // Loop through array of AI previews
                 await Promise.all(aiPreviews.map(async (preview: any) => {
                     const generatedDescription = form.type === 'CODING' && preview.questions?.[0] ? `${preview.description}\n\nProblem: ${preview.questions[0].question}` : preview.description;
                     const taskBody = {
@@ -181,9 +223,13 @@ export default function AssignmentsPage() {
                     if (!resp.ok) throw new Error(`Failed to create ${preview.generatedType} assignment`);
                 }));
             } else {
-                // PDF or Manual creation
                 const resp = await apiFetch('/api/training/assignments', { method: 'POST', body: JSON.stringify(baseBody) });
                 if (!resp.ok) throw new Error('Failed to create');
+            }
+
+            setShowModal(false); resetModal(); loadAssignments();
+        } catch (err: any) { alert(err?.message || "Failed to save assignment."); } finally { setSaving(false); }
+    };(!resp.ok) throw new Error('Failed to create');
             }
 
             setShowModal(false); resetModal(); loadAssignments();
@@ -298,6 +344,9 @@ export default function AssignmentsPage() {
                                             <button className="btn btn-sm btn-ghost" onClick={() => handleViewSubmissions(a)} style={{ color: 'var(--primary)', padding: '4px 8px' }} title="View Submissions & Performance">
                                                 📊
                                             </button>
+                                            <button className="btn btn-sm btn-ghost" onClick={() => openEditModal(a)} style={{ color: 'var(--primary)', padding: '4px 8px' }} title="Edit Assignment">
+                                                ✏️
+                                            </button>
                                             <button className="btn btn-sm btn-ghost" onClick={() => handleDelete(a.id)} style={{ color: '#ef4444', padding: '4px 8px' }} title="Delete Assignment">
                                                 🗑️
                                             </button>
@@ -315,7 +364,7 @@ export default function AssignmentsPage() {
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '620px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <h2 className="modal-title" style={{ margin: 0 }}>New Assignment</h2>
+                            <h2 className="modal-title" style={{ margin: 0 }}>{editingAssignment ? '✏️ Edit Assignment' : 'New Assignment'}</h2>
                             <button className="btn btn-sm btn-ghost" onClick={() => setShowModal(false)}>✕</button>
                         </div>
 
@@ -436,22 +485,26 @@ export default function AssignmentsPage() {
                         {step === 'ai_review' && aiPreviews && aiPreviews.length > 0 && (
                             <>
                                 <StepIndicator steps={aiSteps} current={2} />
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '50vh', overflowY: 'auto', paddingRight: '8px' }}>
+                                <div style={{ marginBottom: '12px' }}>
+                                    <p style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, margin: '0 0 4px', textTransform: 'uppercase' }}>✨ AI Generated — Question Preview</p>
+                                    <h3 style={{ margin: '0 0 4px', fontSize: '16px' }}>{form.title || aiPreviews[0].title}</h3>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '45vh', overflowY: 'auto', paddingRight: '8px', marginBottom: '16px' }}>
                                     {aiPreviews.map((preview: any, idx: number) => (
-                                        <div key={idx} style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '16px', border: '1px solid #10b98130' }}>
+                                        <div key={idx} style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '16px', border: `1px solid ${typeColors[preview.generatedType]}30` }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                                                 <div>
-                                                    <p style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>✨ AI Generated — {preview.generatedType}</p>
+                                                    <p style={{ fontSize: '11px', color: typeColors[preview.generatedType], fontWeight: 700, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{typeIcons[preview.generatedType]} {preview.generatedType} SECTION</p>
                                                     <h3 style={{ margin: 0, fontSize: '16px' }}>{preview.title || "Generated Task"}</h3>
                                                 </div>
                                                 <span style={{ fontSize: '11px', padding: '2px 8px', background: `${typeColors[preview.generatedType]}20`, color: typeColors[preview.generatedType], borderRadius: '99px', fontWeight: 600 }}>
                                                     {aiDifficulty}
                                                 </span>
                                             </div>
-                                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 10px' }}>{preview.description}</p>
+                                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 16px' }}>{preview.description}</p>
                                             
                                             {preview.requirements?.length > 0 && (
-                                                <div style={{ marginBottom: '10px' }}>
+                                                <div style={{ marginBottom: '16px' }}>
                                                     <p style={{ fontSize: '12px', fontWeight: 600, margin: '0 0 6px' }}>Requirements:</p>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                         {preview.requirements.map((r: string, i: number) => (
@@ -462,6 +515,30 @@ export default function AssignmentsPage() {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                {(preview.questions || []).map((q: any, i: number) => {
+                                                    const isMCQ = preview.generatedType === 'MCQ' || !!q.options;
+                                                    return (
+                                                        <div key={i} style={{ padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px', border: `1px solid var(--border)` }}>
+                                                            <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Q{i+1}. {q.question}</div>
+                                                            {isMCQ && q.options && (
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
+                                                                    {q.options.map((opt: string, oi: number) => (
+                                                                        <div key={oi} style={{ fontSize: '12px', padding: '4px 8px', borderRadius: '6px', background: q.answer === oi ? '#10b98115' : 'transparent', border: q.answer === oi ? '1px solid #10b981' : '1px solid transparent', color: q.answer === oi ? '#10b981' : 'var(--text-secondary)' }}>
+                                                                            {String.fromCharCode(65+oi)}. {opt} {q.answer === oi ? '✓' : ''}
+                                                                        </div>
+                                                                    ))}
+                                                                    {q.explanation && <p style={{ fontSize: '11px', color: 'var(--primary)', margin: '6px 0 0', paddingLeft: '4px' }}>💡 {q.explanation}</p>}
+                                                                </div>
+                                                            )}
+                                                            {!isMCQ && q.initial_code && (
+                                                                <pre style={{ fontSize: '11px', background: '#1e1e1e', color: '#4ade80', padding: '8px', borderRadius: '6px', overflow: 'auto', margin: '4px 0 0' }}>{q.initial_code.slice(0, 200)}</pre>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
