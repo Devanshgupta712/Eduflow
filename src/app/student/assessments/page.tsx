@@ -23,6 +23,11 @@ function StudentAssessmentsContent() {
     const [finalScore, setFinalScore] = useState<number | null>(null);
     const [timeLeft, setTimeLeft] = useState<number | null>(null); // seconds remaining
 
+    // Date filter — defaults to today
+    const today = new Date().toISOString().split('T')[0];
+    const [selectedDate, setSelectedDate] = useState(today);
+    const [showAllDates, setShowAllDates] = useState(false);
+
     const [content, setContent] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [reportData, setReportData] = useState<any>(null);
@@ -320,9 +325,46 @@ function StudentAssessmentsContent() {
                 <div className="stat-card accent"><div className="stat-icon accent">🔒</div><div className="stat-info"><h3>Security</h3><div className="stat-value">Active</div></div></div>
             </div>
 
-            {loading ? <p>Loading...</p> : (
+            {/* Date Filter */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '8px 14px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📅 Date:</span>
+                    <input
+                        type="date"
+                        value={selectedDate}
+                        onChange={e => { setSelectedDate(e.target.value); setShowAllDates(false); }}
+                        style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                    />
+                </div>
+                <button
+                    className={`btn btn-sm ${showAllDates ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setShowAllDates(!showAllDates)}
+                    style={{ borderRadius: '20px', fontSize: '12px', padding: '6px 14px' }}
+                >
+                    {showAllDates ? '✕ Showing All' : 'Show All Dates'}
+                </button>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    Showing {(showAllDates ? assignments : assignments.filter(a => {
+                        const created = a.created_at ? a.created_at.split('T')[0] : '';
+                        const due = a.due_date ? a.due_date.split('T')[0] : '';
+                        return created === selectedDate || due === selectedDate;
+                    })).length} of {assignments.length}
+                </span>
+            </div>
+
+            {loading ? <p>Loading...</p> : (() => {
+                const filteredAssignments = showAllDates
+                    ? assignments
+                    : assignments.filter(a => {
+                        const created = a.created_at ? a.created_at.split('T')[0] : '';
+                        const due = a.due_date ? a.due_date.split('T')[0] : '';
+                        return created === selectedDate || due === selectedDate;
+                    });
+                return filteredAssignments.length === 0 ? (
+                    <div className="card"><div className="empty-state"><div className="empty-icon">📝</div><h3>{assignments.length === 0 ? 'No assignments yet' : 'No assignments for this date'}</h3><p className="text-sm text-muted">{assignments.length === 0 ? 'No assignments assigned to you yet.' : 'Select a different date or click "Show All Dates".'}</p></div></div>
+                ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-                    {assignments.map(a => (
+                    {filteredAssignments.map(a => (
                         <div key={a.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{ flex: 1 }}>
@@ -364,7 +406,8 @@ function StudentAssessmentsContent() {
                         </div>
                     ))}
                 </div>
-            )}
+                );
+            })()}
 
             {/* Proctoring Implementation */}
             {activeSubmission && typeof document !== 'undefined' && createPortal(

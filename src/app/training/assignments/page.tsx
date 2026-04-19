@@ -22,6 +22,16 @@ export default function AssignmentsPage() {
     const [showModal, setShowModal] = useState(false);
     const [step, setStep] = useState<ModalStep>('method');
 
+    // Date filter — defaults to today
+    const today = new Date().toISOString().split('T')[0];
+    const [selectedDate, setSelectedDate] = useState(today);
+    const [showAllDates, setShowAllDates] = useState(false);
+
+    // Overdue detail modal
+    const [showOverdueModal, setShowOverdueModal] = useState(false);
+    const [overdueDetails, setOverdueDetails] = useState<any[]>([]);
+    const [loadingOverdue, setLoadingOverdue] = useState(false);
+
     // Batches & Students
     const [batches, setBatches] = useState<any[]>([]);
     const [batchStudents, setBatchStudents] = useState<any[]>([]);
@@ -245,6 +255,42 @@ export default function AssignmentsPage() {
 
     const isOverdue = (d: string | null) => !!d && new Date(d) < new Date();
 
+    // Filter assignments by selected date
+    const filteredAssignments = showAllDates
+        ? assignments
+        : assignments.filter(a => {
+            const created = a.created_at ? a.created_at.split('T')[0] : '';
+            const due = a.due_date ? a.due_date.split('T')[0] : '';
+            return created === selectedDate || due === selectedDate;
+        });
+
+    // Build overdue student details
+    const overdueAssignments = assignments.filter(a => isOverdue(a.due_date));
+
+    const handleOverdueClick = async () => {
+        setShowOverdueModal(true);
+        setLoadingOverdue(true);
+        try {
+            const details: any[] = [];
+            for (const a of overdueAssignments) {
+                try {
+                    const subs = await apiGet(`/api/training/assignments/${a.id}/submissions`);
+                    const pending = subs.filter((s: any) => s.status !== 'SUBMITTED');
+                    const submitted = subs.filter((s: any) => s.status === 'SUBMITTED');
+                    details.push({
+                        assignment: a,
+                        pending,
+                        submitted,
+                        totalStudents: subs.length
+                    });
+                } catch { }
+            }
+            setOverdueDetails(details);
+        } catch { } finally {
+            setLoadingOverdue(false);
+        }
+    };
+
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this assignment?')) return;
         try {
@@ -293,18 +339,48 @@ export default function AssignmentsPage() {
                 <div className="stat-card primary"><div className="stat-icon primary">📝</div><div className="stat-info"><h3>Total</h3><div className="stat-value">{assignments.length}</div></div></div>
                 <div className="stat-card accent"><div className="stat-icon accent">💻</div><div className="stat-info"><h3>Coding</h3><div className="stat-value">{assignments.filter(a => a.type === 'CODING').length}</div></div></div>
                 <div className="stat-card success"><div className="stat-icon success">📨</div><div className="stat-info"><h3>Submissions</h3><div className="stat-value">{assignments.reduce((s, a) => s + a.submission_count, 0)}</div></div></div>
-                <div className="stat-card danger"><div className="stat-icon danger">⚠️</div><div className="stat-info"><h3>Overdue</h3><div className="stat-value">{assignments.filter(a => isOverdue(a.due_date)).length}</div></div></div>
+                <div className="stat-card danger" onClick={handleOverdueClick} style={{ cursor: 'pointer', transition: 'transform 0.2s' }} onMouseOver={e => e.currentTarget.style.transform = 'scale(1.03)'} onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}>
+                    <div className="stat-icon danger">⚠️</div>
+                    <div className="stat-info">
+                        <h3>Overdue</h3>
+                        <div className="stat-value">{overdueAssignments.length}</div>
+                        <div style={{ fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>Click to view students →</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Date Filter Bar */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '8px 14px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📅 Date:</span>
+                    <input
+                        type="date"
+                        value={selectedDate}
+                        onChange={e => { setSelectedDate(e.target.value); setShowAllDates(false); }}
+                        style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                    />
+                </div>
+                <button
+                    className={`btn btn-sm ${showAllDates ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setShowAllDates(!showAllDates)}
+                    style={{ borderRadius: '20px', fontSize: '12px', padding: '6px 14px' }}
+                >
+                    {showAllDates ? '✕ Showing All' : 'Show All Dates'}
+                </button>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    Showing {filteredAssignments.length} of {assignments.length} assignments
+                </span>
             </div>
 
             {/* Table */}
-            {loading ? <p>Loading...</p> : assignments.length === 0 ? (
-                <div className="card"><div className="empty-state"><div className="empty-icon">📝</div><h3>No assignments yet</h3><p className="text-sm text-muted">Create your first assignment</p></div></div>
+            {loading ? <p>Loading...</p> : filteredAssignments.length === 0 ? (
+                <div className="card"><div className="empty-state"><div className="empty-icon">📝</div><h3>{assignments.length === 0 ? 'No assignments yet' : 'No assignments for this date'}</h3><p className="text-sm text-muted">{assignments.length === 0 ? 'Create your first assignment' : 'Try selecting a different date or click "Show All Dates"'}</p></div></div>
             ) : (
                 <div className="table-container">
                     <table className="table">
                         <thead><tr><th>Assignment</th><th>Type</th><th>Marks</th><th>Due Date</th><th>Submissions</th><th>Status</th><th>Action</th></tr></thead>
                         <tbody>
-                            {assignments.map(a => (
+                            {filteredAssignments.map(a => (
                                 <tr key={a.id}>
                                     <td>
                                         <div style={{ fontWeight: 600 }}>{a.title}</div>
@@ -793,6 +869,93 @@ export default function AssignmentsPage() {
                                         </div>
                                     );
                                 })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Overdue Students Modal ── */}
+            {showOverdueModal && (
+                <div className="modal-overlay" onClick={() => setShowOverdueModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h2 className="modal-title" style={{ margin: 0 }}>⚠️ Overdue Assignments — Student Details</h2>
+                            <button className="btn btn-sm btn-ghost" onClick={() => setShowOverdueModal(false)}>✕ Close</button>
+                        </div>
+
+                        {loadingOverdue ? (
+                            <div style={{ padding: '40px', textAlign: 'center' }}>
+                                <div className="spinner" style={{ margin: '0 auto 16px' }}></div>
+                                <p className="text-muted">Loading overdue details...</p>
+                            </div>
+                        ) : overdueDetails.length === 0 ? (
+                            <div className="empty-state">
+                                <div className="empty-icon">✅</div>
+                                <h3>No overdue assignments!</h3>
+                                <p className="text-sm text-muted">All assignments are up to date.</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                {overdueDetails.map((item, idx) => (
+                                    <div key={idx} style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '16px', border: '1px solid #ef444430' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                            <div>
+                                                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>{item.assignment.title}</h3>
+                                                <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600, marginTop: '2px' }}>
+                                                    Due: {new Date(item.assignment.due_date).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                </div>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <span className="badge" style={{ background: `${typeColors[item.assignment.type]}20`, color: typeColors[item.assignment.type] }}>
+                                                    {typeIcons[item.assignment.type]} {item.assignment.type}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Pending students */}
+                                        {item.pending.length > 0 && (
+                                            <div style={{ marginBottom: '10px' }}>
+                                                <div style={{ fontSize: '11px', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', marginBottom: '6px' }}>
+                                                    ❌ Not Submitted ({item.pending.length})
+                                                </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                                    {item.pending.map((s: any) => (
+                                                        <span key={s.student_id} style={{
+                                                            padding: '4px 10px', borderRadius: '20px', fontSize: '12px',
+                                                            background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', fontWeight: 600
+                                                        }}>
+                                                            {s.student_name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Submitted students */}
+                                        {item.submitted.length > 0 && (
+                                            <div>
+                                                <div style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', textTransform: 'uppercase', marginBottom: '6px' }}>
+                                                    ✅ Submitted ({item.submitted.length})
+                                                </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                                    {item.submitted.map((s: any) => (
+                                                        <span key={s.student_id} style={{
+                                                            padding: '4px 10px', borderRadius: '20px', fontSize: '12px',
+                                                            background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', fontWeight: 600
+                                                        }}>
+                                                            {s.student_name} ({s.marks ?? '—'}/{item.assignment.total_marks})
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                            {item.submitted.length}/{item.totalStudents} submitted
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
