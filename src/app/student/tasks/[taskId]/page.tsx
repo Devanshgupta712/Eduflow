@@ -54,6 +54,11 @@ export default function AssessmentSessionPage() {
     const [submitError, setSubmitError] = useState('');
     const [aiGrading, setAiGrading] = useState<'pending' | 'done' | 'n/a'>('n/a');
 
+    // Save & Continue + Review
+    const [savedQuestions, setSavedQuestions] = useState<Set<number>>(new Set());
+    const [showReview, setShowReview] = useState(false);
+    const [currentQuestion, setCurrentQuestion] = useState(0);
+
     const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
     const isCompletedRef = useRef(false);
 
@@ -208,6 +213,14 @@ export default function AssessmentSessionPage() {
 
     const handleAnswerSelect = (qIndex: number, optIndex: number) => {
         setAnswers(prev => ({ ...prev, [qIndex]: optIndex }));
+    };
+
+    const handleSaveAndContinue = (qIndex: number) => {
+        setSavedQuestions(prev => new Set(prev).add(qIndex));
+        // Move to next question
+        if (qIndex < questions.length - 1) {
+            setCurrentQuestion(qIndex + 1);
+        }
     };
 
     const submitAssessment = async (retryCount = 0) => {
@@ -394,6 +407,73 @@ export default function AssessmentSessionPage() {
         );
     }
 
+    const totalQuestions = questions.length || 1;
+    const answeredCount = isCodingTask 
+        ? (codeAnswers[0]?.trim() ? 1 : 0)
+        : questions.filter((q, i) => {
+            const isMCQ = q.options && q.options.length > 0;
+            return isMCQ ? answers[q.index] !== undefined : !!codeAnswers[i]?.trim();
+        }).length;
+    const unansweredQuestions = isCodingTask
+        ? (!codeAnswers[0]?.trim() ? [0] : [])
+        : questions.map((q, i) => {
+            const isMCQ = q.options && q.options.length > 0;
+            const isAnswered = isMCQ ? answers[q.index] !== undefined : !!codeAnswers[i]?.trim();
+            return isAnswered ? -1 : i;
+        }).filter(i => i >= 0);
+
+    // ─── REVIEW SCREEN ───
+    if (showReview) {
+        return (
+            <div style={{ maxWidth: '700px', margin: '20px auto', padding: '0 20px' }}>
+                <div className="card" style={{ padding: '28px' }}>
+                    <h2 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: 800 }}>📋 Review Before Submitting</h2>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: '0 0 20px' }}>
+                        {answeredCount}/{totalQuestions} questions answered
+                    </p>
+
+                    {unansweredQuestions.length > 0 && (
+                        <div style={{ padding: '14px 18px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', marginBottom: '20px' }}>
+                            <div style={{ fontWeight: 700, color: '#991b1b', fontSize: '14px', marginBottom: '6px' }}>⚠️ Unanswered Questions</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                {unansweredQuestions.map(idx => (
+                                    <button key={idx} onClick={() => { setShowReview(false); setCurrentQuestion(idx); }}
+                                        style={{ padding: '6px 14px', borderRadius: '20px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+                                    >
+                                        Q{idx + 1}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                        {(isCodingTask ? [{ question: description, index: 0, options: [] }] : questions).map((q, i) => {
+                            const isMCQ = q.options && q.options.length > 0;
+                            const isAnswered = isMCQ ? answers[q.index] !== undefined : !!codeAnswers[i]?.trim();
+                            return (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: isAnswered ? '#ecfdf5' : '#fef2f2', borderRadius: '10px', border: `1px solid ${isAnswered ? '#a7f3d0' : '#fecaca'}` }}>
+                                    <span style={{ fontSize: '16px' }}>{isAnswered ? '✅' : '❌'}</span>
+                                    <span style={{ flex: 1, fontSize: '14px', fontWeight: 600 }}>Question {i + 1}</span>
+                                    <span style={{ fontSize: '12px', color: isAnswered ? '#065f46' : '#991b1b', fontWeight: 700 }}>
+                                        {isAnswered ? 'Answered' : 'Missing'}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                        <button className="btn btn-ghost" onClick={() => setShowReview(false)}>← Back to Questions</button>
+                        <button className="btn btn-primary" onClick={() => submitAssessment()} disabled={loading}>
+                            {loading ? 'Submitting...' : `✅ Submit (${answeredCount}/${totalQuestions} answered)`}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     // ─── ACTIVE ASSESSMENT UI ───
     return (
         <div style={{ maxWidth: '1000px', margin: '20px auto', padding: '0 20px', paddingBottom: '80px' }}>
@@ -408,8 +488,11 @@ export default function AssessmentSessionPage() {
                             ⏱️ {formatTime(remainingSeconds)}
                         </div>
                     )}
-                    <button className="btn btn-primary" onClick={() => submitAssessment()} disabled={loading}>
-                        {loading ? 'Submitting...' : 'Submit & Finish'}
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        {answeredCount}/{totalQuestions}
+                    </span>
+                    <button className="btn btn-primary" onClick={() => setShowReview(true)}>
+                        📋 Review & Submit
                     </button>
                 </div>
             </div>
@@ -418,6 +501,31 @@ export default function AssessmentSessionPage() {
                 <div style={{ padding: '12px 20px', background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', borderRadius: '10px', color: '#ef4444', fontSize: '14px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>⚠️ {submitError}</span>
                     <button className="btn btn-sm" style={{ color: '#ef4444', border: '1px solid #ef4444', marginLeft: '12px' }} onClick={() => submitAssessment()}>Retry</button>
+                </div>
+            )}
+
+            {/* Question Navigation Dots */}
+            {questions.length > 1 && (
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px', padding: '12px 16px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    {questions.map((q, i) => {
+                        const isMCQ = q.options && q.options.length > 0;
+                        const isAnswered = isMCQ ? answers[q.index] !== undefined : !!codeAnswers[i]?.trim();
+                        const isCurrent = currentQuestion === i;
+                        return (
+                            <button key={i} onClick={() => setCurrentQuestion(i)}
+                                style={{
+                                    width: '36px', height: '36px', borderRadius: '10px', fontSize: '13px', fontWeight: 700,
+                                    border: isCurrent ? '2px solid var(--primary)' : '1px solid var(--border)',
+                                    background: isAnswered ? '#10b981' : isCurrent ? 'var(--primary-glow)' : 'var(--bg-primary)',
+                                    color: isAnswered ? '#fff' : isCurrent ? 'var(--primary)' : 'var(--text-muted)',
+                                    cursor: 'pointer', transition: 'all 0.2s',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}
+                            >
+                                {i + 1}
+                            </button>
+                        );
+                    })}
                 </div>
             )}
 
@@ -430,7 +538,6 @@ export default function AssessmentSessionPage() {
             {/* QUESTION RENDERER */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                 {questions.length === 0 ? (
-                    // Legacy Fallback for single coding task without "questions" array
                     <CodingEditor 
                         index={0} 
                         questionText={description} 
@@ -444,13 +551,21 @@ export default function AssessmentSessionPage() {
                     />
                 ) : (
                     questions.map((q, i) => {
+                        // Show only current question for focused experience (or all if only 1-2 questions)
+                        if (questions.length > 2 && i !== currentQuestion) return null;
                         const isMCQ = q.options && q.options.length > 0;
+                        const isAnswered = isMCQ ? answers[q.index] !== undefined : !!codeAnswers[i]?.trim();
                         if (isMCQ) {
                             return (
                                 <div key={i} className="card" style={{ padding: '24px' }}>
-                                    <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', lineHeight: '1.5' }}>
-                                        {i + 1}. {q.question}
-                                    </h3>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                        <h3 style={{ margin: 0, fontSize: '16px', lineHeight: '1.5' }}>
+                                            {i + 1}. {q.question}
+                                        </h3>
+                                        {savedQuestions.has(i) && (
+                                            <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>✅ Saved</span>
+                                        )}
+                                    </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                         {q.options.map((opt, optIdx) => (
                                             <label key={optIdx} style={{
@@ -470,24 +585,56 @@ export default function AssessmentSessionPage() {
                                             </label>
                                         ))}
                                     </div>
+                                    {/* Save & Continue */}
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', gap: '10px' }}>
+                                        {i > 0 && (
+                                            <button className="btn btn-ghost btn-sm" onClick={() => setCurrentQuestion(i - 1)}>
+                                                ← Previous
+                                            </button>
+                                        )}
+                                        <button
+                                            className="btn btn-primary btn-sm"
+                                            onClick={() => handleSaveAndContinue(i)}
+                                            disabled={!isAnswered}
+                                            style={{ opacity: isAnswered ? 1 : 0.5 }}
+                                        >
+                                            {i < questions.length - 1 ? '💾 Save & Continue →' : '💾 Save & Review'}
+                                        </button>
+                                    </div>
                                 </div>
                             );
                         } else {
                             return (
-                                <CodingEditor 
-                                    key={i}
-                                    index={i} 
-                                    questionText={q.question} 
-                                    code={codeAnswers[i] || ''}
-                                    onChange={(val) => setCodeAnswers(prev => ({ ...prev, [i]: val }))}
-                                    onRun={() => runCode(i)}
-                                    running={!!runningCode[i]}
-                                    output={runOutputs[i]}
-                                    language={language}
-                                    setLanguage={setLanguage}
-                                    hints={(q as any).hints}
-                                    constraints={(q as any).constraints}
-                                />
+                                <div key={i}>
+                                    <CodingEditor 
+                                        index={i} 
+                                        questionText={q.question} 
+                                        code={codeAnswers[i] || ''}
+                                        onChange={(val) => setCodeAnswers(prev => ({ ...prev, [i]: val }))}
+                                        onRun={() => runCode(i)}
+                                        running={!!runningCode[i]}
+                                        output={runOutputs[i]}
+                                        language={language}
+                                        setLanguage={setLanguage}
+                                        hints={(q as any).hints}
+                                        constraints={(q as any).constraints}
+                                    />
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px', gap: '10px' }}>
+                                        {i > 0 && (
+                                            <button className="btn btn-ghost btn-sm" onClick={() => setCurrentQuestion(i - 1)}>
+                                                ← Previous
+                                            </button>
+                                        )}
+                                        <button
+                                            className="btn btn-primary btn-sm"
+                                            onClick={() => handleSaveAndContinue(i)}
+                                            disabled={!isAnswered}
+                                            style={{ opacity: isAnswered ? 1 : 0.5 }}
+                                        >
+                                            {i < questions.length - 1 ? '💾 Save & Continue →' : '💾 Save & Review'}
+                                        </button>
+                                    </div>
+                                </div>
                             );
                         }
                     })

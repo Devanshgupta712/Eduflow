@@ -17,6 +17,10 @@ interface TaskItem {
     created_at: string;
     has_assessment: boolean;
     time_limit: number;
+    // Student-specific fields
+    attempt_count?: number;
+    is_completed?: boolean;
+    score?: number | null;
 }
 
 const priorityColors: Record<string, string> = {
@@ -74,8 +78,8 @@ export default function StudentTasksPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '28px' }} className="tasks-stats-grid">
                 {[
                     { label: 'Total', value: tasks.length, color: '#6366f1', bg: 'hsla(239,80%,65%,0.1)' },
-                    { label: 'Pending', value: countByStatus('PENDING'), color: '#f59e0b', bg: 'hsla(38,95%,55%,0.1)' },
-                    { label: 'In Progress', value: countByStatus('IN_PROGRESS'), color: '#06b6d4', bg: 'hsla(192,90%,50%,0.1)' },
+                    { label: 'Completed', value: tasks.filter(t => t.is_completed).length, color: '#10b981', bg: 'hsla(155,75%,45%,0.1)' },
+                    { label: 'Pending', value: tasks.filter(t => !t.is_completed).length, color: '#f59e0b', bg: 'hsla(38,95%,55%,0.1)' },
                     { label: 'Overdue', value: overdue, color: '#ef4444', bg: 'hsla(0,85%,60%,0.1)' },
                 ].map(stat => (
                     <div key={stat.label} className="card" style={{ padding: '16px 20px', background: stat.bg, border: `1px solid ${stat.color}22`, borderRadius: '14px' }}>
@@ -135,6 +139,11 @@ export default function StudentTasksPage() {
                                         {task.is_overdue && (
                                             <span style={{ fontSize: '11px', background: 'hsla(0,85%,60%,0.15)', color: '#ef4444', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>⚠️ Overdue</span>
                                         )}
+                                        {task.attempt_count !== undefined && task.attempt_count > 1 && (
+                                            <span style={{ fontSize: '11px', background: 'hsla(270,70%,60%,0.15)', color: '#7c3aed', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                                                🔄 {task.attempt_count} Attempts
+                                            </span>
+                                        )}
                                     </div>
                                     {task.description && (
                                         <p style={{ margin: '0 0 12px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -147,9 +156,15 @@ export default function StudentTasksPage() {
                                             {task.priority}
                                         </span>
                                         {/* Status */}
-                                        <span style={{ fontSize: '12px', background: statusBg[task.status] || '#eee', color: statusColors[task.status] || '#666', padding: '3px 10px', borderRadius: '6px', fontWeight: 700 }}>
-                                            {task.status.replace('_', ' ')}
+                                        <span style={{ fontSize: '12px', background: task.is_completed ? 'hsla(155,75%,45%,0.1)' : statusBg[task.status] || '#eee', color: task.is_completed ? '#10b981' : statusColors[task.status] || '#666', padding: '3px 10px', borderRadius: '6px', fontWeight: 700 }}>
+                                            {task.is_completed ? '✅ COMPLETED' : task.status.replace('_', ' ')}
                                         </span>
+                                        {/* Score */}
+                                        {task.is_completed && task.score !== null && task.score !== undefined && (
+                                            <span style={{ fontSize: '12px', background: 'hsla(239,80%,65%,0.1)', color: '#6366f1', padding: '3px 10px', borderRadius: '6px', fontWeight: 700 }}>
+                                                🎯 Score: {task.score}%
+                                            </span>
+                                        )}
                                         {/* Due date */}
                                         {task.due_date && (
                                             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>

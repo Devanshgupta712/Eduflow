@@ -41,6 +41,7 @@ function StudentAssessmentsContent() {
     const [isProctoringActive, setIsProctoringActive] = useState(false);
     const [graceCountdown, setGraceCountdown] = useState<number | null>(null);
     const [violationType, setViolationType] = useState<string | null>(null);
+    const [showAssignmentReview, setShowAssignmentReview] = useState(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const heartbeatRef = useRef<any>(null);
@@ -481,12 +482,18 @@ function StudentAssessmentsContent() {
                                     </div>
                                     {!submitDone && (
                                         <button 
-                                            onClick={() => submitHandler()} 
+                                            onClick={() => {
+                                                if (activeSubmission.type === 'MCQ') {
+                                                    setShowAssignmentReview(true);
+                                                } else {
+                                                    submitHandler();
+                                                }
+                                            }} 
                                             className="btn btn-primary btn-lg" 
                                             disabled={submitLoading || (activeSubmission.type === 'CODING' && content.length < 10)}
                                             style={{ height: '48px', padding: '0 32px', fontSize: '15px', fontWeight: 700, boxShadow: 'var(--shadow-premium)' }}
                                         >
-                                            {submitLoading ? 'Submitting...' : 'Complete & Submit'}
+                                            {submitLoading ? 'Submitting...' : (activeSubmission.type === 'MCQ' ? '📋 Review & Submit' : 'Complete & Submit')}
                                         </button>
                                     )}
                                 </div>
@@ -512,6 +519,60 @@ function StudentAssessmentsContent() {
                                     )}
                                     
                                     <p className="text-muted" style={{ fontSize: '14px' }}>Returning to dashboard in a moment...</p>
+                                </div>
+                            </div>
+                        ) : showAssignmentReview && activeSubmission.type === 'MCQ' ? (
+                            /* MCQ Review Screen */
+                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+                                <div style={{ maxWidth: '600px', width: '100%' }}>
+                                    <h2 style={{ margin: '0 0 8px', fontSize: '22px', fontWeight: 800 }}>📋 Review Before Submitting</h2>
+                                    {(() => {
+                                        try {
+                                            const struct = JSON.parse(activeSubmission.structured_content || '{}');
+                                            const qs = activeSubmission.activeQuestions || struct.questions || [];
+                                            const totalQ = qs.length;
+                                            const answeredQ = qs.filter((_: any, i: number) => mcqAnswers[i] !== undefined).length;
+                                            const unanswered = qs.map((_: any, i: number) => mcqAnswers[i] === undefined ? i : -1).filter((i: number) => i >= 0);
+                                            return (
+                                                <>
+                                                    <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: '0 0 20px' }}>
+                                                        {answeredQ}/{totalQ} questions answered
+                                                    </p>
+                                                    {unanswered.length > 0 && (
+                                                        <div style={{ padding: '14px 18px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', marginBottom: '20px' }}>
+                                                            <div style={{ fontWeight: 700, color: '#991b1b', fontSize: '14px', marginBottom: '6px' }}>⚠️ Unanswered Questions</div>
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                                {unanswered.map((idx: number) => (
+                                                                    <span key={idx} style={{ padding: '6px 14px', borderRadius: '20px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', fontWeight: 700, fontSize: '13px' }}>
+                                                                        Q{idx + 1}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px', maxHeight: '300px', overflowY: 'auto' }}>
+                                                        {qs.map((_: any, i: number) => (
+                                                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: mcqAnswers[i] !== undefined ? '#ecfdf5' : '#fef2f2', borderRadius: '10px', border: `1px solid ${mcqAnswers[i] !== undefined ? '#a7f3d0' : '#fecaca'}` }}>
+                                                                <span style={{ fontSize: '16px' }}>{mcqAnswers[i] !== undefined ? '✅' : '❌'}</span>
+                                                                <span style={{ flex: 1, fontSize: '14px', fontWeight: 600 }}>Question {i + 1}</span>
+                                                                <span style={{ fontSize: '12px', color: mcqAnswers[i] !== undefined ? '#065f46' : '#991b1b', fontWeight: 700 }}>
+                                                                    {mcqAnswers[i] !== undefined ? 'Answered' : 'Missing'}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                                                        <button type="button" className="btn btn-ghost" onClick={() => setShowAssignmentReview(false)}>← Back to Questions</button>
+                                                        <button type="button" className="btn btn-primary" onClick={() => submitHandler()} disabled={submitLoading}>
+                                                            {submitLoading ? 'Submitting...' : `✅ Submit (${answeredQ}/${totalQ})`}
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            );
+                                        } catch {
+                                            return <p>Error loading review. Please submit directly.</p>;
+                                        }
+                                    })()}
                                 </div>
                             </div>
                         ) : (

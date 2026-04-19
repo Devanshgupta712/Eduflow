@@ -29,6 +29,11 @@ const typeConfig: Record<string, { icon: string; color: string; label: string }>
     DISRUPTIVE_BEHAVIOR: { icon: '🚨', color: '#b91c1c', label: 'Disruptive Behavior' },
     PLAGIARISM: { icon: '📋', color: '#dc2626', label: 'Plagiarism' },
     CODE_VIOLATION: { icon: '💻', color: '#0066ff', label: 'Code Violation' },
+    TAB_SWITCHING: { icon: '🔀', color: '#7c3aed', label: 'Tab Switching' },
+    FACE_LOSS: { icon: '👤', color: '#e11d48', label: 'Face Loss' },
+    FULLSCREEN_EXIT: { icon: '🖥️', color: '#6366f1', label: 'Fullscreen Exit' },
+    MIC_OFF: { icon: '🎤', color: '#ea580c', label: 'Mic Off' },
+    MISSED_FEEDBACK: { icon: '📝', color: '#d97706', label: 'Missed Feedback' },
     OTHER: { icon: '❓', color: 'var(--text-secondary)', label: 'Other' },
 };
 const severityConfig: Record<string, { color: string; bg: string }> = {

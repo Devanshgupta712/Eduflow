@@ -826,7 +826,24 @@ async def list_tasks(
         is_overdue = False
         if t.due_date and t.status != TaskStatus.COMPLETED and t.due_date < datetime.utcnow():
             is_overdue = True
-        out.append({
+        
+        # For students, look up their assessment session(s) for this task
+        task_session = None
+        attempt_count = 0
+        if user.role == Role.STUDENT:
+            sess_res = await db.execute(
+                select(AssessmentSession).where(
+                    AssessmentSession.reference_id == t.id,
+                    AssessmentSession.student_id == user.id,
+                    AssessmentSession.reference_type == "TASK"
+                ).order_by(AssessmentSession.created_at.desc())
+            )
+            sessions = sess_res.scalars().all()
+            attempt_count = len(sessions)
+            if sessions:
+                task_session = sessions[0]  # latest session
+        
+        task_data = {
             "id": t.id, "title": t.title, "description": t.description,
             "batch_id": t.batch_id, "student_id": t.student_id, "priority": t.priority.value,
             "status": t.status.value, "is_overdue": is_overdue,
@@ -837,7 +854,14 @@ async def list_tasks(
             "is_randomized": getattr(t, 'is_randomized', False) or False,
             "has_assessment": bool(getattr(t, 'structured_content', None)),
             "created_at": t.created_at.isoformat() if t.created_at else None,
-        })
+        }
+        
+        if user.role == Role.STUDENT:
+            task_data["attempt_count"] = attempt_count
+            task_data["is_completed"] = bool(task_session and task_session.is_completed) if task_session else False
+            task_data["score"] = task_session.score if task_session and task_session.is_completed else None
+        
+        out.append(task_data)
     return out
 
 @router.delete("/tasks/{task_id}")
