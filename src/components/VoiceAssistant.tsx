@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { API_BASE, getToken } from '@/lib/api';
 
 interface Message {
@@ -20,7 +20,7 @@ export default function VoiceAssistant() {
     const synthRef = useRef<SpeechSynthesis | null>(null);
     const [volume, setVolume] = useState(0);
 
-    // Initialize Speech Recognition
+    // Initialize Speech Recognition and Synthesis
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -43,6 +43,29 @@ export default function VoiceAssistant() {
         }
     }, []);
 
+    // ✅ Stop all speech and listening when window is closed
+    const stopAll = useCallback(() => {
+        synthRef.current?.cancel();
+        recognitionRef.current?.stop();
+        setIsSpeaking(false);
+        setIsListening(false);
+    }, []);
+
+    // Close handler — stop audio then close
+    const handleClose = useCallback(() => {
+        stopAll();
+        setIsOpen(false);
+    }, [stopAll]);
+
+    // Orb toggle — if closing, stop audio too
+    const handleOrbToggle = useCallback(() => {
+        if (isOpen) {
+            handleClose();
+        } else {
+            setIsOpen(true);
+        }
+    }, [isOpen, handleClose]);
+
     // Scroll to bottom
     useEffect(() => {
         if (scrollRef.current) {
@@ -53,13 +76,16 @@ export default function VoiceAssistant() {
     const handleSendMessage = async (text: string) => {
         if (!text.trim()) return;
 
+        // Stop speaking if user sends a new message
+        synthRef.current?.cancel();
+        setIsSpeaking(false);
+
         const userMsg: Message = { role: 'user', content: text };
         setMessages(prev => [...prev, userMsg]);
         setInputValue('');
         setIsThinking(true);
 
         try {
-            // Use streaming fetch with correct API base and token
             const response = await fetch(`${API_BASE}/api/ai/chat`, {
                 method: 'POST',
                 headers: {
@@ -77,7 +103,7 @@ export default function VoiceAssistant() {
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
             let assistantContent = '';
-            
+
             setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
             if (!reader) throw new Error('Response body is empty');
@@ -85,28 +111,26 @@ export default function VoiceAssistant() {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                
+
                 const chunk = decoder.decode(value, { stream: true });
                 assistantContent += chunk;
-                
+
                 setMessages(prev => {
-                    const last = prev[prev.length - 1];
                     const others = prev.slice(0, -1);
                     return [...others, { role: 'assistant', content: assistantContent }];
                 });
             }
 
-            // Final decode
             decoder.decode();
 
-            // Speak the response
-            if (assistantContent) speakResponse(assistantContent);
+            // Only speak if the window is still open
+            if (assistantContent && isOpen) speakResponse(assistantContent);
 
         } catch (error: any) {
             console.error('Chat error:', error);
-            setMessages(prev => [...prev, { 
-                role: 'assistant', 
-                content: `⚠️ Error: ${error.message || 'Could not connect to AI'}. Make sure GROQ_API_KEY is set.` 
+            setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: `⚠️ ${error.message || 'Could not connect to AI'}. Please try again.`
             }]);
         } finally {
             setIsThinking(false);
@@ -115,18 +139,33 @@ export default function VoiceAssistant() {
 
     const speakResponse = (text: string) => {
         if (!synthRef.current) return;
-        
-        // Stop any current speech
+
+        // Cancel any current speech first
         synthRef.current.cancel();
 
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.1;
+        // Strip markdown symbols so TTS sounds natural
+        const cleanText = text
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/\*(.*?)\*/g, '$1')
+            .replace(/#+\s/g, '')
+            .replace(/[\[\]()]/g, '')
+            .replace(/\n+/g, ' ')
+            .trim();
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.rate = 1.05;
         utterance.pitch = 1.0;
-        
+
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);
-        
+        utterance.onerror = () => setIsSpeaking(false);
+
         synthRef.current.speak(utterance);
+    };
+
+    const stopSpeaking = () => {
+        synthRef.current?.cancel();
+        setIsSpeaking(false);
     };
 
     const toggleListening = () => {
@@ -138,7 +177,7 @@ export default function VoiceAssistant() {
         }
     };
 
-    // Simulated volume meter for the orb pulse
+    // Volume pulse animation for orb
     useEffect(() => {
         let interval: any;
         if (isListening || isSpeaking) {
@@ -154,14 +193,17 @@ export default function VoiceAssistant() {
     return (
         <div className="voice-assistant-container" style={{ position: 'fixed', bottom: '24px', right: '100px', zIndex: 10000 }}>
             {/* Pulsing AI Orb Button */}
-            <button 
-                onClick={() => setIsOpen(!isOpen)}
+            <button
+                onClick={handleOrbToggle}
+                title={isOpen ? 'Close AI Assistant' : 'Open AI Voice Assistant'}
                 className={`ai-orb-button ${isOpen ? 'active' : ''}`}
                 style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '20px',
+                    background: isOpen
+                        ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                        : 'linear-gradient(135deg, var(--primary), var(--accent))',
                     border: 'none',
                     cursor: 'pointer',
                     display: 'flex',
@@ -170,92 +212,147 @@ export default function VoiceAssistant() {
                     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
                     position: 'relative',
                     transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                    transform: isOpen ? 'rotate(45deg)' : 'none'
+                    fontSize: '22px'
                 }}
             >
-                <div className="orb-inner" style={{
-                    width: '40%',
-                    height: '40%',
-                    background: '#fff',
-                    borderRadius: '50%',
-                    filter: 'blur(2px)',
-                    opacity: 0.8,
-                    animation: isListening || isSpeaking ? 'orb-pulse 1s infinite alternate' : 'none',
-                    transform: `scale(${1 + volume / 100})`
-                }} />
-                
-                {/* Visual indicator rings */}
-                <div className="orb-ring" style={{
+                {isOpen ? '✕' : '🎙️'}
+
+                {/* Pulse ring when speaking */}
+                <div style={{
                     position: 'absolute',
-                    top: '-4px', left: '-4px', right: '-4px', bottom: '-4px',
-                    border: '2px solid var(--primary)',
-                    borderRadius: '50%',
-                    opacity: isListening ? 0.6 : 0,
-                    animation: isListening ? 'ring-ripple 1.5s infinite' : 'none'
+                    inset: '-6px',
+                    border: `2px solid ${isSpeaking ? '#7c3aed' : isListening ? '#ef4444' : 'transparent'}`,
+                    borderRadius: '26px',
+                    opacity: (isSpeaking || isListening) ? 0.7 : 0,
+                    animation: (isSpeaking || isListening) ? 'ring-ripple 1.5s infinite' : 'none'
                 }} />
             </button>
 
             {/* Chat Window */}
             {isOpen && (
-                <div className="glass-premium voice-chat-window" style={{
+                <div style={{
                     position: 'absolute',
-                    bottom: '80px',
+                    bottom: '76px',
                     right: '0',
                     width: '360px',
-                    height: '500px',
-                    borderRadius: '24px',
+                    height: '520px',
+                    borderRadius: '20px',
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',
                     animation: 'slide-up 0.3s ease-out',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    background: 'rgba(255, 255, 255, 0.85)',
-                    backdropFilter: 'blur(16px)',
-                    boxShadow: 'var(--shadow-lg)'
+                    background: '#ffffff',
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.15)'
                 }}>
-                    <div className="chat-header" style={{
-                        padding: '16px 20px',
+                    {/* Header */}
+                    <div style={{
+                        padding: '14px 18px',
                         background: 'linear-gradient(to right, var(--primary), var(--accent))',
                         color: '#fff',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between'
+                        justifyContent: 'space-between',
+                        flexShrink: 0
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4ade80' }} />
-                            <span style={{ fontWeight: 700, fontSize: '15px' }}>AppTechno AI Assistant</span>
+                            <div style={{
+                                width: '8px', height: '8px', borderRadius: '50%',
+                                background: isSpeaking ? '#facc15' : '#4ade80',
+                                boxShadow: isSpeaking ? '0 0 8px #facc15' : '0 0 8px #4ade80',
+                                transition: 'all 0.3s'
+                            }} />
+                            <span style={{ fontWeight: 700, fontSize: '14px' }}>
+                                AppTechno AI &nbsp;
+                                <span style={{ fontWeight: 400, fontSize: '12px', opacity: 0.85 }}>
+                                    {isSpeaking ? '🔊 Speaking...' : isListening ? '🎤 Listening...' : isThinking ? '💭 Thinking...' : 'Voice Assistant'}
+                                </span>
+                            </span>
                         </div>
-                        <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            {/* Stop Speaking button — only shown while speaking */}
+                            {isSpeaking && (
+                                <button
+                                    onClick={stopSpeaking}
+                                    title="Stop speaking"
+                                    style={{
+                                        background: 'rgba(255,255,255,0.15)',
+                                        border: 'none',
+                                        color: '#fff',
+                                        cursor: 'pointer',
+                                        width: '28px', height: '28px',
+                                        borderRadius: '8px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    ⏹
+                                </button>
+                            )}
+                            {/* Close button */}
+                            <button
+                                onClick={handleClose}
+                                title="Close"
+                                style={{
+                                    background: 'rgba(255,255,255,0.15)',
+                                    border: 'none',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    width: '28px', height: '28px',
+                                    borderRadius: '8px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: '16px'
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
                     </div>
 
-                    <div ref={scrollRef} style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Messages */}
+                    <div ref={scrollRef} style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {messages.length === 0 && (
-                            <div style={{ textAlign: 'center', marginTop: '40px', opacity: 0.6 }}>
-                                <div style={{ fontSize: '32px', marginBottom: '12px' }}>👋</div>
-                                <p style={{ fontSize: '14px', marginBottom: '20px' }}>Hi! I'm your learning assistant. How can I help you today?</p>
-                                
+                            <div style={{ textAlign: 'center', marginTop: '30px', color: 'var(--text-secondary)' }}>
+                                <div style={{ fontSize: '36px', marginBottom: '10px' }}>🎙️</div>
+                                <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                                    Hi! I'm your AI Guide.
+                                </p>
+                                <p style={{ fontSize: '13px', opacity: 0.7, marginBottom: '18px' }}>
+                                    Tap the mic or type to ask anything.
+                                </p>
+
+                                {/* Quick question chips */}
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
                                     {[
                                         "What courses do you offer?",
-                                        "How do I mark attendance?",
                                         "Tell me about placements",
-                                        "How to submit assignments?"
+                                        "How do I register?",
+                                        "What is the course fee?",
                                     ].map(q => (
                                         <button
                                             key={q}
                                             onClick={() => handleSendMessage(q)}
                                             style={{
-                                                padding: '8px 12px',
+                                                padding: '7px 12px',
                                                 borderRadius: '20px',
                                                 border: '1px solid var(--border)',
-                                                background: '#fff',
+                                                background: '#f9fafb',
                                                 fontSize: '12px',
                                                 cursor: 'pointer',
                                                 color: 'var(--text-secondary)',
-                                                transition: 'all 0.2s'
+                                                transition: 'all 0.2s',
+                                                fontWeight: 500
                                             }}
-                                            onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
-                                            onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                                            onMouseOver={(e) => {
+                                                e.currentTarget.style.borderColor = 'var(--primary)';
+                                                e.currentTarget.style.color = 'var(--primary)';
+                                                e.currentTarget.style.background = '#eff6ff';
+                                            }}
+                                            onMouseOut={(e) => {
+                                                e.currentTarget.style.borderColor = 'var(--border)';
+                                                e.currentTarget.style.color = 'var(--text-secondary)';
+                                                e.currentTarget.style.background = '#f9fafb';
+                                            }}
                                         >
                                             {q}
                                         </button>
@@ -263,24 +360,27 @@ export default function VoiceAssistant() {
                                 </div>
                             </div>
                         )}
+
                         {messages.map((m, i) => (
                             <div key={i} style={{
                                 alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
                                 maxWidth: '85%',
-                                padding: '12px 16px',
-                                borderRadius: m.role === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
+                                padding: '10px 14px',
+                                borderRadius: m.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                                 background: m.role === 'user' ? 'var(--primary)' : '#f3f4f6',
                                 color: m.role === 'user' ? '#fff' : '#111827',
-                                fontSize: '14px',
-                                lineHeight: '1.5',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                                border: m.role === 'assistant' ? '1px solid var(--border)' : 'none'
+                                fontSize: '13.5px',
+                                lineHeight: '1.55',
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                                border: m.role === 'assistant' ? '1px solid #e5e7eb' : 'none',
+                                wordBreak: 'break-word'
                             }}>
                                 {m.content}
                             </div>
                         ))}
+
                         {isThinking && (
-                            <div style={{ alignSelf: 'flex-start', padding: '12px 16px', background: '#f3f4f6', borderRadius: '20px', fontSize: '14px' }}>
+                            <div style={{ alignSelf: 'flex-start', padding: '10px 16px', background: '#f3f4f6', borderRadius: '18px', border: '1px solid #e5e7eb' }}>
                                 <div className="typing-indicator">
                                     <span></span><span></span><span></span>
                                 </div>
@@ -288,73 +388,76 @@ export default function VoiceAssistant() {
                         )}
                     </div>
 
-                    <div style={{ padding: '16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <button 
+                    {/* Input Bar */}
+                    <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', alignItems: 'center', background: '#fafafa', flexShrink: 0 }}>
+                        {/* Mic button */}
+                        <button
                             onClick={toggleListening}
+                            title={isListening ? 'Stop listening' : 'Speak your question'}
                             style={{
-                                width: '40px',
-                                height: '40px',
+                                width: '38px', height: '38px',
                                 borderRadius: '50%',
                                 border: 'none',
-                                background: isListening ? 'var(--danger)' : 'var(--bg-secondary)',
+                                background: isListening ? '#ef4444' : 'var(--bg-secondary)',
                                 color: isListening ? '#fff' : 'var(--text-primary)',
                                 cursor: 'pointer',
-                                fontSize: '18px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.2s'
+                                fontSize: '16px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                flexShrink: 0
                             }}
                         >
                             {isListening ? '⏹' : '🎤'}
                         </button>
-                        <input 
-                            type="text" 
-                            placeholder="Type a message..."
+
+                        <input
+                            type="text"
+                            placeholder="Type or speak..."
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(inputValue)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(inputValue)}
                             style={{
                                 flex: 1,
-                                padding: '10px 16px',
+                                padding: '9px 14px',
                                 borderRadius: '20px',
                                 border: '1px solid var(--border)',
                                 outline: 'none',
-                                fontSize: '14px'
+                                fontSize: '13.5px',
+                                background: '#fff'
                             }}
                         />
-                        <button 
+
+                        <button
                             onClick={() => handleSendMessage(inputValue)}
+                            disabled={!inputValue.trim() || isThinking}
                             style={{
-                                width: '40px',
-                                height: '40px',
+                                width: '38px', height: '38px',
                                 borderRadius: '50%',
                                 border: 'none',
-                                background: 'var(--primary)',
+                                background: inputValue.trim() ? 'var(--primary)' : 'var(--bg-secondary)',
                                 color: '#fff',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
+                                cursor: inputValue.trim() ? 'pointer' : 'default',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '16px',
+                                flexShrink: 0
                             }}
                         >
-                            ✈
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
                         </button>
                     </div>
                 </div>
             )}
 
             <style jsx>{`
-                @keyframes orb-pulse {
-                    from { transform: scale(1); opacity: 0.8; }
-                    to { transform: scale(1.4); opacity: 0.4; }
-                }
                 @keyframes ring-ripple {
                     0% { transform: scale(1); opacity: 0.8; }
-                    100% { transform: scale(2); opacity: 0; }
+                    100% { transform: scale(1.6); opacity: 0; }
                 }
                 @keyframes slide-up {
-                    from { transform: translateY(20px); opacity: 0; }
+                    from { transform: translateY(16px); opacity: 0; }
                     to { transform: translateY(0); opacity: 1; }
                 }
                 .typing-indicator span {
