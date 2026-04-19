@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { apiGet, apiFetch } from '@/lib/api';
 import WebDevEditor from '@/components/WebDevEditor';
 import ProctoringOverlay from '@/components/ProctoringOverlay';
+import PreflightChecklist from '@/components/PreflightChecklist';
 
 function StudentAssessmentsContent() {
     const [assignments, setAssignments] = useState<any[]>([]);
@@ -42,6 +43,9 @@ function StudentAssessmentsContent() {
     const [graceCountdown, setGraceCountdown] = useState<number | null>(null);
     const [violationType, setViolationType] = useState<string | null>(null);
     const [showAssignmentReview, setShowAssignmentReview] = useState(false);
+
+    // Pre-flight checklist gate
+    const [preflightAssignment, setPreflightAssignment] = useState<any>(null);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const heartbeatRef = useRef<any>(null);
@@ -166,10 +170,10 @@ function StudentAssessmentsContent() {
 
     // Auto-start assignment from deep link
     useEffect(() => {
-        if (!loading && assignments.length > 0 && startId && !activeSubmission) {
+        if (!loading && assignments.length > 0 && startId && !activeSubmission && !preflightAssignment) {
             const target = assignments.find(a => a.id === startId);
             if (target && !target.my_submission && !isOverdue(target.due_date)) {
-                startSession(target);
+                setPreflightAssignment(target);
                 // Remove start param from URL so refresh doesn't replay it
                 router.replace('/student/assessments');
             }
@@ -398,7 +402,7 @@ function StudentAssessmentsContent() {
                                     <button
                                         className="btn btn-primary"
                                         style={{ width: '100%', marginTop: 'auto' }}
-                                        onClick={() => startSession(a)}
+                                        onClick={() => setPreflightAssignment(a)}
                                         disabled={isOverdue(a.due_date)}
                                     >
                                         Start Secure Assessment
@@ -409,6 +413,20 @@ function StudentAssessmentsContent() {
                 </div>
                 );
             })()}
+
+            {/* Pre-Flight Checklist Gate */}
+            {preflightAssignment && !activeSubmission && typeof document !== 'undefined' && createPortal(
+                <PreflightChecklist
+                    title={preflightAssignment.title}
+                    onReady={() => {
+                        const assignment = preflightAssignment;
+                        setPreflightAssignment(null);
+                        startSession(assignment);
+                    }}
+                    onCancel={() => setPreflightAssignment(null)}
+                />,
+                document.body
+            )}
 
             {/* Proctoring Implementation */}
             {activeSubmission && typeof document !== 'undefined' && createPortal(
