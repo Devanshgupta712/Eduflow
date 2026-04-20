@@ -22,10 +22,15 @@ export default function CoursesPage() {
     const [submitting, setSubmitting] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
-    const user = getStoredUser();
-    const canEdit = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+    const [canEdit, setCanEdit] = useState(false);
 
-    useEffect(() => { loadCourses(); }, []);
+    useEffect(() => { 
+        loadCourses();
+        const stored = getStoredUser();
+        if (stored) {
+            setCanEdit(stored.role === 'SUPER_ADMIN' || ((stored.role === 'ADMIN' || stored.role === 'TRAINER') && stored.permissions?.manage_courses));
+        }
+    }, []);
 
     const loadCourses = async () => {
         try { setCourses(await apiGet('/api/admin/courses')); }

@@ -500,7 +500,7 @@ async def update_user_resume_access(
     user_id: str,
     body: UserResumeAccessUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user: User = Depends(require_admin_permissions(manage_users=True))
 ):
     target_user = await db.get(User, user_id)
     if not target_user:
@@ -516,14 +516,14 @@ async def update_user_password(
     user_id: str,
     body: AdminPasswordChangeRequest,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user: User = Depends(require_admin_permissions(manage_users=True))
 ):
     target_user = await db.get(User, user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    if _user.role == Role.ADMIN and target_user.role in [Role.SUPER_ADMIN, Role.ADMIN]:
-        raise HTTPException(status_code=403, detail="Admins cannot change passwords for other Admins or Super Admins")
+    if _user.role in [Role.ADMIN, Role.TRAINER] and target_user.role in [Role.SUPER_ADMIN, Role.ADMIN]:
+        raise HTTPException(status_code=403, detail="Only Super Admin can change passwords for other Admins/Super Admins")
         
     if _user.role == Role.SUPER_ADMIN and target_user.role == Role.SUPER_ADMIN:
         raise HTTPException(status_code=403, detail="Cannot change password for SUPER_ADMIN")
@@ -903,7 +903,7 @@ async def get_student_report(
 async def create_student(
     body: StudentCreate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN, Role.TRAINER)),
+    _user: User = Depends(require_admin_permissions(manage_users=True)),
 ):
     # Check duplicate
     result = await db.execute(select(User).where(User.email == body.email))

@@ -16,6 +16,7 @@ export default function UsersPage() {
     const [isTrainer, setIsTrainer] = useState(false);
     const [myPermissions, setMyPermissions] = useState<any>({});
     const [canManageUsers, setCanManageUsers] = useState(false);
+    const [canManageBatches, setCanManageBatches] = useState(false);
     const [passwordModal, setPasswordModal] = useState({ show: false, targetUser: null as UserItem | null, newPassword: '' });
     const [manageModal, setManageModal] = useState({ show: false, targetUser: null as UserItem | null, details: null as any });
     const [permissionsModal, setPermissionsModal] = useState({ show: false, targetUser: null as UserItem | null, permissions: { manage_users: false, manage_batches: false, manage_courses: false, manage_leaves: false }, loading: false });
@@ -34,8 +35,11 @@ export default function UsersPage() {
             setIsSuperAdmin(stored.role === 'SUPER_ADMIN');
             setIsAdmin(stored.role === 'ADMIN');
             setIsTrainer(stored.role === 'TRAINER');
-            setMyPermissions(stored.permissions || {});
-            setCanManageUsers(stored.role === 'SUPER_ADMIN' || ((stored.role === 'ADMIN' || stored.role === 'TRAINER') && stored.permissions?.manage_users));
+            const perms = stored.permissions || {};
+            setMyPermissions(perms);
+            const role = stored.role;
+            setCanManageUsers(role === 'SUPER_ADMIN' || ((role === 'ADMIN' || role === 'TRAINER') && perms.manage_users));
+            setCanManageBatches(role === 'SUPER_ADMIN' || ((role === 'ADMIN' || role === 'TRAINER') && perms.manage_batches));
         }
         loadUsers();
         loadBatches();
@@ -305,32 +309,16 @@ export default function UsersPage() {
                                             <button
                                                 className="btn btn-sm btn-secondary"
                                                 onClick={() => setPasswordModal({ show: true, targetUser: u, newPassword: '' })}
-                                                disabled={(isAdmin && (u.role === 'ADMIN' || u.role === 'SUPER_ADMIN')) || (isSuperAdmin && u.role === 'SUPER_ADMIN')}
+                                                disabled={((isAdmin || isTrainer) && (u.role === 'ADMIN' || u.role === 'SUPER_ADMIN')) || (isSuperAdmin && u.role === 'SUPER_ADMIN')}
                                             >
                                                 Password
                                             </button>
-                                            {u.role === 'STUDENT' && (
+                                            {(u.role === 'STUDENT' || u.role === 'TRAINER') && (canManageUsers || canManageBatches) && (
                                                 <button
                                                     className="btn btn-sm btn-secondary"
                                                     onClick={() => handleOpenManage(u)}
                                                 >
-                                                    Manage
-                                                </button>
-                                            )}
-                                            {u.role === 'STUDENT' && canManageUsers && (
-                                                <button
-                                                    className={`btn btn-sm ${u.can_build_resume ? 'btn-success' : 'btn-secondary'}`}
-                                                    onClick={() => handleToggleResumeAccess(u)}
-                                                >
-                                                    📄 Resume: {u.can_build_resume ? 'ON' : 'OFF'}
-                                                </button>
-                                            )}
-                                            {u.role === 'TRAINER' && (
-                                                <button
-                                                    className="btn btn-sm btn-secondary"
-                                                    onClick={() => handleOpenManage(u)}
-                                                >
-                                                    Assign Batches
+                                                    {u.role === 'STUDENT' ? 'Manage' : 'Assign Batches'}
                                                 </button>
                                             )}
                                             {u.is_blocked && isSuperAdmin && (
@@ -346,6 +334,7 @@ export default function UsersPage() {
                                                 <button
                                                     className="btn btn-sm btn-secondary"
                                                     onClick={() => handleOpenPermissions(u)}
+                                                    disabled={((isAdmin || isTrainer) && (u.role === 'ADMIN' || u.role === 'SUPER_ADMIN')) || (isSuperAdmin && u.role === 'SUPER_ADMIN')}
                                                 >
                                                     🔑 Permissions
                                                 </button>
