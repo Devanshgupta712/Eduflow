@@ -229,7 +229,7 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
                         <img src="/logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                     </div>
                     <div>
-                        <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontFamily: 'var(--font-heading)' }}>AppTechno</h2>
+                        <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontFamily: 'var(--font-heading)' }}>EduSuite.ai</h2>
                     </div>
                 </div>
 

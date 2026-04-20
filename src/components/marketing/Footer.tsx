@@ -29,8 +29,8 @@ export default function Footer() {
           {/* Logo & Info */}
           <div>
             <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px', textDecoration: 'none' }}>
-              <img src="/logo.png" alt="AppTechno" style={{ height: '32px', width: 'auto' }} />
-              <span style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontFamily: 'var(--font-heading)' }}>AppTechno</span>
+              <img src="/logo.png" alt="EduSuite.ai" style={{ height: '32px', width: 'auto' }} />
+              <span style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontFamily: 'var(--font-heading)' }}>EduSuite.ai</span>
             </Link>
             <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '32px', maxWidth: '320px', fontSize: '15px' }}>
               Experience the future of IT training with real projects and MNC certificates.
@@ -71,7 +71,7 @@ export default function Footer() {
 
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 500 }}>
-            © {currentYear} AppTechno Software. All rights reserved.
+            © {currentYear} EduSuite.ai. All rights reserved.
           </p>
           <div style={{ display: 'flex', gap: '24px' }}>
             {['Terms', 'Privacy', 'Cookies'].map(item => (

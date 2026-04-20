@@ -53,7 +53,7 @@ export default function Features() {
             letterSpacing: '-0.02em',
             marginBottom: '40px'
           }}>
-            The Difference: How AppTechno Prepares You for the Real World
+            The Difference: How EduSuite.ai Prepares You for the Real World
           </h2>
         </div>
 

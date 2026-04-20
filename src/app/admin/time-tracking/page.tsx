@@ -618,7 +618,7 @@ export default function TimeTrackingPage() {
                                         .info{margin-top:24px;font-size:14px;color:#888;}
                                         @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style>
                                         </head><body>
-                                        <h1>AppTechno Software — Punch Machine</h1>
+                                        <h1>EduSuite.ai — Punch Machine</h1>
                                         <p>Scan to Punch In / Out</p>
                                         <img src="${qrUrl.replace('250x250', '400x400')}" width="400" height="400" />
                                         <p class="info">Everyone can scan (except Super Admin) • Location restricted</p>

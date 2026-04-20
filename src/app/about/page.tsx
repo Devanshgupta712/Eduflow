@@ -25,9 +25,9 @@ export default function AboutPage() {
           <div className="container-wide" style={{ maxWidth: '1000px', padding: '0 var(--space-8)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '60px', marginBottom: 'var(--space-16)' }}>
               <div>
-                <h2 style={{ fontSize: '32px', fontWeight: 700, marginBottom: 'var(--space-6)', letterSpacing: '-0.02em' }}>The AppTechno Story</h2>
+                <h2 style={{ fontSize: '32px', fontWeight: 700, marginBottom: 'var(--space-6)', letterSpacing: '-0.02em' }}>The EduSuite.ai Story</h2>
                 <p style={{ color: 'var(--text-secondary)', lineHeight: 1.8, fontSize: '17px', marginBottom: 'var(--space-6)' }}>
-                  AppTechno Software was founded with a single goal: to provide high-quality IT training that actually gets students hired. 
+                  EduSuite.ai was founded with a single goal: to provide high-quality IT training that actually gets students hired. 
                   Our founders, who are veterans of the software industry, realized that traditional education often fails to prepare students 
                   for the fast-paced world of technology.
                 </p>

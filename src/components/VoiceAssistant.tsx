@@ -263,7 +263,7 @@ export default function VoiceAssistant() {
                                 transition: 'all 0.3s'
                             }} />
                             <span style={{ fontWeight: 700, fontSize: '14px' }}>
-                                AppTechno AI &nbsp;
+                                EduSuite.ai AI &nbsp;
                                 <span style={{ fontWeight: 400, fontSize: '12px', opacity: 0.85 }}>
                                     {isSpeaking ? '🔊 Speaking...' : isListening ? '🎤 Listening...' : isThinking ? '💭 Thinking...' : 'Voice Assistant'}
                                 </span>

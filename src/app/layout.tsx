@@ -12,9 +12,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AppTechno Software LMS | Ultra-Premium Tech Training",
-  description: "Experience the next-gen Learning Management System for AppTechno Software Institute. Bespoke training, placement support, and MNC certification.",
-  keywords: "LMS, AppTechno Software, learning management, education, training",
+  title: "EduSuite.ai LMS | Ultra-Premium Tech Training",
+  description: "Experience the next-gen Learning Management System for EduSuite.ai Institute. Bespoke training, placement support, and MNC certification.",
+  keywords: "LMS, EduSuite.ai, learning management, education, training",
 };
 
 export const viewport = {

@@ -95,8 +95,8 @@ function VerifyEmailContent() {
             <header style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '24px 48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <img src="/logo.png" alt="AppTechno" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
-                        <span style={{ fontSize: '24px', background: 'linear-gradient(135deg, #0066ff, #3399ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 700 }}>AppTechno Software</span>
+                        <img src="/logo.png" alt="EduSuite.ai" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+                        <span style={{ fontSize: '24px', background: 'linear-gradient(135deg, #0066ff, #3399ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 700 }}>EduSuite.ai</span>
                     </div>
                 </div>
             </header>

@@ -1,6 +1,6 @@
 'use client';
 
-const ComparisonRow = ({ feature, traditional, apptechno }: { feature: string, traditional: string, apptechno: string }) => {
+const ComparisonRow = ({ feature, traditional, edusuite }: { feature: string, traditional: string, edusuite: string }) => {
   return (
     <div style={{ 
       display: 'grid', 
@@ -19,18 +19,18 @@ const ComparisonRow = ({ feature, traditional, apptechno }: { feature: string, t
         background: 'rgba(var(--primary-h), 84%, 54%, 0.05)',
         padding: '12px',
         borderRadius: '12px'
-      }}>{apptechno}</div>
+      }}>{edusuite}</div>
     </div>
   );
 };
 
 export default function Comparison() {
   const comparisons = [
-    { feature: 'Certification', traditional: 'Only Certificate', apptechno: '6-Month IT Experience' },
-    { feature: 'Learning Method', traditional: 'Theory & Labs', apptechno: 'Job Immersion Program' },
-    { feature: 'Placement Policy', traditional: 'Assistance', apptechno: 'Placement Guarantee' },
-    { feature: 'Soft Skills', traditional: 'No Focus', apptechno: 'Soft Skill Mentorship' },
-    { feature: 'MNC Standards', traditional: 'Not Covered', apptechno: 'Full MNC Exposure' }
+    { feature: 'Certification', traditional: 'Only Certificate', edusuite: '6-Month IT Experience' },
+    { feature: 'Learning Method', traditional: 'Theory & Labs', edusuite: 'Job Immersion Program' },
+    { feature: 'Placement Policy', traditional: 'Assistance', edusuite: 'Placement Guarantee' },
+    { feature: 'Soft Skills', traditional: 'No Focus', edusuite: 'Soft Skill Mentorship' },
+    { feature: 'MNC Standards', traditional: 'Not Covered', edusuite: 'Full MNC Exposure' }
   ];
 
   return (
@@ -44,7 +44,7 @@ export default function Comparison() {
             letterSpacing: '-0.02em',
             marginBottom: '20px'
           }}>
-            Why AppTechno?
+            Why EduSuite.ai?
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>The difference between learning and being industry-ready.</p>
         </div>
@@ -71,7 +71,7 @@ export default function Comparison() {
           }}>
             <div>Features</div>
             <div style={{ textAlign: 'center' }}>Traditional</div>
-            <div style={{ textAlign: 'center', color: 'var(--primary)' }}>AppTechno</div>
+            <div style={{ textAlign: 'center', color: 'var(--primary)' }}>EduSuite.ai</div>
           </div>
 
           {/* Rows */}
@@ -99,7 +99,7 @@ export default function Comparison() {
                 justifyContent: 'center',
                 gap: '8px'
               }}>
-                <span style={{ color: 'var(--success)' }}>✓</span> {c.apptechno}
+                <span style={{ color: 'var(--success)' }}>✓</span> {c.edusuite}
               </div>
             </div>
           ))}

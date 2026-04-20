@@ -52,14 +52,14 @@ export default function Navbar() {
           gap: '10px',
           textDecoration: 'none'
         }}>
-          <img src="/logo.png" alt="AppTechno Logo" style={{ height: '32px', width: 'auto' }} />
+          <img src="/logo.png" alt="EduSuite.ai Logo" style={{ height: '32px', width: 'auto' }} />
           <span style={{ 
             fontSize: '20px', 
             fontWeight: 800, 
             color: 'var(--text-primary)',
             letterSpacing: '-0.02em',
             fontFamily: 'var(--font-heading)'
-          }}>AppTechno</span>
+          }}>EduSuite.ai</span>
         </Link>
 
         {/* Links (Centered) */}

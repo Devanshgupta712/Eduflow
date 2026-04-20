@@ -83,7 +83,7 @@ export default function ChatbotFAQ() {
             setMessages([{
                 id: 'welcome',
                 role: 'bot',
-                text: "👋 Hi! I'm the **AppTechno AI Assistant**.\n\nI can help you with:\n\n📚 **Courses & Fees** — Full Stack, MERN, Python, Data Science & more\n🎓 **Student Actions** — How to mark attendance, submit assignments, apply for leave\n🧑‍🏫 **Trainer Tools** — Generating tasks, QR codes, exporting reports\n🚀 **Placements** — Jobs, mock interviews, placement stats\n🔧 **Platform Help** — Step-by-step guidance for any feature\n\nType your question or tap a quick option below 👇",
+                text: "👋 Hi! I'm the **EduSuite.ai AI Assistant**.\n\nI can help you with:\n\n📚 **Courses & Fees** — Full Stack, MERN, Python, Data Science & more\n🎓 **Student Actions** — How to mark attendance, submit assignments, apply for leave\n🧑‍🏫 **Trainer Tools** — Generating tasks, QR codes, exporting reports\n🚀 **Placements** — Jobs, mock interviews, placement stats\n🔧 **Platform Help** — Step-by-step guidance for any feature\n\nType your question or tap a quick option below 👇",
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }]);
         }
@@ -179,7 +179,7 @@ export default function ChatbotFAQ() {
                                 fontSize: '20px'
                             }}>🤖</div>
                             <div>
-                                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, letterSpacing: '-0.01em' }}>AppTechno AI</h3>
+                                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, letterSpacing: '-0.01em' }}>EduSuite.ai AI</h3>
                                 <p style={{ margin: 0, fontSize: '11px', opacity: 0.8, display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
                                     <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
                                     Ready to help

@@ -102,8 +102,8 @@ export default function PortalSelector() {
         zIndex: 50 
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <img src="/logo.png" alt="AppTechno" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
-          <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em' }}>AppTechno</span>
+          <img src="/logo.png" alt="EduSuite.ai" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+          <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em' }}>EduSuite.ai</span>
         </div>
         <a href="/" style={{
           display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px', fontWeight: 700,
