@@ -46,6 +46,8 @@ function StudentAssessmentsContent() {
 
     // Pre-flight checklist gate
     const [preflightAssignment, setPreflightAssignment] = useState<any>(null);
+    // Pending screenshot for next heartbeat
+    const pendingScreenshotRef = useRef<{screenshot?: string; description?: string} | null>(null);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const heartbeatRef = useRef<any>(null);
@@ -233,21 +235,31 @@ function StudentAssessmentsContent() {
         }
     };
 
-    const sendHeartbeat = async (customAnswers?: any) => {
+    const sendHeartbeat = async (customAnswers?: any, extraData?: Record<string, any>) => {
         if (!sessionId || submitDone) return;
         try {
             // Priority: Use customAnswers if passed (forced save), otherwise use current state
             const answersToSave = customAnswers ? { content: JSON.stringify(customAnswers) } : { content };
             
+            const heartbeatBody: any = {
+                answers: answersToSave,
+                fullscreen_exited: fullscreenExitCount > 0,
+                face_violation: faceViolationCount > 0,
+                tab_switched: tabSwitchCount > 0,
+                mic_violation: micViolationCount > 0,
+                ...extraData
+            };
+
+            // Attach pending screenshot if any
+            if (pendingScreenshotRef.current) {
+                heartbeatBody.screenshot_base64 = pendingScreenshotRef.current.screenshot;
+                heartbeatBody.face_description = pendingScreenshotRef.current.description;
+                pendingScreenshotRef.current = null;
+            }
+            
             await apiFetch(`/api/training/assessments/${sessionId}/heartbeat`, {
                 method: 'POST',
-                body: JSON.stringify({
-                    answers: answersToSave,
-                    fullscreen_exited: fullscreenExitCount > 0,
-                    face_violation: faceViolationCount > 0,
-                    tab_switched: tabSwitchCount > 0,
-                    mic_violation: micViolationCount > 0
-                })
+                body: JSON.stringify(heartbeatBody)
             });
         } catch (e) { console.error('Heartbeat failed', e); }
     };
@@ -437,10 +449,20 @@ function StudentAssessmentsContent() {
                 }}>
                     <ProctoringOverlay 
                         isActive={isProctoringActive && !submitDone}
-                        onViolation={(type) => {
+                        onViolation={(type, screenshot, description) => {
                             if (type === 'NO_FACE' || type === 'MULTI_FACE') {
                                 setFaceViolationCount(prev => prev + 1);
                                 triggerGracePeriod(type);
+                                // Store screenshot for next heartbeat
+                                if (screenshot) {
+                                    pendingScreenshotRef.current = { screenshot, description };
+                                }
+                                // Immediately send heartbeat with screenshot
+                                sendHeartbeat(undefined, {
+                                    face_violation: true,
+                                    screenshot_base64: screenshot,
+                                    face_description: description
+                                });
                             } else if (type === 'HIGH_NOISE') {
                                 setMicViolationCount(prev => prev + 1);
                                 triggerGracePeriod("Background Noise Too High");
@@ -494,6 +516,18 @@ function StudentAssessmentsContent() {
                                     </p>
                                 </div>
                                 <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                    {faceViolationCount > 0 && (
+                                        <div style={{ 
+                                            padding: '6px 14px', borderRadius: '10px',
+                                            background: 'hsla(0,85%,60%,0.15)', border: '1px solid #ef4444',
+                                            display: 'flex', alignItems: 'center', gap: '6px'
+                                        }}>
+                                            <span style={{ fontSize: '14px' }}>📸</span>
+                                            <span style={{ color: '#ef4444', fontWeight: 800, fontSize: '13px' }}>
+                                                {faceViolationCount} Face {faceViolationCount === 1 ? 'Violation' : 'Violations'}
+                                            </span>
+                                        </div>
+                                    )}
                                     <div style={{ textAlign: 'right' }}>
                                         <span className="badge badge-warning" style={{ fontSize: '12px', display: 'inline-block', marginBottom: '4px' }}>Proctoring Active</span>
                                         <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Keep tab focused & stay in view.</div>

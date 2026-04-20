@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { apiGet, apiPost, getStoredUser } from '@/lib/api';
+import { apiGet, apiPost, apiFetch, getStoredUser } from '@/lib/api';
 
 interface ViolationItem {
     id: string; student_id: string; student_name: string;
@@ -11,6 +11,7 @@ interface ViolationItem {
     penalty_points: number;
     resolved_by: string | null; resolution_note: string | null;
     resolved_at: string | null; created_at: string;
+    screenshot_url?: string | null;
 }
 
 interface Summary {
@@ -60,6 +61,9 @@ export default function ViolationsPage() {
     const [resolveNote, setResolveNote] = useState('');
     const user = getStoredUser();
     const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'TRAINER';
+    const canDelete = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+    const [expandedScreenshot, setExpandedScreenshot] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const [form, setForm] = useState({
         student_id: '', type: 'POOR_ACADEMIC_PERFORMANCE', severity: 'MEDIUM',
@@ -100,6 +104,19 @@ export default function ViolationsPage() {
         setShowResolveModal(null);
         setResolveNote('');
         load();
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Are you sure you want to permanently delete this violation? This action cannot be undone.')) return;
+        setDeletingId(id);
+        try {
+            await apiFetch(`/api/training/violations/${id}`, { method: 'DELETE' });
+            setViolations(prev => prev.filter(v => v.id !== id));
+        } catch (e) {
+            alert('Failed to delete violation');
+        } finally {
+            setDeletingId(null);
+        }
     };
 
     const handleCheckDeadlines = async () => {
@@ -223,12 +240,46 @@ export default function ViolationsPage() {
                                                 <strong>Resolution:</strong> {v.resolution_note}
                                             </div>
                                         )}
+                                        {/* Screenshot Evidence */}
+                                        {v.screenshot_url && (
+                                            <div style={{ marginTop: '12px' }}>
+                                                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>📸 Screenshot Evidence</div>
+                                                <img 
+                                                    src={v.screenshot_url} 
+                                                    alt="Violation screenshot"
+                                                    onClick={() => setExpandedScreenshot(v.screenshot_url!)}
+                                                    style={{ 
+                                                        width: '160px', height: '120px', objectFit: 'cover',
+                                                        borderRadius: '10px', border: '2px solid var(--border)',
+                                                        cursor: 'pointer', transition: 'transform 0.2s',
+                                                    }}
+                                                    onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                                                    onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
-                                    {isAdmin && v.status === 'OPEN' && (
-                                        <button className="btn btn-ghost btn-sm" onClick={() => setShowResolveModal(v.id)} style={{ flexShrink: 0 }}>
-                                            Resolve
-                                        </button>
-                                    )}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
+                                        {isAdmin && v.status === 'OPEN' && (
+                                            <button className="btn btn-ghost btn-sm" onClick={() => setShowResolveModal(v.id)}>
+                                                Resolve
+                                            </button>
+                                        )}
+                                        {canDelete && (
+                                            <button 
+                                                className="btn btn-sm" 
+                                                onClick={() => handleDelete(v.id)}
+                                                disabled={deletingId === v.id}
+                                                style={{ 
+                                                    background: 'hsla(0,85%,60%,0.1)', color: '#ef4444',
+                                                    border: '1px solid #ef444430', fontSize: '12px',
+                                                    opacity: deletingId === v.id ? 0.5 : 1
+                                                }}
+                                            >
+                                                {deletingId === v.id ? '...' : '🗑️ Delete'}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -287,6 +338,30 @@ export default function ViolationsPage() {
                             <button className="btn btn-ghost" onClick={() => handleResolve('DISMISSED')}>Dismiss</button>
                             <button className="btn btn-primary" onClick={() => handleResolve('RESOLVED')}>Mark Resolved</button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Screenshot Lightbox */}
+            {expandedScreenshot && (
+                <div 
+                    className="modal-overlay" 
+                    onClick={() => setExpandedScreenshot(null)}
+                    style={{ zIndex: 999999, background: 'rgba(0,0,0,0.9)', cursor: 'pointer' }}
+                >
+                    <div style={{ 
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', 
+                        justifyContent: 'center', height: '100%', gap: '20px' 
+                    }}>
+                        <img 
+                            src={expandedScreenshot} 
+                            alt="Violation evidence"
+                            style={{ 
+                                maxWidth: '90vw', maxHeight: '80vh', objectFit: 'contain',
+                                borderRadius: '16px', border: '3px solid rgba(255,255,255,0.2)',
+                                boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
+                            }}
+                        />
+                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>Click anywhere to close</div>
                     </div>
                 </div>
             )}

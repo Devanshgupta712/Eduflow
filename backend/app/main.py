@@ -91,6 +91,12 @@ async def lifespan(app: FastAPI):
                 batch_cols = [row[1] for row in result.fetchall()]
                 if "schedule_link" not in batch_cols:
                     await conn.execute(text("ALTER TABLE batches ADD COLUMN schedule_link TEXT"))
+                
+                # Violations schema migration
+                result = await conn.execute(text("PRAGMA table_info(violations)"))
+                viol_cols = [row[1] for row in result.fetchall()]
+                if "screenshot_url" not in viol_cols:
+                    await conn.execute(text("ALTER TABLE violations ADD COLUMN screenshot_url TEXT"))
             print("SQLite startup complete.")
         else:
             # For PostgreSQL production: Run critical startup queries
@@ -212,6 +218,8 @@ async def lifespan(app: FastAPI):
                         created_at TIMESTAMP DEFAULT NOW(),
                         updated_at TIMESTAMP DEFAULT NOW()
                     )""",
+                    # Violations: screenshot evidence
+                    "ALTER TABLE violations ADD COLUMN IF NOT EXISTS screenshot_url TEXT",
                 ]
                 for sql in pg_migrations:
                     try:

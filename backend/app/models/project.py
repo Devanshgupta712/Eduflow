@@ -198,6 +198,8 @@ class Violation(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Penalties
     penalty_points: Mapped[int] = mapped_column(Integer, default=0)
+    # Screenshot evidence (base64 data URI)
+    screenshot_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     student = relationship("User", foreign_keys=[student_id], backref="violations")

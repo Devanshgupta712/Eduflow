@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 
 interface ProctoringProps {
   isActive: boolean;
-  onViolation: (type: 'NO_FACE' | 'MULTI_FACE' | 'MIC_SILENT' | 'SCREEN_STOPPED' | 'FULLSCREEN_EXIT' | 'HIGH_NOISE') => void;
+  onViolation: (type: 'NO_FACE' | 'MULTI_FACE' | 'MIC_SILENT' | 'SCREEN_STOPPED' | 'FULLSCREEN_EXIT' | 'HIGH_NOISE', screenshot?: string, description?: string) => void;
   onMetricsUpdate: (metrics: { faceCount: number; volume: number; isScreenActive: boolean }) => void;
 }
 
@@ -17,6 +17,7 @@ export default function ProctoringOverlay({ isActive, onViolation, onMetricsUpda
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const screenshotCanvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const requestRef = useRef<number | null>(null);
@@ -97,8 +98,14 @@ export default function ProctoringOverlay({ isActive, onViolation, onMetricsUpda
         const count = detections.length;
         setFaceCount(count);
 
-        if (count === 0) onViolation('NO_FACE');
-        else if (count > 1) onViolation('MULTI_FACE');
+        if (count === 0) {
+          const screenshot = captureFrame();
+          onViolation('NO_FACE', screenshot, 'No face detected during assessment');
+        }
+        else if (count > 1) {
+          const screenshot = captureFrame();
+          onViolation('MULTI_FACE', screenshot, `Multiple faces (${count}) detected during assessment`);
+        }
 
         // 2. Audio Level
         if (analyserRef.current) {
@@ -130,6 +137,18 @@ export default function ProctoringOverlay({ isActive, onViolation, onMetricsUpda
     };
 
     requestRef.current = requestAnimationFrame(check);
+  };
+
+  // Capture current webcam frame as a compressed JPEG data URI
+  const captureFrame = (): string | undefined => {
+    if (!videoRef.current) return undefined;
+    const canvas = screenshotCanvasRef.current || document.createElement('canvas');
+    canvas.width = 320; // Small size for efficiency
+    canvas.height = 240;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return undefined;
+    ctx.drawImage(videoRef.current, 0, 0, 320, 240);
+    return canvas.toDataURL('image/jpeg', 0.5); // 50% quality JPEG (~20-40KB)
   };
 
   const stopStreams = () => {
@@ -174,6 +193,8 @@ export default function ProctoringOverlay({ isActive, onViolation, onMetricsUpda
         border: '2px solid var(--primary)'
       }}>
         <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        {/* Hidden canvas for screenshot capture */}
+        <canvas ref={screenshotCanvasRef} style={{ display: 'none' }} width={320} height={240} />
         
         {/* Indicators Overlay */}
         <div style={{

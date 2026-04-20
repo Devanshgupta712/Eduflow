@@ -1458,6 +1458,7 @@ async def list_violations(
             "resolution_note": v.resolution_note,
             "resolved_at": v.resolved_at.isoformat() if v.resolved_at else None,
             "created_at": v.created_at.isoformat() if v.created_at else None,
+            "screenshot_url": getattr(v, 'screenshot_url', None),
         })
     return out
 
@@ -1508,6 +1509,20 @@ async def update_violation(
 
     await db.flush()
     return {"status": "updated"}
+
+
+@router.delete("/violations/{violation_id}")
+async def delete_violation(
+    violation_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
+):
+    violation = await db.get(Violation, violation_id)
+    if not violation:
+        raise HTTPException(404, "Violation not found")
+    await db.delete(violation)
+    await db.flush()
+    return {"status": "deleted"}
 
 
 @router.post("/violations/check-deadlines")
@@ -2452,6 +2467,45 @@ async def session_heartbeat(
     if body.get("mic_violation"):
         session.mic_violation_count = (session.mic_violation_count or 0) + 1
         violation_sent = "MIC_OFF"
+
+    # Auto-create Violation record for face violations with screenshot evidence
+    # Throttle: max 1 record per 30 seconds per student per session
+    if body.get("face_violation"):
+        face_desc = body.get("face_description", "Face violation during assessment")
+        screenshot_b64 = body.get("screenshot_base64")
+        item_title = getattr(item, 'title', 'Unknown') if item else 'Unknown'
+
+        # Check throttle: find last violation for this student + reference
+        last_viol_res = await db.execute(
+            select(Violation).where(
+                Violation.student_id == user.id,
+                Violation.reference_id == session.reference_id,
+                Violation.type == ViolationType.FACE_LOSS,
+            ).order_by(Violation.created_at.desc()).limit(1)
+        )
+        last_viol = last_viol_res.scalars().first()
+        
+        should_create = True
+        if last_viol and last_viol.created_at:
+            seconds_since = (datetime.utcnow() - last_viol.created_at.replace(tzinfo=None)).total_seconds()
+            if seconds_since < 30:
+                should_create = False
+
+        if should_create:
+            face_count = session.face_violation_count or 1
+            severity = ViolationSeverity.MEDIUM if face_count < 3 else ViolationSeverity.HIGH
+            new_violation = Violation(
+                student_id=user.id,
+                type=ViolationType.FACE_LOSS,
+                severity=severity,
+                title=f"Face violation during: {item_title}",
+                description=face_desc,
+                reference_type=session.reference_type,
+                reference_id=session.reference_id,
+                penalty_points=2 if face_count < 3 else 5,
+                screenshot_url=screenshot_b64[:500000] if screenshot_b64 else None,  # cap at ~500KB
+            )
+            db.add(new_violation)
 
     # Emit real-time alert if a violation occurred
     if violation_sent and item and item.batch_id:
