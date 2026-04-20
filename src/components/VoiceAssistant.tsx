@@ -18,7 +18,7 @@ export default function VoiceAssistant() {
     const scrollRef = useRef<HTMLDivElement>(null);
     const recognitionRef = useRef<any>(null);
     const synthRef = useRef<SpeechSynthesis | null>(null);
-    const [volume, setVolume] = useState(0);
+    const [volume, setVolume] = useState(1); // 1 is 100% volume
 
     // Initialize Speech Recognition and Synthesis
     useEffect(() => {
@@ -155,6 +155,7 @@ export default function VoiceAssistant() {
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.rate = 1.05;
         utterance.pitch = 1.0;
+        utterance.volume = volume;
 
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);
@@ -248,28 +249,42 @@ export default function VoiceAssistant() {
                     {/* Header */}
                     <div style={{
                         padding: '14px 18px',
-                        background: 'linear-gradient(to right, var(--primary), var(--accent))',
-                        color: '#fff',
+                        background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+                        color: 'white',
                         display: 'flex',
-                        alignItems: 'center',
                         justifyContent: 'space-between',
-                        flexShrink: 0
+                        alignItems: 'center',
+                        borderTopLeftRadius: '20px',
+                        borderTopRightRadius: '20px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div style={{
-                                width: '8px', height: '8px', borderRadius: '50%',
-                                background: isSpeaking ? '#facc15' : '#4ade80',
-                                boxShadow: isSpeaking ? '0 0 8px #facc15' : '0 0 8px #4ade80',
-                                transition: 'all 0.3s'
-                            }} />
-                            <span style={{ fontWeight: 700, fontSize: '14px' }}>
-                                EduSuite.ai AI &nbsp;
-                                <span style={{ fontWeight: 400, fontSize: '12px', opacity: 0.85 }}>
-                                    {isSpeaking ? '🔊 Speaking...' : isListening ? '🎤 Listening...' : isThinking ? '💭 Thinking...' : 'Voice Assistant'}
-                                </span>
-                            </span>
+                                width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
+                                animation: isSpeaking ? 'pulse-avatar 1.5s infinite' : 'none'
+                            }}>
+                                🤖
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '14px', fontWeight: 600 }}>EduSuite.ai Assistant</div>
+                                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.8)' }}>
+                                    {isThinking ? 'Thinking...' : isSpeaking ? 'Speaking...' : isListening ? 'Listening...' : 'Online'}
+                                </div>
+                            </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {/* Volume Control */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} title="Volume">
+                                <span style={{ fontSize: '12px' }}>{volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}</span>
+                                <input 
+                                    type="range" 
+                                    min="0" max="1" step="0.1" 
+                                    value={volume} 
+                                    onChange={(e) => setVolume(parseFloat(e.target.value))}
+                                    style={{ width: '40px', cursor: 'pointer', accentColor: '#ffffff' }}
+                                />
+                            </div>
                             {/* Stop Speaking button — only shown while speaking */}
                             {isSpeaking && (
                                 <button
@@ -289,7 +304,6 @@ export default function VoiceAssistant() {
                                     ⏹
                                 </button>
                             )}
-                            {/* Close button */}
                             <button
                                 onClick={handleClose}
                                 title="Close"
