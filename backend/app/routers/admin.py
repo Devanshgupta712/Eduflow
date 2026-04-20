@@ -1509,6 +1509,7 @@ async def delete_notification(
 @router.post("/notifications/send", status_code=201)
 async def send_notification(
     body: SendNotificationRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
 ):
@@ -1522,8 +1523,8 @@ async def send_notification(
         for u in users:
             n = Notification(user_id=u.id, title=body.title, message=body.message, type="SYSTEM", reference_id="admin_broadcast")
             db.add(n)
-            # Dispatch push in background
-            asyncio.create_task(send_push_notification(db, u.id, body.title, body.message, "/student/dashboard"))
+            # Dispatch push in background using dedicated session
+            background_tasks.add_task(send_push_notification, u.id, body.title, body.message, "/student/dashboard")
         await db.flush()
         return {"status": "sent", "count": len(users)}
         
@@ -1537,7 +1538,7 @@ async def send_notification(
             n = Notification(user_id=u.id, title=body.title, message=body.message, type="SYSTEM", reference_id="admin_broadcast")
             db.add(n)
             # Dispatch push
-            asyncio.create_task(send_push_notification(db, u.id, body.title, body.message, "/student/dashboard"))
+            background_tasks.add_task(send_push_notification, u.id, body.title, body.message, "/student/dashboard")
         await db.flush()
         return {"status": "sent", "count": len(users)}
 
@@ -1549,7 +1550,7 @@ async def send_notification(
 
         db.add(n)
         # Dispatch push
-        asyncio.create_task(send_push_notification(db, user.id, body.title, body.message, "/student/dashboard"))
+        background_tasks.add_task(send_push_notification, user.id, body.title, body.message, "/student/dashboard")
         await db.flush()
         
         # Real-time emission
