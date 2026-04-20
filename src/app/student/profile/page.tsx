@@ -127,19 +127,32 @@ export default function StudentProfilePage() {
         if (file.size > 2 * 1024 * 1024) { alert('Image must be under 2MB'); return; }
         setUploadingAvatar(true);
         try {
-            const reader = new FileReader();
-            reader.onload = async () => {
-                const base64 = reader.result as string;
-                await fetch((process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com') + '/api/auth/profile', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-                    body: JSON.stringify({ avatar: base64 }),
-                });
-                loadAll();
-            };
-            reader.readAsDataURL(file);
-        } catch { alert('Failed to upload photo'); } finally {
-            setTimeout(() => setUploadingAvatar(false), 1000);
+            // Read file as base64
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => reject(new Error('Failed to read file'));
+                reader.readAsDataURL(file);
+            });
+
+            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com') + '/api/auth/profile', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify({ avatar: base64 }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || 'Upload failed');
+            }
+
+            // Reload profile to show updated avatar
+            await loadAll();
+        } catch (err: any) {
+            console.error('Avatar upload error:', err);
+            alert(err.message || 'Failed to upload photo');
+        } finally {
+            setUploadingAvatar(false);
         }
     };
 

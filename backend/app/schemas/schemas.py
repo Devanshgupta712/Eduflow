@@ -56,6 +56,7 @@ class UserOut(BaseModel):
     phone: str | None
     role: str
     student_id: str | None
+    avatar: str | None = None
     dob: str | None = None
     education_status: str | None = None
     highest_education: str | None = None

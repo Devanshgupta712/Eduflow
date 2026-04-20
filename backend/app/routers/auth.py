@@ -369,7 +369,32 @@ async def update_profile(
     if "phone" in body:
         user.phone = body["phone"]
     if "avatar" in body:
-        user.avatar = body["avatar"]
+        avatar_data = body["avatar"]
+        # If it's a base64 data URL, upload to Cloudinary for proper storage
+        if avatar_data and isinstance(avatar_data, str) and avatar_data.startswith("data:image"):
+            try:
+                import cloudinary
+                import cloudinary.uploader
+                from app.config import settings as cfg
+                if not cloudinary.config().cloud_name:
+                    cloudinary.config(
+                        cloud_name=cfg.CLOUDINARY_CLOUD_NAME,
+                        api_key=cfg.CLOUDINARY_API_KEY,
+                        api_secret=cfg.CLOUDINARY_API_SECRET
+                    )
+                upload_result = cloudinary.uploader.upload(
+                    avatar_data,
+                    folder="lms_avatars",
+                    public_id=f"avatar_{user.id}",
+                    overwrite=True,
+                    transformation=[{"width": 300, "height": 300, "crop": "fill", "gravity": "face"}]
+                )
+                user.avatar = upload_result.get("secure_url")
+            except Exception as e:
+                logger.warning(f"Cloudinary avatar upload failed: {e}, storing base64")
+                user.avatar = avatar_data
+        else:
+            user.avatar = avatar_data
     if "dob" in body:
         user.dob = body["dob"]
     if "education_status" in body:
@@ -381,7 +406,7 @@ async def update_profile(
     if "passing_year" in body:
         user.passing_year = body["passing_year"]
     await db.commit()
-    return {"status": "updated", "name": user.name, "phone": user.phone}
+    return {"status": "updated", "name": user.name, "phone": user.phone, "avatar": user.avatar}
 
 
 @router.post("/change-password")

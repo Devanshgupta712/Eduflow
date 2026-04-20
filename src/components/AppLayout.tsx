@@ -106,24 +106,74 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         return () => observer.disconnect();
     }, [pathname]);
 
+    // Convert VAPID base64url key to Uint8Array (REQUIRED for mobile push)
+    const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    };
+
     const registerPushWorker = async () => {
-        if ('serviceWorker' in navigator && 'PushManager' in window) {
-            try {
-                const registration = await navigator.serviceWorker.register('/sw.js');
-                const permission = await Notification.requestPermission();
-                if (permission === 'granted') {
-                    // Try to subscribe
-                    const subscription = await registration.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-                    });
-                    
-                    // Send to backend
-                    await apiPost('/api/auth/subscribe', subscription.toJSON());
-                }
-            } catch (err) {
-                console.error('Service Worker / Push registration failed', err);
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            console.warn('[Push] Service Worker or PushManager not supported');
+            return;
+        }
+
+        try {
+            // Register the service worker
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log('[Push] Service Worker registered', registration.scope);
+
+            // Wait for the service worker to be ready (CRITICAL for mobile)
+            await navigator.serviceWorker.ready;
+            console.log('[Push] Service Worker is ready');
+
+            // Request notification permission
+            const permission = await Notification.requestPermission();
+            console.log('[Push] Permission:', permission);
+
+            if (permission !== 'granted') {
+                console.warn('[Push] Notification permission denied');
+                return;
             }
+
+            // Check for existing subscription first
+            let subscription = await registration.pushManager.getSubscription();
+
+            if (!subscription) {
+                // Convert VAPID key to Uint8Array (mobile browsers REQUIRE this format)
+                const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+                if (!vapidKey) {
+                    console.error('[Push] VAPID public key not configured');
+                    return;
+                }
+                const applicationServerKey = urlBase64ToUint8Array(vapidKey);
+
+                subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: applicationServerKey.buffer as ArrayBuffer
+                });
+                console.log('[Push] New subscription created');
+            } else {
+                console.log('[Push] Using existing subscription');
+            }
+
+            // Send subscription to backend with device info
+            const subJSON = subscription.toJSON();
+            await apiPost('/api/auth/subscribe', {
+                ...subJSON,
+                device_type: /Android/i.test(navigator.userAgent) ? 'Android' :
+                             /iPhone|iPad/i.test(navigator.userAgent) ? 'iOS' :
+                             /Windows/i.test(navigator.userAgent) ? 'Windows' : 'Unknown'
+            });
+            console.log('[Push] Subscription sent to backend');
+        } catch (err) {
+            console.error('[Push] Registration failed:', err);
         }
     };
 
