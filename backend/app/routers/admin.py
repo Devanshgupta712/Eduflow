@@ -65,7 +65,7 @@ def parse_times(date_obj: datetime, timeframe: str):
 @router.get("/dashboard")
 async def dashboard_stats(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
+    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN, Role.TRAINER)),
 ):
     from app.models.course import Course, Batch
     from app.models.user import User, Role
@@ -117,7 +117,7 @@ async def list_courses(db: AsyncSession = Depends(get_db)):
 async def create_course(
     body: CourseCreate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
+    _user: User = Depends(require_admin_permissions(manage_courses=True)),
 ):
     course = Course(name=body.name, description=body.description, duration=body.duration, fee=body.fee)
     db.add(course)
@@ -142,7 +142,7 @@ async def update_course(
     course_id: str,
     body: CourseUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
+    _user: User = Depends(require_admin_permissions(manage_courses=True)),
 ):
     course = await db.get(Course, course_id)
     if not course:
@@ -160,7 +160,7 @@ async def update_course(
 async def delete_course(
     course_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
+    _user: User = Depends(require_admin_permissions(manage_courses=True)),
 ):
     course = await db.get(Course, course_id)
     if not course:
@@ -210,7 +210,7 @@ async def delete_course(
 @router.get("/students-by-batch")
 async def get_all_students_by_batch(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN, Role.TRAINER))
 ):
     """Returns all active students grouped by their enrolled batches.
     Used in the session creation modal for cross-batch student selection."""
@@ -290,7 +290,7 @@ async def list_batches(
 async def create_batch(
     body: BatchCreate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
+    _user: User = Depends(require_admin_permissions(manage_batches=True)),
 ):
     course_id = body.course_id if body.course_id else None
     
@@ -339,7 +339,7 @@ async def update_batch(
     batch_id: str,
     body: BatchUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user: User = Depends(require_admin_permissions(manage_batches=True))
 ):
     from app.models.course import Batch
     from app.models.session import Session
@@ -461,7 +461,7 @@ async def delete_batch(
 @router.get("/users")
 async def list_users(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user: User = Depends(require_admin_permissions(manage_users=True))
 ):
     from sqlalchemy.orm import selectinload
     result = await db.execute(
@@ -480,7 +480,7 @@ async def update_user_status(
     user_id: str,
     body: UserStatusUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user: User = Depends(require_admin_permissions(manage_users=True))
 ):
     target_user = await db.get(User, user_id)
     if not target_user:
@@ -742,7 +742,7 @@ async def list_students(
     role: str = "STUDENT", 
     all: str = "", 
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user: User = Depends(require_admin_permissions(manage_users=True))
 ):
     if all == "true":
         result = await db.execute(select(User).order_by(User.created_at.desc()))
@@ -802,7 +802,7 @@ async def list_students(
 async def get_student_report(
     user_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN, Role.TRAINER))
 ):
     student = await db.get(User, user_id)
     if not student:
@@ -949,7 +949,7 @@ async def assign_user_batch(
     user_id: str,
     body: AssignBatchRequest,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user: User = Depends(require_admin_permissions(manage_batches=True))
 ):
     # 1. Verify user
     target_user = await db.get(User, user_id)
@@ -991,7 +991,7 @@ async def assign_user_batch(
 async def get_student_details(
     user_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN, Role.TRAINER))
 ):
     try:
         from sqlalchemy.orm import selectinload
@@ -1066,7 +1066,7 @@ async def remove_user_batch(
     user_id: str,
     batch_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN))
+    _user: User = Depends(require_admin_permissions(manage_batches=True))
 ):
     target_user = await db.get(User, user_id)
     if not target_user:
@@ -1123,7 +1123,7 @@ async def list_registrations(db: AsyncSession = Depends(get_db)):
 async def create_registration(
     body: RegistrationCreate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
+    _user: User = Depends(require_admin_permissions(manage_courses=True)),
 ):
     reg = Registration(
         student_id=body.student_id, course_id=body.course_id,
@@ -1146,7 +1146,7 @@ async def create_registration(
 async def delete_registration(
     registration_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
+    _user: User = Depends(require_admin_permissions(manage_courses=True)),
 ):
     result = await db.execute(delete(Registration).where(Registration.id == registration_id))
     if result.rowcount == 0:

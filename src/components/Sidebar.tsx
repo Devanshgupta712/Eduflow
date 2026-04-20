@@ -251,14 +251,20 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
                                     {section.title}
                                 </div>
                                 {section.items
-                                    .filter((item) => !item.roles || item.roles.includes(userRole))
                                     .filter((item) => {
                                         if (userRole === 'SUPER_ADMIN') return true;
-                                        if (item.permission && userRole === 'ADMIN') {
+                                        
+                                        // Explicit permission check for ADMIN and TRAINER
+                                        if (item.permission && (userRole === 'ADMIN' || userRole === 'TRAINER')) {
                                             const perms = user?.permissions || {};
-                                            return perms[item.permission] === true;
+                                            if (perms[item.permission] === true) return true;
+                                            
+                                            // If they don't have the explicit permission, admins are blocked from permission-gated items
+                                            if (userRole === 'ADMIN') return false; 
                                         }
-                                        return true;
+                                        
+                                        // Fallback to basic role check if no specific permission required or if TRAINER without the specific permission (e.g. Batches)
+                                        return !item.roles || item.roles.includes(userRole);
                                     })
                                     .filter((item) => !item.requiresResumeAccess || canBuildResume)
                                     .map((item) => {

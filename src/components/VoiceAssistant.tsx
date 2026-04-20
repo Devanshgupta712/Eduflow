@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { API_BASE, getToken } from '@/lib/api';
+import { API_BASE, getToken, getStoredUser } from '@/lib/api';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -10,6 +10,7 @@ interface Message {
 
 export default function VoiceAssistant() {
     const [isOpen, setIsOpen] = useState(false);
+    const [user, setUser] = useState<any>(null);
     const [isListening, setIsListening] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
@@ -20,9 +21,12 @@ export default function VoiceAssistant() {
     const synthRef = useRef<SpeechSynthesis | null>(null);
     const [volume, setVolume] = useState(1); // 1 is 100% volume
 
-    // Initialize Speech Recognition and Synthesis
+    // Initialize User, Speech Recognition and Synthesis
     useEffect(() => {
         if (typeof window !== 'undefined') {
+            const stored = getStoredUser();
+            setUser(stored);
+
             const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
             if (SpeechRecognition) {
                 recognitionRef.current = new SpeechRecognition();
@@ -178,18 +182,7 @@ export default function VoiceAssistant() {
         }
     };
 
-    // Volume pulse animation for orb
-    useEffect(() => {
-        let interval: any;
-        if (isListening || isSpeaking) {
-            interval = setInterval(() => {
-                setVolume(Math.random() * 50 + 20);
-            }, 100);
-        } else {
-            setVolume(0);
-        }
-        return () => clearInterval(interval);
-    }, [isListening, isSpeaking]);
+    // The volume state is managed strictly by the user via the volume slider.
 
     return (
         <div className="voice-assistant-container" style={{ position: 'fixed', bottom: '24px', right: '100px', zIndex: 10000 }}>
@@ -267,7 +260,9 @@ export default function VoiceAssistant() {
                                 🤖
                             </div>
                             <div>
-                                <div style={{ fontSize: '14px', fontWeight: 600 }}>EduSuite.ai Assistant</div>
+                                <div style={{ fontSize: '14px', fontWeight: 600 }}>
+                                    {user ? `${user.name.split(' ')[0]}'s Assistant` : 'EduSuite.ai Assistant'}
+                                </div>
                                 <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.8)' }}>
                                     {isThinking ? 'Thinking...' : isSpeaking ? 'Speaking...' : isListening ? 'Listening...' : 'Online'}
                                 </div>
@@ -329,10 +324,10 @@ export default function VoiceAssistant() {
                             <div style={{ textAlign: 'center', marginTop: '30px', color: 'var(--text-secondary)' }}>
                                 <div style={{ fontSize: '36px', marginBottom: '10px' }}>🎙️</div>
                                 <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                                    Hi! I'm your AI Guide.
+                                    {user ? `${user.name.split(' ')[0]}, focus on your goals.` : "I'm your AI Mentor."}
                                 </p>
                                 <p style={{ fontSize: '13px', opacity: 0.7, marginBottom: '18px' }}>
-                                    Tap the mic or type to ask anything.
+                                    Excuses don't build careers. Discipline does.
                                 </p>
 
                                 {/* Quick question chips */}

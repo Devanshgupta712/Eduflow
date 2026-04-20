@@ -35,8 +35,11 @@ async def chat_with_assistant(
     if not api_key:
         return StreamingResponse(iter(["Error: GROQ_API_KEY is not set. Please check server environment variables."]), media_type="text/plain")
 
+    from datetime import datetime
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     # Start with the shared platform knowledge
-    system_prompt = SYSTEM_CONTEXT
+    system_prompt = SYSTEM_CONTEXT + f"\n\n[CURRENT_TIME]: {current_time}"
 
     # Add role-specific personality and real-time context
     if not user:
@@ -87,20 +90,81 @@ STRICT RULES FOR GUEST RESPONSES:
             done_assign_res = await db.execute(select(func.count(AssignmentSubmission.id)).where(AssignmentSubmission.student_id == user_id))
             done_assign = done_assign_res.scalar() or 0
             
+            # Fetch latest 3 pending assignments titles
+            from sqlalchemy import not_
+            pending_titles = []
+            if batch_ids:
+                pending_res = await db.execute(
+                    select(Assignment.title)
+                    .where(
+                        (Assignment.batch_id.in_(batch_ids)) &
+                        not_(Assignment.id.in_(
+                            select(AssignmentSubmission.assignment_id).where(AssignmentSubmission.student_id == user_id)
+                        ))
+                    )
+                    .order_by(Assignment.created_at.desc())
+                    .limit(3)
+                )
+                pending_titles = pending_res.scalars().all()
+            pending_str = ", ".join(pending_titles) if pending_titles else "None"
+            
+            # 4. Fetch Primary Course
+            from app.models.registration import Registration
+            from app.models.course import Course as CourseModel
+            course_res = await db.execute(
+                select(CourseModel.name)
+                .join(Registration, Registration.course_id == CourseModel.id)
+                .where(Registration.student_id == user_id)
+                .order_by(Registration.created_at.desc())
+                .limit(1)
+            )
+            course_name = course_res.scalar() or "Not Enrolled"
+            
+            # 5. Get Latest Attendance Status
+            latest_att_res = await db.execute(
+                select(Attendance.status, Attendance.date)
+                .where(Attendance.student_id == user_id)
+                .order_by(Attendance.date.desc())
+                .limit(1)
+            )
+            latest_att_row = latest_att_res.first()
+            latest_status = "No records"
+            if latest_att_row:
+                status, date = latest_att_row
+                latest_status = f"{status.value if hasattr(status, 'value') else status} on {date}"
+
             context_block = f"""
 [PERSONALIZED CONTEXT FOR VOICE AI]
 User: {user_name} ({user_role})
+Course: {course_name}
 Batches: {batch_str}
-Attendance: {att_pct}%
+Attendance: {att_pct}% (Latest: {latest_status})
 Assignments: {done_assign}/{total_assign}
+Pending Tasks: {pending_str}
 """
             if user.role == Role.STUDENT:
-                system_prompt += f"\n{context_block}\n[PERSONA]: You are a 'Strict Mentor'. If attendance is < 85% or assignments are pending, mention it firmly but with care."
-            elif user.role in [Role.SUPER_ADMIN, Role.ADMIN]:
-                # Add platform-wide stats for admin
+                system_prompt += f"\n{context_block}\n[PERSONA]: You are {user_name}'s 'Strict Mentor'. You have high standards because you want them to land a 14 LPA job. If attendance is < 90% or there are Pending Tasks, address it FIRMLY. You do not accept excuses. Be disciplined, professional, and push them to excel. Excellence is not an option; it is the requirement."
+            elif user.role in [Role.SUPER_ADMIN, Role.ADMIN, Role.TRAINER]:
+                # Broaden context for administrative roles
+                from app.models.attendance import LeaveRequest
+                from app.models.placement import Job
+                from app.models.course import Course as CourseModel
+
                 s_count = await db.execute(select(func.count(User.id)).where(User.role == Role.STUDENT))
                 b_count = await db.execute(select(func.count(Batch.id)))
-                system_prompt += f"\n[PLATFORM STATS]: {s_count.scalar()} students, {b_count.scalar()} active batches.\n[PERSONA]: You are a 'Data Analytics Assistant'. Provide concise, data-driven insights."
+                c_count = await db.execute(select(func.count(CourseModel.id)))
+                l_count = await db.execute(select(func.count(LeaveRequest.id)).where(LeaveRequest.status == "PENDING"))
+                j_count = await db.execute(select(func.count(Job.id)).where(Job.is_active == True))
+                
+                admin_context = f"""
+[ADMIN/TRAINER PLATFORM OVERVIEW]
+Total Students: {s_count.scalar()}
+Active Batches: {b_count.scalar()}
+Total Courses: {c_count.scalar()}
+Pending Leave Requests: {l_count.scalar()}
+Active Job Postings: {j_count.scalar()}
+"""
+                system_prompt += f"\n{admin_context}\n[PERSONA]: You are the 'Lead Operations Intelligence Assistant'. You have full access to platform metrics. Provide concise, data-driven insights. Help the {user_role} manage the ecosystem efficiently by highlighting pending actions like leave requests."
         except Exception as e:
             print(f"DB Error in AI persona: {e}")
             await db.rollback()

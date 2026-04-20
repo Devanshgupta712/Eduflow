@@ -100,7 +100,7 @@ def require_admin_permissions(
         if user.role == Role.SUPER_ADMIN:
             return user
             
-        if user.role != Role.ADMIN:
+        if user.role not in [Role.ADMIN, Role.TRAINER]:
             raise HTTPException(status_code=403, detail="Admin access required")
             
         result = await db.execute(select(AdminPermission).where(AdminPermission.user_id == user.id))

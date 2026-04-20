@@ -13,7 +13,9 @@ export default function UsersPage() {
     const [showModal, setShowModal] = useState(false);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isTrainer, setIsTrainer] = useState(false);
     const [myPermissions, setMyPermissions] = useState<any>({});
+    const [canManageUsers, setCanManageUsers] = useState(false);
     const [passwordModal, setPasswordModal] = useState({ show: false, targetUser: null as UserItem | null, newPassword: '' });
     const [manageModal, setManageModal] = useState({ show: false, targetUser: null as UserItem | null, details: null as any });
     const [permissionsModal, setPermissionsModal] = useState({ show: false, targetUser: null as UserItem | null, permissions: { manage_users: false, manage_batches: false, manage_courses: false, manage_leaves: false }, loading: false });
@@ -31,7 +33,9 @@ export default function UsersPage() {
         if (stored) {
             setIsSuperAdmin(stored.role === 'SUPER_ADMIN');
             setIsAdmin(stored.role === 'ADMIN');
+            setIsTrainer(stored.role === 'TRAINER');
             setMyPermissions(stored.permissions || {});
+            setCanManageUsers(stored.role === 'SUPER_ADMIN' || ((stored.role === 'ADMIN' || stored.role === 'TRAINER') && stored.permissions?.manage_users));
         }
         loadUsers();
         loadBatches();
@@ -265,7 +269,7 @@ export default function UsersPage() {
         <div className="animate-in">
             <div className="page-header">
                 <div><h1 className="page-title">User Management</h1><p className="page-subtitle">All system users and their roles</p></div>
-                {(isSuperAdmin || (isAdmin && myPermissions.manage_users)) && <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Create User</button>}
+                {canManageUsers && <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Create User</button>}
             </div>
 
             <div className="grid-4 mb-24">
@@ -282,7 +286,7 @@ export default function UsersPage() {
             <div className="card">
                 {loading ? <SkeletonLoader count={5} type="row" /> : (
                     <div className="table-responsive"><table className="table">
-                        <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Joined</th>{(isSuperAdmin || isAdmin) && <th>Actions</th>}</tr></thead>
+                        <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Joined</th>{(isSuperAdmin || isAdmin || canManageUsers) && <th>Actions</th>}</tr></thead>
                         <tbody>{filtered.map(u => (
                             <tr key={u.id} style={{ opacity: deletingUserId === u.id ? 0.4 : 1, transition: 'opacity 0.2s' }}>
                                 <td><strong>{u.name}</strong></td>
@@ -295,7 +299,7 @@ export default function UsersPage() {
                                     </div>
                                 </td>
                                 <td className="text-sm text-muted">{new Date(u.created_at).toLocaleDateString()}</td>
-                                {(isSuperAdmin || isAdmin) && (
+                                {(isSuperAdmin || isAdmin || canManageUsers) && (
                                     <td>
                                         <div style={{ display: 'flex', gap: '8px' }}>
                                             <button
@@ -313,7 +317,7 @@ export default function UsersPage() {
                                                     Manage
                                                 </button>
                                             )}
-                                            {u.role === 'STUDENT' && (isSuperAdmin || (isAdmin && myPermissions.manage_users)) && (
+                                            {u.role === 'STUDENT' && canManageUsers && (
                                                 <button
                                                     className={`btn btn-sm ${u.can_build_resume ? 'btn-success' : 'btn-secondary'}`}
                                                     onClick={() => handleToggleResumeAccess(u)}
@@ -338,7 +342,7 @@ export default function UsersPage() {
                                                     🔓 Unblock
                                                 </button>
                                             )}
-                                            {(u.role === 'ADMIN' || u.role === 'TRAINER') && (isSuperAdmin || (isAdmin && myPermissions.manage_users)) && (
+                                            {(u.role === 'ADMIN' || u.role === 'TRAINER') && canManageUsers && (
                                                 <button
                                                     className="btn btn-sm btn-secondary"
                                                     onClick={() => handleOpenPermissions(u)}
@@ -353,7 +357,7 @@ export default function UsersPage() {
                                             >
                                                 {u.is_active ? 'Suspend' : 'Activate'}
                                             </button>
-                                            {(isSuperAdmin || (isAdmin && myPermissions.manage_users)) && (
+                                            {canManageUsers && (
                                                 confirmDeleteUserId === u.id ? (
                                                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center', background: 'rgba(239,68,68,0.08)', padding: '4px 8px', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
                                                         <span style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: 600 }}>Sure?</span>
