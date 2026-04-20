@@ -15,6 +15,12 @@ export const metadata: Metadata = {
   title: "EduSuite.ai LMS | Ultra-Premium Tech Training",
   description: "Experience the next-gen Learning Management System for EduSuite.ai Institute. Bespoke training, placement support, and MNC certification.",
   keywords: "LMS, EduSuite.ai, learning management, education, training",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "EduSuite.ai",
+  },
 };
 
 export const viewport = {

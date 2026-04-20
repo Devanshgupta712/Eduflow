@@ -106,11 +106,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         return () => observer.disconnect();
     }, [pathname]);
 
+    const registerPushWorker = async () => {
+        if ('serviceWorker' in navigator && 'PushManager' in window) {
+            try {
+                const registration = await navigator.serviceWorker.register('/sw.js');
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    // Try to subscribe
+                    const subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+                    });
+                    
+                    // Send to backend
+                    await apiPost('/api/auth/subscribe', subscription.toJSON());
+                }
+            } catch (err) {
+                console.error('Service Worker / Push registration failed', err);
+            }
+        }
+    };
+
     useEffect(() => {
         const stored = getStoredUser();
         if (stored) {
             setUser(stored);
             
+            // Ask for notifications if not on public paths
+            if (!PUBLIC_PATHS.includes(pathname)) {
+                registerPushWorker();
+            }
+
             // Sync user data from server to catch permission changes (e.g. Resume Builder)
             apiGet('/api/auth/me')
                 .then(latestUser => {

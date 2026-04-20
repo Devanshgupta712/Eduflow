@@ -1513,6 +1513,8 @@ async def send_notification(
     _user: User = Depends(require_roles(Role.SUPER_ADMIN, Role.ADMIN)),
 ):
     from app.models.notification import Notification
+    from app.utils.push import send_push_notification
+    import asyncio
 
     if body.target == "ALL":
         result = await db.execute(select(User).where(User.is_active == True))
@@ -1520,6 +1522,8 @@ async def send_notification(
         for u in users:
             n = Notification(user_id=u.id, title=body.title, message=body.message, type="SYSTEM", reference_id="admin_broadcast")
             db.add(n)
+            # Dispatch push in background
+            asyncio.create_task(send_push_notification(db, u.id, body.title, body.message, "/student/dashboard"))
         await db.flush()
         return {"status": "sent", "count": len(users)}
         
@@ -1532,6 +1536,8 @@ async def send_notification(
         for u in users:
             n = Notification(user_id=u.id, title=body.title, message=body.message, type="SYSTEM", reference_id="admin_broadcast")
             db.add(n)
+            # Dispatch push
+            asyncio.create_task(send_push_notification(db, u.id, body.title, body.message, "/student/dashboard"))
         await db.flush()
         return {"status": "sent", "count": len(users)}
 
@@ -1542,6 +1548,8 @@ async def send_notification(
         n = Notification(user_id=user.id, title=body.title, message=body.message, type="SYSTEM", reference_id="admin_direct")
 
         db.add(n)
+        # Dispatch push
+        asyncio.create_task(send_push_notification(db, user.id, body.title, body.message, "/student/dashboard"))
         await db.flush()
         
         # Real-time emission

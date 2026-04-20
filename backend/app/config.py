@@ -26,7 +26,11 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""  # Set in .env
     SMTP_PASSWORD: str = ""  # Set in .env
-    SMTP_SENDER: str = "AppTechno Software <devanshd7124g@gmail.com>"
+    SMTP_SENDER: str = "EduSuite.ai <devanshd7124g@gmail.com>"
+
+    # VAPID Keys for Web Push Notifications
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_SUBJECT: str = "mailto:admin@edusuite.ai"
 
     class Config:
         # Get the absolute path to the root .env file

@@ -1,0 +1,21 @@
+{
+  "name": "EduSuite.ai LMS",
+  "short_name": "EduSuite",
+  "description": "Ultra-Premium Tech Training and Learning Management System",
+  "start_url": "/login",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0066ff",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

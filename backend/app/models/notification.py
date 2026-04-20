@@ -23,6 +23,20 @@ class Notification(Base):
     user = relationship("User", back_populates="notifications")
 
 
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"))
+    endpoint: Mapped[str] = mapped_column(String, unique=True, index=True)
+    p256dh: Mapped[str] = mapped_column(String)
+    auth: Mapped[str] = mapped_column(String)
+    device_type: Mapped[str | None] = mapped_column(String, nullable=True)  # Android, iOS, Windows, etc.
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user = relationship("User", foreign_keys=[user_id])
+
+
 class Message(Base):
     __tablename__ = "messages"
 

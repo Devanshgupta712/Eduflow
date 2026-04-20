@@ -828,3 +828,42 @@ async def submit_suggestion(
     db.add(s)
     await db.commit()
     return {"status": "submitted", "message": "Thank you for your suggestion!"}
+
+
+# ─── Push Notifications Subscribe ──────────────────────────
+@router.post("/subscribe", status_code=201)
+async def subscribe_push(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from app.models.notification import PushSubscription
+    endpoint = body.get("endpoint")
+    keys = body.get("keys", {})
+    p256dh = keys.get("p256dh")
+    auth_secret = keys.get("auth")
+
+    if not endpoint or not p256dh or not auth_secret:
+        raise HTTPException(status_code=400, detail="Invalid subscription payload")
+
+    # Check if subscription already exists
+    res = await db.execute(select(PushSubscription).where(PushSubscription.endpoint == endpoint))
+    existing = res.scalars().first()
+
+    if existing:
+        if existing.user_id != user.id:
+            existing.user_id = user.id
+            await db.commit()
+        return {"status": "updated"}
+
+    # Create new subscription
+    sub = PushSubscription(
+        user_id=user.id,
+        endpoint=endpoint,
+        p256dh=p256dh,
+        auth=auth_secret,
+        device_type=body.get("device_type", "Unknown")
+    )
+    db.add(sub)
+    await db.commit()
+    return {"status": "subscribed"}

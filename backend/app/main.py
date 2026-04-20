@@ -138,6 +138,15 @@ async def lifespan(app: FastAPI):
                         is_anonymous BOOLEAN DEFAULT FALSE,
                         created_at TIMESTAMP DEFAULT NOW()
                     )""",
+                    """CREATE TABLE IF NOT EXISTS push_subscriptions (
+                        id VARCHAR PRIMARY KEY,
+                        user_id VARCHAR REFERENCES users(id),
+                        endpoint VARCHAR UNIQUE,
+                        p256dh VARCHAR NOT NULL,
+                        auth VARCHAR NOT NULL,
+                        device_type VARCHAR,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )""",
 
                     # 2. Existing Migrations
                     "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR",
