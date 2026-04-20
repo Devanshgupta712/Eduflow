@@ -265,7 +265,8 @@ export default function AssignmentsPage() {
         });
 
     // Build overdue student details
-    const overdueAssignments = assignments.filter(a => isOverdue(a.due_date));
+    // Build overdue student details based on filtered view
+    const overdueAssignments = filteredAssignments.filter(a => isOverdue(a.due_date));
 
     const handleOverdueClick = async () => {
         setShowOverdueModal(true);
@@ -336,9 +337,9 @@ export default function AssignmentsPage() {
 
             {/* Stats */}
             <div className="grid-4 mb-24">
-                <div className="stat-card primary"><div className="stat-icon primary">📝</div><div className="stat-info"><h3>Total</h3><div className="stat-value">{assignments.length}</div></div></div>
-                <div className="stat-card accent"><div className="stat-icon accent">💻</div><div className="stat-info"><h3>Coding</h3><div className="stat-value">{assignments.filter(a => a.type === 'CODING').length}</div></div></div>
-                <div className="stat-card success"><div className="stat-icon success">📨</div><div className="stat-info"><h3>Submissions</h3><div className="stat-value">{assignments.reduce((s, a) => s + a.submission_count, 0)}</div></div></div>
+                <div className="stat-card primary"><div className="stat-icon primary">📝</div><div className="stat-info"><h3>Total</h3><div className="stat-value">{filteredAssignments.length}</div></div></div>
+                <div className="stat-card accent"><div className="stat-icon accent">💻</div><div className="stat-info"><h3>Coding</h3><div className="stat-value">{filteredAssignments.filter(a => a.type === 'CODING').length}</div></div></div>
+                <div className="stat-card success"><div className="stat-icon success">📨</div><div className="stat-info"><h3>Submissions</h3><div className="stat-value">{filteredAssignments.reduce((s, a) => s + a.submission_count, 0)}</div></div></div>
                 <div className="stat-card danger" onClick={handleOverdueClick} style={{ cursor: 'pointer', transition: 'transform 0.2s' }} onMouseOver={e => e.currentTarget.style.transform = 'scale(1.03)'} onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}>
                     <div className="stat-icon danger">⚠️</div>
                     <div className="stat-info">

@@ -128,7 +128,9 @@ export default function VoiceAssistant() {
             decoder.decode();
 
             // Only speak if the window is still open
-            if (assistantContent && isOpen) speakResponse(assistantContent);
+            if (assistantContent && isOpen) {
+                setTimeout(() => speakResponse(assistantContent), 100);
+            }
 
         } catch (error: any) {
             console.error('Chat error:', error);
@@ -142,10 +144,10 @@ export default function VoiceAssistant() {
     };
 
     const speakResponse = (text: string) => {
-        if (!synthRef.current) return;
+        if (!synthRef.current || !text) return;
 
         // Cancel any current speech first
-        synthRef.current.cancel();
+        window.speechSynthesis.cancel();
 
         // Strip markdown symbols so TTS sounds natural
         const cleanText = text
@@ -156,16 +158,24 @@ export default function VoiceAssistant() {
             .replace(/\n+/g, ' ')
             .trim();
 
+        if (!cleanText) return;
+
         const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.rate = 1.05;
+        utterance.lang = 'en-US';
+        utterance.rate = 1.0;
         utterance.pitch = 1.0;
-        utterance.volume = volume;
+        utterance.volume = volume > 0 ? volume : 1; // Ensure audible if state is 0 for some reason
 
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);
-        utterance.onerror = () => setIsSpeaking(false);
+        utterance.onerror = (e) => {
+            console.error('TTS Error:', e);
+            setIsSpeaking(false);
+        };
 
-        synthRef.current.speak(utterance);
+        // Some browsers get stuck in a paused state
+        window.speechSynthesis.resume();
+        window.speechSynthesis.speak(utterance);
     };
 
     const stopSpeaking = () => {
