@@ -21,3 +21,4 @@ pdfplumber
 python-docx
 weasyprint
 Jinja2
+pywebpush

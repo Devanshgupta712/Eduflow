@@ -24,6 +24,10 @@ export default function VoiceAssistant() {
     // Initialize User, Speech Recognition and Synthesis
     useEffect(() => {
         if (typeof window !== 'undefined') {
+            const storedVol = localStorage.getItem('assistant_volume');
+            if (storedVol !== null) {
+                setVolume(parseFloat(storedVol));
+            }
             const stored = getStoredUser();
             setUser(stored);
 
@@ -44,6 +48,12 @@ export default function VoiceAssistant() {
                 };
             }
             synthRef.current = window.speechSynthesis;
+            // Pre-load voices to avoid silent first-try in Chrome
+            if (synthRef.current.onvoiceschanged !== undefined) {
+                synthRef.current.onvoiceschanged = () => {
+                    synthRef.current?.getVoices();
+                };
+            }
         }
     }, []);
 
@@ -144,7 +154,7 @@ export default function VoiceAssistant() {
     };
 
     const speakResponse = (text: string) => {
-        if (!synthRef.current || !text) return;
+        if (!synthRef.current || !text || volume === 0) return;
 
         // Cancel any current speech first
         window.speechSynthesis.cancel();
@@ -161,10 +171,21 @@ export default function VoiceAssistant() {
         if (!cleanText) return;
 
         const utterance = new SpeechSynthesisUtterance(cleanText);
+        
+        // Try to assign a good voice if available
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+            const enVoices = voices.filter(v => v.lang.startsWith('en'));
+            const preferredVoice = enVoices.find(v => v.name.includes('Google') || v.name.includes('Zira') || v.name.includes('David')) || enVoices[0];
+            if (preferredVoice) {
+                utterance.voice = preferredVoice;
+            }
+        }
+
         utterance.lang = 'en-US';
         utterance.rate = 1.0;
         utterance.pitch = 1.0;
-        utterance.volume = volume > 0 ? volume : 1; // Ensure audible if state is 0 for some reason
+        utterance.volume = volume;
 
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);
@@ -286,7 +307,13 @@ export default function VoiceAssistant() {
                                     type="range" 
                                     min="0" max="1" step="0.1" 
                                     value={volume} 
-                                    onChange={(e) => setVolume(parseFloat(e.target.value))}
+                                    onChange={(e) => {
+                                        const val = parseFloat(e.target.value);
+                                        setVolume(val);
+                                        if (typeof window !== 'undefined') {
+                                            localStorage.setItem('assistant_volume', val.toString());
+                                        }
+                                    }}
                                     style={{ width: '40px', cursor: 'pointer', accentColor: '#ffffff' }}
                                 />
                             </div>
