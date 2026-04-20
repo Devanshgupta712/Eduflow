@@ -34,7 +34,8 @@ if "sqlite" not in db_url:
         "pool_size": 3,
         "max_overflow": 5,
         "pool_timeout": 10,
-        "pool_recycle": 1800,
+        "pool_recycle": 300,  # 5 minutes for serverless DBs
+        "pool_pre_ping": True,  # ⬅️ This fixes the "connection is closed" error!
     })
 
 engine = create_async_engine(db_url, **kw)
