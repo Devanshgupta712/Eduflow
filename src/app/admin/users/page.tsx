@@ -334,7 +334,7 @@ export default function UsersPage() {
                                                 <button
                                                     className="btn btn-sm btn-secondary"
                                                     onClick={() => handleOpenPermissions(u)}
-                                                    disabled={((isAdmin || isTrainer) && (u.role === 'ADMIN' || u.role === 'SUPER_ADMIN')) || (isSuperAdmin && u.role === 'SUPER_ADMIN')}
+                                                    disabled={(isAdmin || isTrainer) && u.role === 'ADMIN'}
                                                 >
                                                     🔑 Permissions
                                                 </button>
