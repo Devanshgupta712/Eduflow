@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 # Groq Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-PRIMARY_MODEL = "llama-3.1-70b-versatile"
+PRIMARY_MODEL = "llama-3.3-70b-versatile"
 FALLBACK_MODEL = "mixtral-8x7b-32768"
 
 async def get_groq_completion(
