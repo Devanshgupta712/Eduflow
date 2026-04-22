@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { apiGet, apiPost, getStoredUser } from '@/lib/api';
+import { apiGet, apiPost, apiPatch, apiDelete, getStoredUser } from '@/lib/api';
 
 interface UserProfile {
     id: string; name: string; email: string; phone: string | null;
@@ -78,13 +78,13 @@ export default function StudentProfilePage() {
     };
 
     const handleSaveProfile = async () => {
-        await fetch((process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com') + '/api/auth/profile', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-            body: JSON.stringify(editForm),
-        });
-        setEditing(false);
-        loadAll();
+        try {
+            await apiPatch('/api/auth/profile', editForm);
+            setEditing(false);
+            loadAll();
+        } catch (err: any) {
+            alert(err.message || 'Failed to update profile');
+        }
     };
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,11 +111,12 @@ export default function StudentProfilePage() {
 
     const handleDelete = async (docId: string) => {
         if (!confirm('Delete this document?')) return;
-        await fetch((process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com') + '/api/auth/documents/' + docId, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        loadAll();
+        try {
+            await apiDelete('/api/auth/documents/' + docId);
+            loadAll();
+        } catch (err: any) {
+            alert(err.message || 'Failed to delete document');
+        }
     };
 
     const roleColor = user?.role === 'STUDENT' ? '#06b6d4' : user?.role === 'TRAINER' ? '#10b981' : '#0066ff';
@@ -135,16 +136,7 @@ export default function StudentProfilePage() {
                 reader.readAsDataURL(file);
             });
 
-            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'https://lms-api-bkuw.onrender.com') + '/api/auth/profile', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-                body: JSON.stringify({ avatar: base64 }),
-            });
-
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.detail || 'Upload failed');
-            }
+            await apiPatch('/api/auth/profile', { avatar: base64 });
 
             // Reload profile to show updated avatar
             await loadAll();
