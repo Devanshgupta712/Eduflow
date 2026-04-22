@@ -12,6 +12,7 @@ from app.routers.auth import get_current_user
 from app.models.user import User
 from app.models.resume import Resume
 from pydantic import BaseModel
+from app.utils.resume_ai_pipeline import enhance_resume, get_groq_completion
 
 router = APIRouter(prefix="/api/resume", tags=["Resume"])
 
@@ -56,43 +57,7 @@ class AISectionRewriteRequest(BaseModel):
     section_content: str
     job_description: Optional[str] = None
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-async def get_groq_completion(prompt: str, system_prompt: str = "You are an expert ATS resume writer.") -> str:
-    if not GROQ_API_KEY:
-        raise HTTPException(status_code=500, detail="Groq API Key not configured")
-        
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.7,
-                    "max_tokens": 4000
-                },
-                timeout=60.0
-            )
-            if response.status_code != 200:
-                error_detail = response.text
-                try:
-                    error_json = response.json()
-                    error_detail = error_json.get("error", {}).get("message", response.text)
-                except:
-                    pass
-                raise HTTPException(status_code=500, detail=f"Groq API Error: {error_detail}")
-                
-            data = response.json()
-            return data["choices"][0]["message"]["content"]
-        except Exception as e:
-            if isinstance(e, HTTPException):
-                raise e
-            raise HTTPException(status_code=500, detail=f"LLM Generation failed: {str(e)}")
+# Groq Completion helper moved to app.utils.resume_ai_pipeline
 
 
 @router.get("", response_model=List[ResumeSummaryResponse])
@@ -273,42 +238,20 @@ async def ai_enhance_resume(
     req: AIEnhanceRequest,
     current_user: User = Depends(get_current_user)
 ):
-    system_prompt = """You are an expert ATS resume writer.
-Your objective is to take the user's existing resume text and a target Job Description, and output a clean, professional JSON resume structure.
-
-STRICT RULES:
-1. SUMMARY: Keep it extremely concise (MAX 2 SHORT SENTENCES). Focus on current role and top tech.
-2. EXPERIENCE: DO NOT hallucinate experience they do not have. If no experience is found in the input, return an empty array [].
-3. PROJECTS: Only include projects found in the input.
-4. TONE: Professional and factual. Use implied FIRST PERSON. 
-5. NO NAMES: Never mention the user's name or use pronouns like 'He/She' in the summary or experience. Start with verbs or adjectives (e.g., 'Detail-oriented QA engineer...' instead of 'Devansh is a...').
-
-You MUST respond with pure JSON only:
-{
-  "summary": "Max 2 short sentences",
-  "skills": ["Skill1", "Skill2"],
-  "experience": [{"company": "Name", "role": "Title", "from": "Date", "to": "Date", "bullets": ["Action verb + result + tech"]}],
-  "education": [{"degree": "Name", "school": "Name", "year": "Year", "grade": ""}],
-  "projects": [{"name": "Name", "tech": "Stack", "description": "1 sentence", "link": ""}]
-}
-Return only raw JSON."""
-
-    prompt = f"RESUME TEXT:\n{req.resume_text}\n\nTARGET JOB DESCRIPTION:\n{req.job_description}"
-    
-    generated_json_str = await get_groq_completion(prompt, system_prompt)
-    
+    """
+    Enhanced AI Resume Pipeline:
+    1. analyze_jd
+    2. parse_resume
+    3. analyze_gap
+    4. optimize_resume
+    """
     try:
-        # Strip markdown if model added them despite instructions
-        clean_json = generated_json_str.strip()
-        if clean_json.startswith("```json"):
-            clean_json = clean_json[7:-3]
-        elif clean_json.startswith("```"):
-            clean_json = clean_json[3:-3]
-            
-        parsed = json.loads(clean_json)
-        return {"data": parsed}
+        enhanced_data = await enhance_resume(req.resume_text, req.job_description)
+        return {"data": enhanced_data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse AI response into JSON: {str(e)}")
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"AI Enhancement failed: {str(e)}")
 
 @router.post("/generate", response_model=dict)
 async def ai_generate_resume(
@@ -337,16 +280,15 @@ Return only raw JSON."""
 
     prompt = f"USER RAW DETAILS:\n{json.dumps(req.basic_details, indent=2)}\n\nTARGET JOB DESCRIPTION:\n{req.job_description}"
     
-    generated_json_str = await get_groq_completion(prompt, system_prompt)
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt}
+    ]
+    
+    generated_json_str = await get_groq_completion(messages, temperature=0.7)
     
     try:
-        clean_json = generated_json_str.strip()
-        if clean_json.startswith("```json"):
-            clean_json = clean_json[7:-3]
-        elif clean_json.startswith("```"):
-            clean_json = clean_json[3:-3]
-            
-        parsed = json.loads(clean_json)
+        parsed = json.loads(generated_json_str)
         return {"data": parsed}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse AI response into JSON: {str(e)}")
@@ -404,7 +346,12 @@ async def ai_rewrite_section(
 
     prompt = f"Current {req.section_name}:\n{req.section_content}"
     
-    improved_content = await get_groq_completion(prompt, system_prompt)
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt}
+    ]
+    
+    improved_content = await get_groq_completion(messages, temperature=0.7, json_mode=False)
     return {"content": improved_content.strip()}
 
 from fastapi.responses import StreamingResponse

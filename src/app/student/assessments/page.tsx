@@ -639,7 +639,37 @@ function StudentAssessmentsContent() {
                             <form onSubmit={(e) => { e.preventDefault(); submitHandler(); }} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                                 <div style={{ flex: 1, overflowY: 'auto', marginBottom: '20px', borderRadius: '12px', border: '1px solid var(--border)', background: activeSubmission.type === 'CODING' ? '#1e1e1e' : 'var(--bg-secondary)', padding: activeSubmission.type === 'CODING' ? '0' : '24px' }}>
                                     {activeSubmission.type === 'CODING' && (
-                                        <WebDevEditor code={content} onChange={setContent} />
+                                        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                            {/* Questions Sidebar/Header */}
+                                            <div style={{ padding: '24px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', maxHeight: '40%', overflowY: 'auto' }}>
+                                                <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: 800 }}>💻 Lab Challenges</h3>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                                    {(() => {
+                                                        try {
+                                                            const struct = JSON.parse(activeSubmission.structured_content || '{}');
+                                                            const qs = activeSubmission.activeQuestions || struct.questions || [];
+                                                            return qs.map((q: any, i: number) => (
+                                                                <div key={i} style={{ padding: '16px', background: 'var(--bg-primary)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                                    <div style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '13px', marginBottom: '4px' }}>PROBLEM {i + 1}</div>
+                                                                    <div style={{ fontSize: '15px', lineHeight: '1.5', fontWeight: 600 }}>{q.question}</div>
+                                                                    {q.constraints && q.constraints.length > 0 && (
+                                                                        <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                                                            {q.constraints.map((c: string, ci: number) => (
+                                                                                <span key={ci} style={{ fontSize: '10px', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', opacity: 0.7 }}>{c}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ));
+                                                        } catch (e) { return null; }
+                                                    })()}
+                                                </div>
+                                            </div>
+                                            {/* Editor Container */}
+                                            <div style={{ flex: 1, position: 'relative', minHeight: '400px' }}>
+                                                <WebDevEditor code={content} onChange={setContent} />
+                                            </div>
+                                        </div>
                                     )}
                                     
                                     {(activeSubmission.type === 'WRITTEN' || activeSubmission.type === 'PROJECT') && (

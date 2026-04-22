@@ -25,8 +25,8 @@ export default function PreflightChecklist({ title, onReady, onCancel }: Preflig
     // Cleanup on unmount
     useEffect(() => {
         return () => {
-            camStream?.getTracks().forEach(t => t.stop());
-            screenStream?.getTracks().forEach(t => t.stop());
+            // We NO LONGER stop tracks here because they are passed to the parent for the actual test.
+            // This prevents the "Security Alert" or re-requesting permissions.
         };
     }, []);
 

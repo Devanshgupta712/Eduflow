@@ -89,7 +89,7 @@ def evaluate_submission(assignment_instructions: str, student_content: str, max_
                                 f"You are an encouraging yet accurate coding instructor grading a submission. "
                                 f"The submission may contain MULTIPLE problems. "
                                 f"You MUST evaluate ALL problems and provide a single holistic score (out of {max_marks}). "
-                                f"IMPORTANT: You MUST award partial credit if some problems are solved correctly but others are not. Do not give a 0 unless NO problems were solved correctly. "
+                                f"IMPORTANT: You MUST award partial credit fairly. If an assignment contains multiple problems (e.g., 5 problems) and the student only attempts one, their maximum possible score should STRICTLY correspond to the portion they completed (e.g., max 20-30%), even if that one answer is perfect. Do not give high marks for incomplete submissions. "
                                 f"For the 'feedback' field, you MUST format your response as a visually clean Markdown string containing EXACTLY these exactly three headers: \n"
                                 f"### 🌟 What You Did Well\n(list points here)\n\n"
                                 f"### 📈 Areas for Improvement\n(list points here)\n\n"
