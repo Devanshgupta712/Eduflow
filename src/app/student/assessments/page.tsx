@@ -43,6 +43,8 @@ function StudentAssessmentsContent() {
     const [graceCountdown, setGraceCountdown] = useState<number | null>(null);
     const [violationType, setViolationType] = useState<string | null>(null);
     const [showAssignmentReview, setShowAssignmentReview] = useState(false);
+    const [codingAnswers, setCodingAnswers] = useState<Record<number, string>>({});
+    const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
 
     // Pre-flight checklist gate
     const [preflightAssignment, setPreflightAssignment] = useState<any>(null);
@@ -222,6 +224,10 @@ function StudentAssessmentsContent() {
                 });
                 
                 setMcqAnswers(savedAnsMap);
+                if (assignment.type === 'CODING') {
+                    setCodingAnswers(savedAnsMap as Record<number, string>);
+                    setActiveQuestionIndex(0);
+                }
                 setContent(JSON.stringify(savedAnsMap));
                 
                 setIsProctoringActive(true);
@@ -639,35 +645,109 @@ function StudentAssessmentsContent() {
                             <form onSubmit={(e) => { e.preventDefault(); submitHandler(); }} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                                 <div style={{ flex: 1, overflowY: 'auto', marginBottom: '20px', borderRadius: '12px', border: '1px solid var(--border)', background: activeSubmission.type === 'CODING' ? '#1e1e1e' : 'var(--bg-secondary)', padding: activeSubmission.type === 'CODING' ? '0' : '24px' }}>
                                     {activeSubmission.type === 'CODING' && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
                                             {/* Questions Sidebar/Header */}
-                                            <div style={{ padding: '24px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', maxHeight: '40%', overflowY: 'auto' }}>
-                                                <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: 800 }}>💻 Lab Challenges</h3>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                            <div style={{ padding: '24px 24px 0', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800 }}>💻 Lab Challenges</h3>
+                                                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                                        {Object.keys(codingAnswers).length} / {(() => {
+                                                            try {
+                                                                const struct = JSON.parse(activeSubmission.structured_content || '{}');
+                                                                return (activeSubmission.activeQuestions || struct.questions || []).length;
+                                                            } catch(e) { return 0; }
+                                                        })()} Solved
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Problem Tabs */}
+                                                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '16px' }} className="no-scrollbar">
                                                     {(() => {
                                                         try {
                                                             const struct = JSON.parse(activeSubmission.structured_content || '{}');
                                                             const qs = activeSubmission.activeQuestions || struct.questions || [];
-                                                            return qs.map((q: any, i: number) => (
-                                                                <div key={i} style={{ padding: '16px', background: 'var(--bg-primary)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                                                    <div style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '13px', marginBottom: '4px' }}>PROBLEM {i + 1}</div>
-                                                                    <div style={{ fontSize: '15px', lineHeight: '1.5', fontWeight: 600 }}>{q.question}</div>
-                                                                    {q.constraints && q.constraints.length > 0 && (
-                                                                        <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                                                            {q.constraints.map((c: string, ci: number) => (
-                                                                                <span key={ci} style={{ fontSize: '10px', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', opacity: 0.7 }}>{c}</span>
-                                                                            ))}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ));
+                                                            return qs.map((q: any, i: number) => {
+                                                                const isActive = activeQuestionIndex === i;
+                                                                const hasCode = codingAnswers[i] && codingAnswers[i].length > 10;
+                                                                return (
+                                                                    <button 
+                                                                        key={i}
+                                                                        type="button"
+                                                                        onClick={() => setActiveQuestionIndex(i)}
+                                                                        style={{
+                                                                            padding: '10px 20px',
+                                                                            borderRadius: '12px',
+                                                                            border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
+                                                                            background: isActive ? 'var(--primary-glow)' : 'var(--bg-primary)',
+                                                                            color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+                                                                            fontWeight: 700,
+                                                                            fontSize: '13px',
+                                                                            whiteSpace: 'nowrap',
+                                                                            cursor: 'pointer',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '8px',
+                                                                            transition: 'all 0.2s'
+                                                                        }}
+                                                                    >
+                                                                        <span style={{ 
+                                                                            width: '20px', height: '20px', borderRadius: '6px',
+                                                                            background: hasCode ? '#10b981' : (isActive ? 'var(--primary)' : 'rgba(255,255,255,0.1)'),
+                                                                            color: '#fff', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                                        }}>
+                                                                            {hasCode ? '✓' : i + 1}
+                                                                        </span>
+                                                                        Problem {i + 1}
+                                                                    </button>
+                                                                );
+                                                            });
                                                         } catch (e) { return null; }
                                                     })()}
                                                 </div>
                                             </div>
-                                            {/* Editor Container */}
-                                            <div style={{ flex: 1, position: 'relative', minHeight: '400px' }}>
-                                                <WebDevEditor code={content} onChange={setContent} />
+
+                                            {/* Active Question Statement */}
+                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                                                {(() => {
+                                                    try {
+                                                        const struct = JSON.parse(activeSubmission.structured_content || '{}');
+                                                        const qs = activeSubmission.activeQuestions || struct.questions || [];
+                                                        const q = qs[activeQuestionIndex];
+                                                        if (!q) return null;
+                                                        return (
+                                                            <>
+                                                                <div style={{ padding: '24px', background: 'var(--bg-primary)', borderBottom: '1px solid var(--border)', overflowY: 'auto', maxHeight: '180px' }}>
+                                                                    <div style={{ fontSize: '15px', lineHeight: '1.6', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                                                        {q.question}
+                                                                    </div>
+                                                                    {q.constraints && q.constraints.length > 0 && (
+                                                                        <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                                            {q.constraints.map((c: string, ci: number) => (
+                                                                                <span key={ci} style={{ fontSize: '11px', background: 'rgba(255,255,255,0.05)', padding: '4px 12px', borderRadius: '8px', opacity: 0.8, border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                                                    ⛓️ {c}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                
+                                                                {/* Editor Container */}
+                                                                <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+                                                                    <WebDevEditor 
+                                                                        code={codingAnswers[activeQuestionIndex] || q.initial_code || ''} 
+                                                                        onChange={(val) => {
+                                                                            const newAnswers = { ...codingAnswers, [activeQuestionIndex]: val };
+                                                                            setCodingAnswers(newAnswers);
+                                                                            setContent(JSON.stringify(newAnswers));
+                                                                            // Auto-save heartbeat
+                                                                            sendHeartbeat(newAnswers);
+                                                                        }} 
+                                                                    />
+                                                                </div>
+                                                            </>
+                                                        );
+                                                    } catch (e) { return <p style={{ padding: '40px', textAlign: 'center' }}>Error loading problem statement.</p>; }
+                                                })()}
                                             </div>
                                         </div>
                                     )}
@@ -883,9 +963,30 @@ function StudentAssessmentsContent() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                                     <div>
                                         <h4 style={{ marginBottom: '12px', fontSize: '14px', textTransform: 'uppercase', opacity: 0.6 }}>Your Submission</h4>
-                                        <div style={{ padding: '20px', background: '#1e1e1e', color: '#fff', borderRadius: '12px', fontFamily: 'monospace', fontSize: '14px', whiteSpace: 'pre-wrap', border: '1px solid var(--border)' }}>
-                                            {reportData.my_submission.content || "Empty submission"}
-                                        </div>
+                                        {(() => {
+                                            if (reportData.type === 'CODING') {
+                                                try {
+                                                    const answers = JSON.parse(reportData.my_submission.content || '{}');
+                                                    const struct = JSON.parse(reportData.structured_content || '{}');
+                                                    const qs = struct.questions || [];
+                                                    if (qs.length > 0) {
+                                                        return qs.map((q: any, i: number) => (
+                                                            <div key={i} style={{ marginBottom: '20px' }}>
+                                                                <div style={{ fontWeight: 800, fontSize: '12px', color: 'var(--primary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Problem {i+1}</div>
+                                                                <div style={{ padding: '20px', background: '#111', color: '#4ade80', borderRadius: '12px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'pre-wrap', border: '1px solid var(--border)', lineHeight: '1.6' }}>
+                                                                    {answers[i] || "No code submitted for this problem."}
+                                                                </div>
+                                                            </div>
+                                                        ));
+                                                    }
+                                                } catch(e) { console.error("Could not parse coding report", e); }
+                                            }
+                                            return (
+                                                <div style={{ padding: '20px', background: '#1e1e1e', color: '#fff', borderRadius: '12px', fontFamily: 'monospace', fontSize: '14px', whiteSpace: 'pre-wrap', border: '1px solid var(--border)' }}>
+                                                    {reportData.my_submission.content || "Empty submission"}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                     {reportData.my_submission.feedback && (
                                         <div>
