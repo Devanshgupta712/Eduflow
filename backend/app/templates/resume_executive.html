@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Executive Resume</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 0;
+        }
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            margin: 0;
+            padding: 0;
+            color: #1a1a1a;
+            background: #fff;
+            font-size: 11pt;
+            line-height: 1.45;
+        }
+        .container {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 20mm;
+            box-sizing: border-box;
+        }
+        .header {
+            border-bottom: 2px solid #1a365d;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .name {
+            font-size: 28pt;
+            font-weight: normal;
+            color: #1a365d;
+            margin: 0 0 10px 0;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .contact {
+            font-size: 10pt;
+            color: #4a5568;
+            margin: 0;
+            letter-spacing: 1px;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin: 25px 0 15px 0;
+        }
+        .section-title {
+            font-size: 13pt;
+            font-weight: bold;
+            color: #1a365d;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            white-space: nowrap;
+            margin-right: 15px;
+        }
+        .section-line {
+            flex-grow: 1;
+            height: 1px;
+            background: #cbd5e0;
+        }
+        .summary {
+            font-size: 10.5pt;
+            font-style: italic;
+            color: #2d3748;
+            text-align: justify;
+        }
+        .item {
+            margin-bottom: 20px;
+        }
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 2px;
+        }
+        .item-title {
+            font-weight: bold;
+            font-size: 11.5pt;
+            color: #2d3748;
+        }
+        .item-date {
+            font-size: 10pt;
+            color: #718096;
+            font-weight: bold;
+        }
+        .item-subtitle {
+            font-weight: bold;
+            color: #4a5568;
+            font-size: 10.5pt;
+            margin-bottom: 6px;
+        }
+        .item-desc {
+            margin: 0;
+            font-size: 10.5pt;
+            color: #2d3748;
+        }
+        .item-desc ul {
+            margin: 5px 0 0 0;
+            padding-left: 18px;
+        }
+        .item-desc li {
+            margin-bottom: 5px;
+        }
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .skill-item {
+            font-size: 10pt;
+            color: #2d3748;
+        }
+        .skill-item::before {
+            content: "• ";
+            color: #1a365d;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="name">{{ personal.get('name', 'Your Name') }}</h1>
+            <p class="contact">
+                {% set parts = [] %}
+                {% if personal.get('email') %}{% set _ = parts.append(personal.get('email')) %}{% endif %}
+                {% if personal.get('phone') %}{% set _ = parts.append(personal.get('phone')) %}{% endif %}
+                {% if personal.get('location') %}{% set _ = parts.append(personal.get('location')) %}{% endif %}
+                {{ parts | join('  |  ') }}
+            </p>
+            {% if personal.get('linkedin') %}
+            <p class="contact" style="margin-top: 5px;">{{ personal.get('linkedin') }}</p>
+            {% endif %}
+        </div>
+
+        {% if summary %}
+        <div class="section-header">
+            <div class="section-title">Executive Profile</div>
+            <div class="section-line"></div>
+        </div>
+        <div class="summary">{{ summary }}</div>
+        {% endif %}
+
+        {% if experience %}
+        <div class="section-header">
+            <div class="section-title">Professional Experience</div>
+            <div class="section-line"></div>
+        </div>
+        {% for exp in experience %}
+        <div class="item">
+            <div class="item-header">
+                <div class="item-title">{{ exp.get('role', '') }}</div>
+                <div class="item-date">{{ exp.get('from', '') }} - {{ exp.get('to', '') }}</div>
+            </div>
+            <div class="item-subtitle">{{ exp.get('company', '') }}</div>
+            <div class="item-desc">
+                {% if exp.get('bullets') %}
+                <ul>
+                    {% for point in exp.get('bullets') %}
+                    <li>{{ point }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if projects %}
+        <div class="section-header">
+            <div class="section-title">Key Projects</div>
+            <div class="section-line"></div>
+        </div>
+        {% for proj in projects %}
+        <div class="item">
+            <div class="item-header">
+                <div class="item-title">{{ proj.get('name', '') }}</div>
+                <div class="item-date">{{ proj.get('link', '') }}</div>
+            </div>
+            <div class="item-subtitle">{{ proj.get('tech', '') }}</div>
+            <div class="item-desc">
+                {% if proj.get('description') %}
+                <p>{{ proj.get('description') }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <div style="display: flex; gap: 40px;">
+            <div style="flex: 1;">
+                {% if education %}
+                <div class="section-header">
+                    <div class="section-title">Education</div>
+                    <div class="section-line"></div>
+                </div>
+                {% for edu in education %}
+                <div class="item" style="margin-bottom: 12px;">
+                    <div class="item-title" style="font-size: 10.5pt;">{{ edu.get('degree', '') }}</div>
+                    <div style="font-size: 10pt; color: #4a5568;">{{ edu.get('school', '') }}</div>
+                    <div style="font-size: 9.5pt; color: #718096;">Class of {{ edu.get('year', '') }}</div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <div style="flex: 1;">
+                {% if skills %}
+                <div class="section-header">
+                    <div class="section-title">Core Competencies</div>
+                    <div class="section-line"></div>
+                </div>
+                <div class="skills-grid">
+                    {% for skill in skills %}
+                    <div class="skill-item">{{ skill }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if certifications %}
+        <div class="section-header">
+            <div class="section-title">Certifications</div>
+            <div class="section-line"></div>
+        </div>
+        <div class="skills-grid">
+            {% for cert in certifications %}
+            <div class="skill-item">{{ cert.get('name', '') }} ({{ cert.get('issuer', '') }})</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+    </div>
+</body>
+</html>

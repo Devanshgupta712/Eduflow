@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Harvard Resume</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 0;
+        }
+        body {
+            font-family: 'Garamond', 'EB Garamond', Georgia, serif;
+            margin: 0;
+            padding: 0;
+            color: #000;
+            background: #fff;
+            font-size: 10pt;
+            line-height: 1.2;
+        }
+        .container {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 15mm 20mm;
+            box-sizing: border-box;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .name {
+            font-size: 18pt;
+            font-weight: bold;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+        }
+        .contact {
+            font-size: 9.5pt;
+            margin: 0;
+        }
+        .section-title {
+            font-size: 11pt;
+            font-weight: bold;
+            border-bottom: 1px solid #000;
+            margin: 15px 0 8px 0;
+            padding-bottom: 2px;
+            text-transform: uppercase;
+        }
+        .item {
+            margin-bottom: 10px;
+        }
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+        }
+        .item-subheader {
+            display: flex;
+            justify-content: space-between;
+            font-style: italic;
+            margin-bottom: 4px;
+        }
+        .item-desc {
+            margin: 0;
+        }
+        .item-desc ul {
+            margin: 2px 0 0 0;
+            padding-left: 20px;
+        }
+        .item-desc li {
+            margin-bottom: 3px;
+        }
+        .skills-line {
+            margin-bottom: 6px;
+        }
+        .skills-label {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="name">{{ personal.get('name', 'Your Name') }}</h1>
+            <p class="contact">
+                {% set parts = [] %}
+                {% if personal.get('email') %}{% set _ = parts.append(personal.get('email')) %}{% endif %}
+                {% if personal.get('phone') %}{% set _ = parts.append(personal.get('phone')) %}{% endif %}
+                {% if personal.get('location') %}{% set _ = parts.append(personal.get('location')) %}{% endif %}
+                {{ parts | join(' | ') }}
+            </p>
+            {% if personal.get('linkedin') or personal.get('github') %}
+            <p class="contact">
+                {% if personal.get('linkedin') %}{{ personal.get('linkedin') }}{% endif %}
+                {% if personal.get('linkedin') and personal.get('github') %} | {% endif %}
+                {% if personal.get('github') %}{{ personal.get('github') }}{% endif %}
+            </p>
+            {% endif %}
+        </div>
+
+        {% if summary %}
+        <div class="section-title">Professional Summary</div>
+        <div class="item-desc">{{ summary }}</div>
+        {% endif %}
+
+        {% if education %}
+        <div class="section-title">Education</div>
+        {% for edu in education %}
+        <div class="item">
+            <div class="item-header">
+                <div>{{ edu.get('school', '') }}</div>
+                <div>{{ edu.get('year', '') }}</div>
+            </div>
+            <div class="item-subheader">
+                <div>{{ edu.get('degree', '') }}</div>
+                <div>{% if edu.get('grade') %}GPA: {{ edu.get('grade') }}{% endif %}</div>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if experience %}
+        <div class="section-title">Experience</div>
+        {% for exp in experience %}
+        <div class="item">
+            <div class="item-header">
+                <div>{{ exp.get('company', '') }}</div>
+                <div>{{ exp.get('from', '') }} – {{ exp.get('to', '') }}</div>
+            </div>
+            <div class="item-subheader">
+                <div>{{ exp.get('role', '') }}</div>
+            </div>
+            <div class="item-desc">
+                {% if exp.get('bullets') %}
+                <ul>
+                    {% for point in exp.get('bullets') %}
+                    <li>{{ point }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if projects %}
+        <div class="section-title">Projects & Leadership</div>
+        {% for proj in projects %}
+        <div class="item">
+            <div class="item-header">
+                <div>{{ proj.get('name', '') }}</div>
+                <div>{{ proj.get('tech', '') }}</div>
+            </div>
+            <div class="item-desc">
+                {% if proj.get('description') %}
+                <ul>
+                    <li>{{ proj.get('description') }}</li>
+                    {% if proj.get('link') %}<li>Link: {{ proj.get('link') }}</li>{% endif %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <div class="section-title">Skills & Additional Information</div>
+        {% if skills %}
+        <div class="skills-line">
+            <span class="skills-label">Skills:</span> {{ skills | join(', ') }}
+        </div>
+        {% endif %}
+        {% if certifications %}
+        <div class="skills-line">
+            <span class="skills-label">Certifications:</span> 
+            {% for cert in certifications %}
+            {{ cert.get('name', '') }} ({{ cert.get('issuer', '') }}){% if not loop.last %}, {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+    </div>
+</body>
+</html>

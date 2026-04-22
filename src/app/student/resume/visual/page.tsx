@@ -180,12 +180,15 @@ export default function VisualResumeEditor() {
           <select 
             value={resume.template}
             onChange={(e) => handleChange(prev => ({ ...prev, template: e.target.value }))}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-primary)' }}
+            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-primary)', fontWeight: 600 }}
           >
-            <option value="modern">Modern Template</option>
-            <option value="classic">Classic Template</option>
-            <option value="minimal">Minimal Template</option>
-            <option value="tech">Tech Template</option>
+            <option value="modern">Modern (Standard)</option>
+            <option value="classic">Classic (Serif)</option>
+            <option value="minimal">Minimal (Clean)</option>
+            <option value="tech">Tech (Monospace)</option>
+            <option value="executive">Executive (Premium)</option>
+            <option value="creative">Creative (Bold)</option>
+            <option value="harvard">Harvard (Traditional)</option>
           </select>
           <button onClick={() => handleSave(true)} className="btn btn-outline" disabled={saving}>
             {saving ? 'Saving...' : '💾 Save'}
@@ -375,32 +378,87 @@ export default function VisualResumeEditor() {
           
           <div style={{ 
             width: '210mm', minHeight: '297mm', background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '20mm',
-            color: '#000', fontFamily: resume.template === 'classic' ? 'serif' : resume.template === 'minimal' ? 'Helvetica, Arial, sans-serif' : resume.template === 'tech' ? 'monospace' : 'sans-serif'
+            color: '#000', 
+            fontFamily: resume.template === 'classic' || resume.template === 'executive' || resume.template === 'harvard' ? 'serif' : resume.template === 'tech' ? 'monospace' : 'sans-serif',
+            position: 'relative',
+            display: resume.template === 'creative' ? 'flex' : 'block'
           }}>
-            <h1 style={{ fontSize: '24pt', fontWeight: 800, textAlign: 'center', marginBottom: '8px', color: resume.template === 'modern' ? '#2563eb' : '#000', textTransform: 'uppercase' }}>
+            {/* Creative Sidebar */}
+            {resume.template === 'creative' && (
+               <div style={{ width: '30%', background: '#111827', color: '#fff', margin: '-20mm 0 -20mm -20mm', padding: '20mm 15px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div style={{ width: '80px', height: '80px', background: '#2563eb', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 800 }}>
+                    {resume.personal.name ? resume.personal.name[0] : 'Y'}
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: '10px', color: '#3b82f6', textTransform: 'uppercase', marginBottom: '8px' }}>Contact</h4>
+                    <div style={{ fontSize: '9px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                       <div>{resume.personal.email}</div>
+                       <div>{resume.personal.phone}</div>
+                       <div>{resume.personal.location}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: '10px', color: '#3b82f6', textTransform: 'uppercase', marginBottom: '8px' }}>Skills</h4>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                       {resume.skills.map((s:string, i:number) => (
+                         <span key={i} style={{ fontSize: '9px', padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>{s}</span>
+                       ))}
+                    </div>
+                  </div>
+               </div>
+            )}
+
+            <div style={{ flex: 1, paddingLeft: resume.template === 'creative' ? '24px' : '0' }}>
+            <h1 style={{ 
+              fontSize: resume.template === 'executive' ? '28pt' : '24pt', 
+              fontWeight: 800, 
+              textAlign: (resume.template === 'modern' || resume.template === 'executive' || resume.template === 'harvard') ? 'center' : 'left', 
+              marginBottom: '8px', 
+              color: (resume.template === 'modern' || resume.template === 'creative') ? '#2563eb' : (resume.template === 'executive' ? '#1a365d' : '#000'), 
+              textTransform: 'uppercase',
+              letterSpacing: resume.template === 'executive' ? '2px' : 'normal'
+            }}>
               {resume.personal.name || 'Your Name'}
             </h1>
-            <p style={{ textAlign: 'center', fontSize: '10pt', marginBottom: '24px', color: '#666' }}>
+            <p style={{ textAlign: (resume.template === 'modern' || resume.template === 'executive' || resume.template === 'harvard') ? 'center' : 'left', fontSize: '10pt', marginBottom: '24px', color: '#666' }}>
               {[resume.personal.email, resume.personal.phone, resume.personal.location, resume.personal.linkedin].filter(Boolean).join(' | ')}
             </p>
             
             {resume.summary && (
               <div style={{ marginBottom: '20px' }}>
-                <h2 style={{ fontSize: '12pt', fontWeight: 700, borderBottom: resume.template === 'minimal' ? '1px solid #eee' : '2px solid #000', paddingBottom: '4px', marginBottom: '8px', textTransform: 'uppercase', color: resume.template === 'modern' ? '#2563eb' : '#000' }}>Summary</h2>
-                <p style={{ fontSize: '10.5pt', lineHeight: 1.5 }}>{resume.summary}</p>
+                <h2 style={{ 
+                  fontSize: '12pt', fontWeight: 700, 
+                  borderBottom: resume.template === 'minimal' ? '1px solid #eee' : (resume.template === 'executive' ? '1px solid #cbd5e0' : '2px solid #000'), 
+                  paddingBottom: '4px', marginBottom: '8px', textTransform: 'uppercase', 
+                  color: resume.template === 'modern' ? '#2563eb' : (resume.template === 'executive' ? '#1a365d' : '#000'),
+                  display: 'flex', alignItems: 'center'
+                }}>
+                  {resume.template === 'executive' ? 'Executive Profile' : 'Summary'}
+                  {resume.template === 'executive' && <span style={{ flex: 1, height: '1px', background: '#cbd5e0', marginLeft: '15px' }}></span>}
+                </h2>
+                <p style={{ fontSize: '10.5pt', lineHeight: 1.5, fontStyle: resume.template === 'executive' ? 'italic' : 'normal' }}>{resume.summary}</p>
               </div>
             )}
             
             {resume.experience && resume.experience.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
-                  <h2 style={{ fontSize: '12pt', fontWeight: 700, borderBottom: resume.template === 'minimal' ? '1px solid #eee' : '2px solid #000', paddingBottom: '4px', marginBottom: '12px', textTransform: 'uppercase', color: resume.template === 'modern' ? '#2563eb' : '#000' }}>Experience</h2>
+                  <h2 style={{ 
+                    fontSize: '12pt', fontWeight: 700, 
+                    borderBottom: resume.template === 'minimal' ? '1px solid #eee' : (resume.template === 'executive' ? 'none' : '2px solid #000'), 
+                    paddingBottom: '4px', marginBottom: '12px', textTransform: 'uppercase', 
+                    color: resume.template === 'modern' ? '#2563eb' : (resume.template === 'executive' ? '#1a365d' : '#000'),
+                    display: 'flex', alignItems: 'center'
+                  }}>
+                    Experience
+                    {resume.template === 'executive' && <span style={{ flex: 1, height: '1px', background: '#cbd5e0', marginLeft: '15px' }}></span>}
+                  </h2>
                   {resume.experience.map((exp: any, i: number) => (
-                    <div key={i} style={{ marginBottom: '16px' }}>
+                    <div key={i} style={{ marginBottom: '16px', borderLeft: resume.template === 'creative' ? '2px solid #3b82f6' : 'none', paddingLeft: resume.template === 'creative' ? '12px' : '0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
                         <span style={{ fontWeight: 700, fontSize: '11pt' }}>{exp.role}</span>
                         <span style={{ fontWeight: 700, fontSize: '10pt', color: '#555' }}>{exp.from} - {exp.to}</span>
                       </div>
-                      <div style={{ fontStyle: 'italic', fontSize: '10pt', color: '#555', marginBottom: '4px' }}>{exp.company}</div>
+                      <div style={{ fontStyle: 'italic', fontSize: '10pt', color: resume.template === 'creative' ? '#3b82f6' : '#555', marginBottom: '4px', fontWeight: resume.template === 'creative' ? 600 : 400 }}>{exp.company}</div>
                       {exp.bullets && exp.bullets.length > 0 && (
                         <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px', fontSize: '10.5pt' }}>
                           {exp.bullets.map((b: string, j: number) => b.trim() && <li key={j} style={{ marginBottom: '4px' }}>{b}</li>)}
@@ -413,14 +471,23 @@ export default function VisualResumeEditor() {
 
             {resume.projects && resume.projects.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
-                  <h2 style={{ fontSize: '12pt', fontWeight: 700, borderBottom: resume.template === 'minimal' ? '1px solid #eee' : '2px solid #000', paddingBottom: '4px', marginBottom: '12px', textTransform: 'uppercase', color: resume.template === 'modern' ? '#2563eb' : '#000' }}>Projects</h2>
+                  <h2 style={{ 
+                    fontSize: '12pt', fontWeight: 700, 
+                    borderBottom: resume.template === 'minimal' ? '1px solid #eee' : (resume.template === 'executive' ? 'none' : '2px solid #000'), 
+                    paddingBottom: '4px', marginBottom: '12px', textTransform: 'uppercase', 
+                    color: resume.template === 'modern' ? '#2563eb' : (resume.template === 'executive' ? '#1a365d' : '#000'),
+                    display: 'flex', alignItems: 'center'
+                  }}>
+                    Projects
+                    {resume.template === 'executive' && <span style={{ flex: 1, height: '1px', background: '#cbd5e0', marginLeft: '15px' }}></span>}
+                  </h2>
                   {resume.projects.map((proj: any, i: number) => (
                     <div key={i} style={{ marginBottom: '12px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '2px' }}>
                         <span style={{ fontWeight: 700, fontSize: '11pt' }}>{proj.name}</span>
                         <span style={{ fontSize: '10pt', color: '#555' }}>{proj.link}</span>
                       </div>
-                      <div style={{ fontStyle: 'italic', fontSize: '10pt', color: '#555', marginBottom: '4px' }}>{proj.tech}</div>
+                      <div style={{ fontStyle: 'italic', fontSize: '10pt', color: resume.template === 'creative' ? '#3b82f6' : '#555', marginBottom: '4px', fontWeight: resume.template === 'creative' ? 600 : 400 }}>{proj.tech}</div>
                       <p style={{ margin: 0, fontSize: '10.5pt' }}>{proj.description}</p>
                     </div>
                   ))}
@@ -429,7 +496,16 @@ export default function VisualResumeEditor() {
             
             {resume.skills && resume.skills.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
-                <h2 style={{ fontSize: '12pt', fontWeight: 700, borderBottom: resume.template === 'minimal' ? '1px solid #eee' : '2px solid #000', paddingBottom: '4px', marginBottom: '8px', textTransform: 'uppercase', color: resume.template === 'modern' ? '#2563eb' : '#000' }}>Skills</h2>
+                <h2 style={{ 
+                  fontSize: '12pt', fontWeight: 700, 
+                  borderBottom: resume.template === 'minimal' ? '1px solid #eee' : (resume.template === 'executive' ? 'none' : '2px solid #000'), 
+                  paddingBottom: '4px', marginBottom: '8px', textTransform: 'uppercase', 
+                  color: resume.template === 'modern' ? '#2563eb' : (resume.template === 'executive' ? '#1a365d' : '#000'),
+                  display: 'flex', alignItems: 'center'
+                }}>
+                  Skills
+                  {resume.template === 'executive' && <span style={{ flex: 1, height: '1px', background: '#cbd5e0', marginLeft: '15px' }}></span>}
+                </h2>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {resume.skills.map((skill: string, i: number) => (
                     <span key={i} style={{ padding: '4px 8px', fontSize: '10pt', color: '#333', background: resume.template === 'tech' ? '#fff' : '#f3f4f6', border: resume.template === 'tech' ? 'none' : '1px solid #e5e7eb', borderRadius: '4px' }}>{skill}{resume.template === 'tech' ? (i < resume.skills.length - 1 ? ', ' : '') : ''}</span>
@@ -440,7 +516,16 @@ export default function VisualResumeEditor() {
 
             {resume.education && resume.education.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
-                  <h2 style={{ fontSize: '12pt', fontWeight: 700, borderBottom: resume.template === 'minimal' ? '1px solid #eee' : '2px solid #000', paddingBottom: '4px', marginBottom: '12px', textTransform: 'uppercase', color: resume.template === 'modern' ? '#2563eb' : '#000' }}>Education</h2>
+                  <h2 style={{ 
+                    fontSize: '12pt', fontWeight: 700, 
+                    borderBottom: resume.template === 'minimal' ? '1px solid #eee' : (resume.template === 'executive' ? 'none' : '2px solid #000'), 
+                    paddingBottom: '4px', marginBottom: '12px', textTransform: 'uppercase', 
+                    color: resume.template === 'modern' ? '#2563eb' : (resume.template === 'executive' ? '#1a365d' : '#000'),
+                    display: 'flex', alignItems: 'center'
+                  }}>
+                    Education
+                    {resume.template === 'executive' && <span style={{ flex: 1, height: '1px', background: '#cbd5e0', marginLeft: '15px' }}></span>}
+                  </h2>
                   {resume.education.map((edu: any, i: number) => (
                     <div key={i} style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
                       <div>
@@ -475,6 +560,7 @@ export default function VisualResumeEditor() {
 
           </div>
         </div>
+      </div>
 
       </div>
     </div>

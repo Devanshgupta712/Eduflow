@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Creative Resume</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 0;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #1f2937;
+            background: #fff;
+            font-size: 10pt;
+            line-height: 1.6;
+        }
+        .container {
+            width: 210mm;
+            min-height: 297mm;
+            display: flex;
+            box-sizing: border-box;
+        }
+        .sidebar {
+            width: 75mm;
+            background: #111827;
+            color: #f9fafb;
+            padding: 15mm 8mm;
+            display: flex;
+            flex-direction: column;
+        }
+        .main {
+            flex: 1;
+            padding: 15mm 12mm;
+            background: #fff;
+        }
+        .avatar-circle {
+            width: 40mm;
+            height: 40mm;
+            background: #3b82f6;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48pt;
+            font-weight: 800;
+            color: #fff;
+            border: 4px solid #374151;
+        }
+        .sidebar-name {
+            font-size: 20pt;
+            font-weight: 800;
+            text-align: center;
+            margin: 0 0 5px 0;
+            color: #fff;
+        }
+        .sidebar-title {
+            font-size: 11pt;
+            text-align: center;
+            color: #9ca3af;
+            margin-bottom: 30px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .sidebar-section {
+            margin-bottom: 25px;
+        }
+        .sidebar-section-title {
+            font-size: 10pt;
+            font-weight: 800;
+            color: #3b82f6;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #374151;
+            padding-bottom: 4px;
+        }
+        .sidebar-item {
+            margin-bottom: 10px;
+            font-size: 9.5pt;
+        }
+        .sidebar-label {
+            font-weight: 700;
+            color: #9ca3af;
+            font-size: 8pt;
+            text-transform: uppercase;
+        }
+        .sidebar-value {
+            word-break: break-all;
+        }
+        .main-section {
+            margin-bottom: 30px;
+        }
+        .main-section-title {
+            font-size: 14pt;
+            font-weight: 800;
+            color: #111827;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .main-section-title::after {
+            content: "";
+            flex: 1;
+            height: 2px;
+            background: #f3f4f6;
+        }
+        .exp-item {
+            margin-bottom: 20px;
+            position: relative;
+            padding-left: 20px;
+            border-left: 2px solid #e5e7eb;
+        }
+        .exp-item::before {
+            content: "";
+            position: absolute;
+            left: -6px;
+            top: 5px;
+            width: 10px;
+            height: 10px;
+            background: #3b82f6;
+            border-radius: 50%;
+        }
+        .exp-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+        .exp-role {
+            font-weight: 800;
+            font-size: 11pt;
+            color: #111827;
+        }
+        .exp-date {
+            font-size: 9pt;
+            color: #6b7280;
+            font-weight: 600;
+        }
+        .exp-company {
+            font-weight: 600;
+            color: #3b82f6;
+            font-size: 10pt;
+            margin-bottom: 8px;
+        }
+        .exp-bullets {
+            margin: 0;
+            padding-left: 15px;
+            list-style-type: square;
+        }
+        .exp-bullets li {
+            margin-bottom: 5px;
+        }
+        .skill-pill {
+            display: inline-block;
+            background: #f3f4f6;
+            color: #1f2937;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 9pt;
+            font-weight: 600;
+            margin: 0 4px 6px 0;
+        }
+        .proj-item {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+        .proj-name {
+            font-weight: 800;
+            font-size: 11pt;
+            margin-bottom: 2px;
+        }
+        .proj-tech {
+            font-size: 9pt;
+            color: #3b82f6;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            {% set initials = personal.get('name', 'Y N').split(' ') | map('first') | join('') | upper %}
+            <div class="avatar-circle">{{ initials[:2] }}</div>
+            
+            <h1 class="sidebar-name">{{ personal.get('name', 'Your Name') }}</h1>
+            <div class="sidebar-title">
+                {% if experience %}{{ experience[0].get('role', 'Professional') }}{% else %}Professional{% endif %}
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Contact</div>
+                <div class="sidebar-item">
+                    <div class="sidebar-label">Email</div>
+                    <div class="sidebar-value">{{ personal.get('email', '') }}</div>
+                </div>
+                <div class="sidebar-item">
+                    <div class="sidebar-label">Phone</div>
+                    <div class="sidebar-value">{{ personal.get('phone', '') }}</div>
+                </div>
+                <div class="sidebar-item">
+                    <div class="sidebar-label">Location</div>
+                    <div class="sidebar-value">{{ personal.get('location', '') }}</div>
+                </div>
+                {% if personal.get('linkedin') %}
+                <div class="sidebar-item">
+                    <div class="sidebar-label">LinkedIn</div>
+                    <div class="sidebar-value">{{ personal.get('linkedin') }}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if skills %}
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Skills</div>
+                {% for skill in skills %}
+                <div class="skill-pill" style="background: rgba(59, 130, 246, 0.2); color: #fff;">{{ skill }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if education %}
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Education</div>
+                {% for edu in education %}
+                <div class="sidebar-item" style="margin-bottom: 15px;">
+                    <div style="font-weight: 700; font-size: 10pt;">{{ edu.get('degree', '') }}</div>
+                    <div style="color: #9ca3af; font-size: 9pt;">{{ edu.get('school', '') }}</div>
+                    <div style="color: #6b7280; font-size: 8.5pt;">{{ edu.get('year', '') }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="main">
+            {% if summary %}
+            <div class="main-section">
+                <div class="main-section-title">About Me</div>
+                <p style="margin: 0;">{{ summary }}</p>
+            </div>
+            {% endif %}
+
+            {% if experience %}
+            <div class="main-section">
+                <div class="main-section-title">Work Experience</div>
+                {% for exp in experience %}
+                <div class="exp-item">
+                    <div class="exp-header">
+                        <div class="exp-role">{{ exp.get('role', '') }}</div>
+                        <div class="exp-date">{{ exp.get('from', '') }} - {{ exp.get('to', '') }}</div>
+                    </div>
+                    <div class="exp-company">{{ exp.get('company', '') }}</div>
+                    {% if exp.get('bullets') %}
+                    <ul class="exp-bullets">
+                        {% for point in exp.get('bullets') %}
+                        <li>{{ point }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if projects %}
+            <div class="main-section">
+                <div class="main-section-title">Personal Projects</div>
+                {% for proj in projects %}
+                <div class="proj-item">
+                    <div class="proj-name">{{ proj.get('name', '') }}</div>
+                    <div class="proj-tech">{{ proj.get('tech', '') }}</div>
+                    <p style="margin: 0; font-size: 9.5pt;">{{ proj.get('description', '') }}</p>
+                    {% if proj.get('link') %}
+                    <div style="margin-top: 5px; font-size: 8.5pt; color: #6b7280;">🔗 {{ proj.get('link') }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if certifications %}
+            <div class="main-section">
+                <div class="main-section-title">Certifications</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    {% for cert in certifications %}
+                    <div style="border: 1px solid #f3f4f6; padding: 10px; border-radius: 8px;">
+                        <div style="font-weight: 700;">{{ cert.get('name', '') }}</div>
+                        <div style="font-size: 8.5pt; color: #6b7280;">{{ cert.get('issuer', '') }} | {{ cert.get('date', '') }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
