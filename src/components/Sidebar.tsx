@@ -114,6 +114,7 @@ const navSections: NavSection[] = [
         roles: ['SUPER_ADMIN', 'ADMIN'],
         items: [
             { label: 'Users', href: '/admin/users', icon: '👤', roles: ['SUPER_ADMIN', 'ADMIN'], permission: 'manage_users' },
+            { label: 'Project History', href: '/admin/project-history', icon: '📜', roles: ['SUPER_ADMIN'] },
             { label: 'Security', href: '/reports', icon: '⚠️' },
             { label: 'Notifications', href: '/notifications', icon: '🔔' },
             { label: 'Settings', href: '/admin/settings', icon: '⚙️' },
