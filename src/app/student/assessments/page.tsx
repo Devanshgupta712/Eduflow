@@ -48,6 +48,7 @@ function StudentAssessmentsContent() {
     const [preflightAssignment, setPreflightAssignment] = useState<any>(null);
     // Pending screenshot for next heartbeat
     const pendingScreenshotRef = useRef<{screenshot?: string; description?: string} | null>(null);
+    const [preflightStreams, setPreflightStreams] = useState<{ cam: MediaStream; screen: MediaStream } | null>(null);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const heartbeatRef = useRef<any>(null);
@@ -435,8 +436,9 @@ function StudentAssessmentsContent() {
             {preflightAssignment && !activeSubmission && typeof document !== 'undefined' && createPortal(
                 <PreflightChecklist
                     title={preflightAssignment.title}
-                    onReady={() => {
+                    onReady={(streams) => {
                         const assignment = preflightAssignment;
+                        setPreflightStreams(streams);
                         setPreflightAssignment(null);
                         startSession(assignment);
                     }}
@@ -454,6 +456,7 @@ function StudentAssessmentsContent() {
                 }}>
                     <ProctoringOverlay 
                         isActive={isProctoringActive && !submitDone}
+                        initialStreams={preflightStreams}
                         onViolation={(type, screenshot, description) => {
                             if (type === 'NO_FACE' || type === 'MULTI_FACE') {
                                 setFaceViolationCount(prev => prev + 1);

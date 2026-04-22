@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 
-interface ProctoringProps {
+interface ProctoringOverlayProps {
   isActive: boolean;
+  initialStreams?: { cam: MediaStream | null; screen: MediaStream | null };
   onViolation: (type: 'NO_FACE' | 'MULTI_FACE' | 'MIC_SILENT' | 'SCREEN_STOPPED' | 'FULLSCREEN_EXIT' | 'HIGH_NOISE', screenshot?: string, description?: string) => void;
   onMetricsUpdate: (metrics: { faceCount: number; volume: number; isScreenActive: boolean }) => void;
 }
 
-export default function ProctoringOverlay({ isActive, onViolation, onMetricsUpdate }: ProctoringProps) {
+export default function ProctoringOverlay({ isActive, initialStreams, onViolation, onMetricsUpdate }: ProctoringOverlayProps) {
   const [streams, setStreams] = useState<{ cam: MediaStream | null; screen: MediaStream | null }>({ cam: null, screen: null });
   const [faceCount, setFaceCount] = useState<number | null>(null);
   const [volume, setVolume] = useState(0);
@@ -57,14 +58,24 @@ export default function ProctoringOverlay({ isActive, onViolation, onMetricsUpda
       await window.faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
       setModelLoaded(true);
 
-      // 2. Request Camera & Audio
-      const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      // 2. Request Camera & Screen (unless provided by parent)
+      let camStream: MediaStream;
+      let screenStream: MediaStream;
+
+      if (initialStreams?.cam && initialStreams?.screen) {
+        camStream = initialStreams.cam;
+        screenStream = initialStreams.screen;
+        console.log('[Proctoring] Using provided pre-flight streams');
+      } else {
+        // 2. Request Camera & Audio
+        camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        // 3. Request Screen Share
+        screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        console.log('[Proctoring] Requested new streams');
+      }
+
       camStreamRef.current = camStream;
-      
-      // 3. Request Screen Share
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       screenStreamRef.current = screenStream;
-      
       setStreams({ cam: camStream, screen: screenStream });
 
       if (videoRef.current) {

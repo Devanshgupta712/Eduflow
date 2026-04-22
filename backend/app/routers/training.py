@@ -2083,22 +2083,28 @@ Return ONLY a JSON object in this EXACT format, with no extra text:
 }}
 IMPORTANT: 'answer' must be the 0-based INDEX of the correct option in the 'options' array (0=A, 1=B, 2=C, 3=D)."""
     elif body.task_type.upper() == "CODING":
-        # Build example question slots to show the AI exactly how many to generate
-        example_qs = ",\n    ".join([
-            f'{{"index": {i}, "question": "Problem {i+1} statement here — be specific and detailed", "initial_code": "# starter code for problem {i+1}\\n", "constraints": ["constraint 1", "constraint 2"], "hints": ["hint 1"]}}'
-            for i in range(body.question_count)
-        ])
-        format_instr = f"""Create EXACTLY {body.question_count} distinct coding problems about "{body.topic}".
-Return ONLY a JSON object in this EXACT format with ALL {body.question_count} questions in the array:
+        format_instr = f"""Create EXACTLY {body.question_count} distinct and high-quality coding problems about "{body.topic}".
+Return ONLY a JSON object in this EXACT format:
 {{
-  "title": "concise lab title",
-  "description": "overall objective of the coding lab",
+  "title": "Professional Lab Title",
+  "description": "2-3 sentence technical overview of the coding challenges",
   "questions": [
-    {example_qs}
+    {{
+      "index": 0,
+      "question": "DETAILED problem statement. Include specific requirements, expected behavior, and a real-world scenario if possible. Explain the logic clearly.",
+      "initial_code": "starter code with appropriate function signatures or boilerplate",
+      "constraints": ["e.g. O(n) time complexity", "e.g. No external libraries"],
+      "hints": ["technical tip 1", "logic hint 2"]
+    }}
   ],
   "estimated_hours": {max(1, body.question_count // 2)}
 }}
-IMPORTANT: The "questions" array MUST contain EXACTLY {body.question_count} items. Each problem must be unique and clearly described."""
+IMPORTANT: The "questions" array MUST contain EXACTLY {body.question_count} unique items.
+For '{body.difficulty}' level:
+- If Beginner: Use simple syntax, basic loops/conditionals, and very clear instructions.
+- If Intermediate: Include data structures (lists, dicts), modularity, and error handling.
+- If Advanced/Expert: Include algorithm optimization, complex data structures, edge cases, and architectural best practices.
+Each problem must be technical, accurate, and challenging enough for the selected difficulty."""
     else:
         format_instr = f"""Create EXACTLY {body.question_count} specific requirements/steps for this {body.task_type} task.
 Return ONLY a JSON object in this EXACT format:
@@ -2141,7 +2147,7 @@ Please tailor the complexity, vocabulary, and scenarios specifically to the {bod
                         json={
                             "model": model_name,
                             "messages": [
-                                {"role": "system", "content": "You are an expert software trainer. Return ONLY valid JSON. No markdown, no explanation."},
+                                {"role": "system", "content": "You are a world-class software engineering instructor. Your task is to generate highly practical, industry-relevant coding challenges or MCQs. Ensure technical accuracy, clear explanations, and follow the requested JSON format strictly. No conversational filler."},
                                 {"role": "user", "content": prompt}
                             ],
                             "temperature": 0.5,
