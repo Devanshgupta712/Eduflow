@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 
 interface ProctoringOverlayProps {
   isActive: boolean;
-  initialStreams?: { cam: MediaStream | null; screen: MediaStream | null };
+  initialStreams?: { cam: MediaStream | null; screen: MediaStream | null } | null;
   onViolation: (type: 'NO_FACE' | 'MULTI_FACE' | 'MIC_SILENT' | 'SCREEN_STOPPED' | 'FULLSCREEN_EXIT' | 'HIGH_NOISE', screenshot?: string, description?: string) => void;
   onMetricsUpdate: (metrics: { faceCount: number; volume: number; isScreenActive: boolean }) => void;
 }
@@ -63,8 +63,8 @@ export default function ProctoringOverlay({ isActive, initialStreams, onViolatio
       let screenStream: MediaStream;
 
       if (initialStreams?.cam && initialStreams?.screen) {
-        camStream = initialStreams.cam;
-        screenStream = initialStreams.screen;
+        camStream = initialStreams.cam!;
+        screenStream = initialStreams.screen!;
         console.log('[Proctoring] Using provided pre-flight streams');
       } else {
         // 2. Request Camera & Audio

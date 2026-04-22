@@ -456,7 +456,7 @@ function StudentAssessmentsContent() {
                 }}>
                     <ProctoringOverlay 
                         isActive={isProctoringActive && !submitDone}
-                        initialStreams={preflightStreams}
+                        initialStreams={preflightStreams || undefined}
                         onViolation={(type, screenshot, description) => {
                             if (type === 'NO_FACE' || type === 'MULTI_FACE') {
                                 setFaceViolationCount(prev => prev + 1);
