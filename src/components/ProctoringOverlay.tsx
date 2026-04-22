@@ -21,6 +21,8 @@ export default function ProctoringOverlay({ isActive, onViolation, onMetricsUpda
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const requestRef = useRef<number | null>(null);
+  const camStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (!isActive) {
@@ -57,9 +59,11 @@ export default function ProctoringOverlay({ isActive, onViolation, onMetricsUpda
 
       // 2. Request Camera & Audio
       const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      camStreamRef.current = camStream;
       
       // 3. Request Screen Share
       const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      screenStreamRef.current = screenStream;
       
       setStreams({ cam: camStream, screen: screenStream });
 
@@ -124,7 +128,7 @@ export default function ProctoringOverlay({ isActive, onViolation, onMetricsUpda
         onMetricsUpdate({
           faceCount: count,
           volume: volume,
-          isScreenActive: streams.screen?.active || false
+          isScreenActive: screenStreamRef.current?.active || false
         });
       } catch (e) {
         console.warn('Face detection cycle failed', e);
@@ -152,10 +156,24 @@ export default function ProctoringOverlay({ isActive, onViolation, onMetricsUpda
   };
 
   const stopStreams = () => {
-    if (streams.cam) streams.cam.getTracks().forEach(t => t.stop());
-    if (streams.screen) streams.screen.getTracks().forEach(t => t.stop());
+    if (camStreamRef.current) {
+        camStreamRef.current.getTracks().forEach(t => {
+            t.stop();
+            console.log(`[Proctoring] Stopped cam track: ${t.label}`);
+        });
+        camStreamRef.current = null;
+    }
+    if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(t => {
+            t.stop();
+            console.log(`[Proctoring] Stopped screen track: ${t.label}`);
+        });
+        screenStreamRef.current = null;
+    }
     if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    if (audioContextRef.current) audioContextRef.current.close();
+    if (audioContextRef.current) {
+        try { audioContextRef.current.close(); } catch(e) {}
+    }
     setStreams({ cam: null, screen: null });
   };
 

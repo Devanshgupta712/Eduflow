@@ -51,6 +51,7 @@ function StudentAssessmentsContent() {
 
     const containerRef = useRef<HTMLDivElement>(null);
     const heartbeatRef = useRef<any>(null);
+    const submitDoneRef = useRef(false);
 
     useEffect(() => { loadAssignments(); }, []);
 
@@ -71,7 +72,7 @@ function StudentAssessmentsContent() {
         };
 
         const onFullscreenChange = () => {
-            if (!document.fullscreenElement && !submitDone) {
+            if (!document.fullscreenElement && !submitDoneRef.current && activeSubmission) {
                 setFullscreenExitCount(prev => prev + 1);
                 triggerGracePeriod('FULLSCREEN_EXIT');
             }
@@ -146,6 +147,7 @@ function StudentAssessmentsContent() {
 
     const resumeFullscreen = async () => {
         if (containerRef.current) {
+            if (document.fullscreenElement === containerRef.current) return;
             try {
                 await containerRef.current.requestFullscreen();
                 if ('keyboard' in navigator && (navigator as any).keyboard && (navigator as any).keyboard.lock) {
@@ -301,8 +303,11 @@ function StudentAssessmentsContent() {
             if (res.ok) {
                 const data = await res.json().catch(() => ({}));
                 setFinalScore(data.score !== undefined ? data.score : (data.marks !== undefined ? data.marks : null));
+                submitDoneRef.current = true;
                 setSubmitDone(true);
-                if (document.fullscreenElement) document.exitFullscreen();
+                if (document.fullscreenElement) {
+                    try { await document.exitFullscreen(); } catch(e) {}
+                }
                 setTimeout(() => {
                     setActiveSubmission(null);
                     setSessionId(null);

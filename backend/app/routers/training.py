@@ -2627,7 +2627,7 @@ async def submit_assessment(
             if total > 0:
                 correct_count = 0
                 for i, q in enumerate(questions):
-                    selected_raw = student_answers.get(str(i)) or student_answers.get(i)
+                    selected_raw = student_answers.get(str(i)) if str(i) in student_answers else student_answers.get(i)
                     correct = q.get("answer", -1)
                     try:
                         correct = int(correct)
@@ -2726,8 +2726,14 @@ async def submit_assessment(
                         # Exclude single digit strings which are likely unintentional MCQ selections
                         if code.strip().isdigit() and len(code.strip()) == 1:
                             continue
+                        
+                        try:
+                            # If key is numeric, use it. Otherwise (e.g. 'content'), use 1 as default problem index.
+                            prob_num = int(idx) + 1 if str(idx).isdigit() else 1
+                        except:
+                            prob_num = 1
                             
-                        student_code_block += f"### PROBLEM {int(idx)+1}:\n{code}\n\n"
+                        student_code_block += f"### PROBLEM {prob_num}:\n{code}\n\n"
                         code_count += 1
                         
                 if not student_code_block:
@@ -2778,6 +2784,22 @@ async def submit_assessment(
                         bg_session.responses = jl.dumps(resp)
                         
                         await bg_db.commit()
+
+                        # ── SYNC TO ASSIGNMENTSUBMISSION ──
+                        if bg_session.reference_type == "ASSIGNMENT":
+                            from app.models.project import AssignmentSubmission as ASUB
+                            # Open another session for the sync to be safe
+                            async with AsyncSessionLocal() as sync_db:
+                                res_asub = await sync_db.execute(select(ASUB).where(
+                                    ASUB.assignment_id == bg_session.reference_id,
+                                    ASUB.student_id == bg_session.student_id
+                                ))
+                                sub_to_update = res_asub.scalars().first()
+                                if sub_to_update:
+                                    sub_to_update.marks = int(ai_score)
+                                    sub_to_update.feedback = ai_feedback
+                                    await sync_db.commit()
+                                    print(f"[AI Grading] ✅ Synced score {int(ai_score)}% to AssignmentSubmission for student {bg_session.student_id}")
                         print(f"[AI Grading] ✅ Session {session_id} successfully graded: {ai_score}%")
             except Exception as bg_err:
                 print(f"[AI Grading Background] ❌ EXCEPTION: {bg_err}")
