@@ -169,50 +169,14 @@ export default function PreflightChecklist({ title, onReady, onCancel }: Preflig
                         )}
                     </div>
 
-                    {/* Step 2: Fullscreen */}
-                    <div style={{
-                        display: 'flex', alignItems: 'center', gap: '14px',
-                        padding: '16px 20px', borderRadius: '16px',
-                        background: fullscreenActive ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
-                        border: `1px solid ${fullscreenActive ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)'}`,
-                        opacity: camGranted ? 1 : 0.4,
-                        pointerEvents: camGranted ? 'auto' : 'none',
-                        transition: 'all 0.3s'
-                    }}>
-                        <div style={{
-                            width: '40px', height: '40px', borderRadius: '12px',
-                            background: fullscreenActive ? '#10b981' : 'rgba(255,255,255,0.1)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '18px', flexShrink: 0, transition: 'all 0.3s'
-                        }}>
-                            {fullscreenActive ? '✅' : '🖥️'}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                            <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Fullscreen Mode</div>
-                            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '2px' }}>
-                                {fullscreenActive ? 'Fullscreen active' : 'Required to prevent tab switching'}
-                            </div>
-                        </div>
-                        {!fullscreenActive && (
-                            <button onClick={requestFullscreen} style={{
-                                padding: '8px 18px', borderRadius: '10px', border: 'none',
-                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                                color: '#fff', fontWeight: 700, fontSize: '12px', cursor: 'pointer',
-                                transition: 'transform 0.2s', flexShrink: 0
-                            }}>
-                                Enable
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Step 3: Screen Share */}
+                    {/* Step 2: Screen Share */}
                     <div style={{
                         display: 'flex', alignItems: 'center', gap: '14px',
                         padding: '16px 20px', borderRadius: '16px',
                         background: screenGranted ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
                         border: `1px solid ${screenGranted ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)'}`,
-                        opacity: fullscreenActive ? 1 : 0.4,
-                        pointerEvents: fullscreenActive ? 'auto' : 'none',
+                        opacity: camGranted ? 1 : 0.4,
+                        pointerEvents: camGranted ? 'auto' : 'none',
                         transition: 'all 0.3s'
                     }}>
                         <div style={{
@@ -238,6 +202,42 @@ export default function PreflightChecklist({ title, onReady, onCancel }: Preflig
                                 transition: 'transform 0.2s', flexShrink: 0
                             }}>
                                 Share
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Step 3: Fullscreen */}
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: '14px',
+                        padding: '16px 20px', borderRadius: '16px',
+                        background: fullscreenActive ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${fullscreenActive ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                        opacity: screenGranted ? 1 : 0.4,
+                        pointerEvents: screenGranted ? 'auto' : 'none',
+                        transition: 'all 0.3s'
+                    }}>
+                        <div style={{
+                            width: '40px', height: '40px', borderRadius: '12px',
+                            background: fullscreenActive ? '#10b981' : 'rgba(255,255,255,0.1)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '18px', flexShrink: 0, transition: 'all 0.3s'
+                        }}>
+                            {fullscreenActive ? '✅' : '🖥️'}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Fullscreen Mode</div>
+                            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '2px' }}>
+                                {fullscreenActive ? 'Fullscreen active' : 'Required to prevent tab switching'}
+                            </div>
+                        </div>
+                        {!fullscreenActive && (
+                            <button onClick={requestFullscreen} style={{
+                                padding: '8px 18px', borderRadius: '10px', border: 'none',
+                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                color: '#fff', fontWeight: 700, fontSize: '12px', cursor: 'pointer',
+                                transition: 'transform 0.2s', flexShrink: 0
+                            }}>
+                                Enable
                             </button>
                         )}
                     </div>

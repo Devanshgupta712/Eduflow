@@ -206,41 +206,167 @@ async def optimize_resume(resume_json: Dict[str, Any], jd_json: Dict[str, Any], 
     response_str = await get_groq_completion(messages, temperature=0.3, max_tokens=3000)
     return json.loads(response_str)
 
+async def structure_user_data(user_input: Dict[str, Any]) -> Dict[str, Any]:
+    """2. structure_user_data(user_input) - Convert raw user input into structured JSON for generator."""
+    system_prompt = """You are a precise data architect. Convert the user's raw input details into a clean, structured JSON format.
+    Do NOT add any information not provided by the user. Simply organize it.
+    
+    EXPECTED OUTPUT:
+    {
+      "personal": {"name": "", "email": "", ...},
+      "raw_experience": "...",
+      "raw_projects": "...",
+      "raw_skills": "..."
+    }"""
+    
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Structure these user details:\n{json.dumps(user_input)}"}
+    ]
+    
+    # Using low temperature for structuring
+    response_str = await get_groq_completion(messages, temperature=0.1, max_tokens=1000)
+    return json.loads(response_str)
+
+async def generate_resume(user_data: Dict[str, Any], jd_data: Dict[str, Any]) -> Dict[str, Any]:
+    """3. generate_resume(user_data, jd_data) - Create final resume JSON."""
+    system_prompt = """You are an expert ATS resume writer. Generate a complete, professional resume JSON based on the user's data and the job description.
+    
+    STRICT RULES:
+    1. NEVER hallucinate experience, companies, or projects.
+    2. ONLY use the provided user data.
+    3. Optimize the tone and keywords based on the Job Description analysis.
+    4. Maintain a professional, concise tone.
+    
+    OUTPUT FORMAT (STRICT JSON ONLY):
+    {
+      "summary": "2 short sentences",
+      "skills": ["Skill1", "Skill2"],
+      "experience": [
+        {
+          "company": "Company Name",
+          "role": "Job Title",
+          "from": "Start Date",
+          "to": "End Date",
+          "bullets": ["Action verb + Result-oriented bullet"]
+        }
+      ],
+      "projects": [
+        {
+          "name": "Project Name",
+          "tech": "Stack",
+          "description": "Short impactful description"
+        }
+      ]
+    }"""
+    
+    user_content = f"USER DATA:\n{json.dumps(user_data)}\n\nJD ANALYSIS:\n{json.dumps(jd_data)}"
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_content}
+    ]
+    
+    # Feature 2 generate_resume temperature = 0.5
+    response_str = await get_groq_completion(messages, temperature=0.5, max_tokens=3000)
+    return json.loads(response_str)
+
 async def enhance_resume(resume_text: str, job_description: str, retries: int = 2) -> Dict[str, Any]:
-    """Main pipeline function to chain all steps."""
+    """Feature 1: Resume Enhancer Pipeline (4-steps)"""
     if not resume_text or not job_description:
         raise HTTPException(status_code=400, detail="Resume text and Job Description are required")
         
     try:
-        # Step 1: Analyze Job Description
+        # Step 1: analyze_jd
         jd_analysis = await analyze_jd(job_description)
         
-        # Step 2: Parse Resume
+        # Step 2: parse_resume
         parsed_resume = await parse_resume(resume_text)
         
-        # Step 3: Analyze Gap
+        # Step 3: analyze_gap
         gap_analysis = await analyze_gap(parsed_resume, jd_analysis)
         
-        # Step 4: Optimize Resume
+        # Step 4: optimize_resume
         optimized_resume = await optimize_resume(parsed_resume, jd_analysis, gap_analysis)
         
-        # Validation Layer: Ensure structure is correct
-        required_keys = ["summary", "skills", "experience", "projects"]
-        for key in required_keys:
-            if key not in optimized_resume:
-                # Fallback or simple fix if missing
-                optimized_resume[key] = parsed_resume.get(key, [] if key != "summary" else "")
-                
-        return optimized_resume
+        # Step 5: Match Score Calculation
+        match_score = calculate_match_score(parsed_resume, jd_analysis)
+        
+        # Validation and Insights
+        final_resume = validate_resume_json(optimized_resume, parsed_resume)
+        
+        return {
+            "resume": final_resume,
+            "original_parsed": parsed_resume,
+            "match_score": match_score,
+            "keywords": {
+                "jd_skills": list(jd_analysis.get("skills", [])),
+                "matched_skills": list(set([s.lower() for s in parsed_resume.get("skills", [])]).intersection(set([s.lower() for s in jd_analysis.get("skills", [])])))
+            },
+            "insights": {
+                "missing_skills": gap_analysis.get("missing_skills", []),
+                "weak_sections": gap_analysis.get("weak_sections", []),
+                "improvements": gap_analysis.get("improvements", [])
+            }
+        }
         
     except (json.JSONDecodeError, ValueError) as e:
-        # Automatic retry for invalid JSON
         if retries > 0:
-            print(f"Invalid JSON or parsing error, retrying pipeline... ({retries} left)")
             return await enhance_resume(resume_text, job_description, retries - 1)
-        raise HTTPException(status_code=500, detail=f"Failed to produce valid JSON output after retries: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to produce valid JSON output after retries")
     except Exception as e:
-        print(f"Error in enhance_resume pipeline: {str(e)}")
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=f"Resume enhancement failed: {str(e)}")
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Enhancement failed: {str(e)}")
+
+async def generate_full_resume(user_input: Dict[str, Any], job_description: str, retries: int = 2) -> Dict[str, Any]:
+    """Feature 2: Full AI Resume Generator Pipeline (3-steps)"""
+    if not user_input or not job_description:
+        raise HTTPException(status_code=400, detail="User input and Job Description are required")
+        
+    try:
+        # Step 1: analyze_jd
+        jd_analysis = await analyze_jd(job_description)
+        
+        # Step 2: structure_user_data
+        structured_data = await structure_user_data(user_input)
+        
+        # Step 3: generate_resume
+        final_resume = await generate_resume(structured_data, jd_analysis)
+        
+        # Validation
+        return validate_resume_json(final_resume)
+        
+    except (json.JSONDecodeError, ValueError) as e:
+        if retries > 0:
+            return await generate_full_resume(user_input, job_description, retries - 1)
+        raise HTTPException(status_code=500, detail="Failed to generate valid resume JSON after retries")
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+
+def validate_resume_json(resume_json: Dict[str, Any], fallback: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Validation layer to ensure strict JSON structure."""
+    required_keys = ["summary", "skills", "experience", "projects"]
+    for key in required_keys:
+        if key not in resume_json:
+            if fallback and key in fallback:
+                resume_json[key] = fallback[key]
+            else:
+                resume_json[key] = [] if key != "summary" else ""
+    return resume_json
+
+def calculate_match_score(resume_json: Dict[str, Any], jd_analysis: Dict[str, Any]) -> int:
+    """Simple algorithm to calculate match score (0-100)."""
+    try:
+        resume_skills = set([s.lower() for s in resume_json.get("skills", [])])
+        jd_skills = set([s.lower() for s in jd_analysis.get("skills", [])])
+        
+        if not jd_skills: return 70 # Default if JD has no skills
+        
+        match_count = len(resume_skills.intersection(jd_skills))
+        score = int((match_count / len(jd_skills)) * 100)
+        
+        # Add base score for having content
+        score = min(95, score + 20) 
+        return max(30, score)
+    except:
+        return 50

@@ -1052,18 +1052,27 @@ async def list_assignments(
         
         # If student, attach their personal AI grade / submission
         student_sub = None
+        current_status = "PENDING"
         if user.role == Role.STUDENT:
+            # 1. Check for formal submission
             sub_res = await db.execute(select(AssignmentSubmission).where(AssignmentSubmission.assignment_id == a.id, AssignmentSubmission.student_id == user.id))
             sub = sub_res.scalars().first()
+            
+            # 2. Check for assessment session (even if submission record hasn't synced yet)
+            sess_res = await db.execute(select(AssessmentSession).where(
+                AssessmentSession.reference_id == a.id,
+                AssessmentSession.student_id == user.id,
+                AssessmentSession.reference_type == "ASSIGNMENT"
+            ).order_by(AssessmentSession.created_at.desc()))
+            sess = sess_res.scalars().first()
+
+            if sess:
+                if sess.status in [SessionStatus.COMPLETED, SessionStatus.FAILED, SessionStatus.EXPIRED]:
+                    current_status = "COMPLETED"
+                elif sess.status == SessionStatus.ACTIVE:
+                    current_status = "IN_PROGRESS"
+
             if sub:
-                # Try to find the associated assessment session for detailed reports
-                sess_res = await db.execute(select(AssessmentSession).where(
-                    AssessmentSession.reference_id == a.id,
-                    AssessmentSession.student_id == user.id,
-                    AssessmentSession.reference_type == "ASSIGNMENT"
-                ).order_by(AssessmentSession.created_at.desc()))
-                sess = sess_res.scalars().first()
-                
                 student_sub = {
                     "id": sub.id,
                     "marks": sub.marks,
@@ -1072,6 +1081,7 @@ async def list_assignments(
                     "content": sub.content,
                     "session_responses": sess.responses if sess else None
                 }
+                current_status = "COMPLETED"
 
         out.append({
             "id": a.id, "title": a.title, "description": a.description,
@@ -1085,7 +1095,7 @@ async def list_assignments(
             "submission_count": sub_count.scalar() or 0,
             "created_at": a.created_at.isoformat() if a.created_at else None,
             "my_submission": student_sub,
-            "status": "COMPLETED" if student_sub else "PENDING"
+            "status": current_status
         })
     return out
 

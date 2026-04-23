@@ -409,12 +409,12 @@ function StudentAssessmentsContent() {
                                         </div>
                                     )}
                                 </div>
-                                <span className={`badge ${a.my_submission ? 'badge-success' : 'badge-warning'}`}>
-                                    {a.my_submission ? 'Completed' : 'Pending'}
+                                <span className={`badge ${a.status === 'COMPLETED' ? 'badge-success' : (a.status === 'IN_PROGRESS' ? 'badge-info' : 'badge-warning')}`}>
+                                    {a.status === 'COMPLETED' ? 'Completed' : (a.status === 'IN_PROGRESS' ? 'In Progress' : 'Pending')}
                                 </span>
                             </div>
                             <p className="text-muted text-sm">{a.description?.slice(0, 100)}...</p>
-                                {a.my_submission ? (
+                                {a.status === 'COMPLETED' ? (
                                     <button
                                         className="btn btn-secondary"
                                         style={{ width: '100%', marginTop: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--primary)', color: 'var(--primary)', fontWeight: 700 }}
@@ -425,11 +425,11 @@ function StudentAssessmentsContent() {
                                 ) : (
                                     <button
                                         className="btn btn-primary"
-                                        style={{ width: '100%', marginTop: 'auto' }}
+                                        style={{ width: '100%', marginTop: 'auto', background: a.status === 'IN_PROGRESS' ? 'var(--info)' : 'var(--primary)' }}
                                         onClick={() => setPreflightAssignment(a)}
                                         disabled={isOverdue(a.due_date)}
                                     >
-                                        Start Secure Assessment
+                                        {a.status === 'IN_PROGRESS' ? '🚀 Resume Secure Assessment' : 'Start Secure Assessment'}
                                     </button>
                                 )}
                         </div>

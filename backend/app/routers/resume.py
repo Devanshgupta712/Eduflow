@@ -12,7 +12,7 @@ from app.routers.auth import get_current_user
 from app.models.user import User
 from app.models.resume import Resume
 from pydantic import BaseModel
-from app.utils.resume_ai_pipeline import enhance_resume, get_groq_completion
+from app.utils.resume_ai_pipeline import enhance_resume, generate_full_resume, get_groq_completion
 
 router = APIRouter(prefix="/api/resume", tags=["Resume"])
 
@@ -258,40 +258,19 @@ async def ai_generate_resume(
     req: AIGenerateRequest,
     current_user: User = Depends(get_current_user)
 ):
-    system_prompt = """You are an expert ATS resume writer.
-Generate a professional resume JSON based ON THE DETAILS PROVIDED.
-
-STRICT RULES:
-1. SUMMARY: Max 2 SHORT sentences. 
-2. NO HALLUCINATION: Do not invent jobs, companies, or projects that aren't in the raw details.
-3. If a section is missing from raw details, return it as an empty array [].
-4. ATS OPTIMIZED: Use keywords from the JD, but only if they match the user's actual background.
-5. NO THIRD PERSON: Never use 'He', 'She', or the user's name. Use implied first person (e.g., 'Motivated student...' instead of 'Devansh is a...').
-
-You MUST respond with pure JSON only:
-{
-  "summary": "2 short sentences",
-  "skills": ["Skill1", "Skill2"],
-  "experience": [{"company": "Name", "role": "Title", "from": "Date", "to": "Date", "bullets": ["Action verb + impact"]}],
-  "education": [{"degree": "Name", "school": "Name", "year": "Year", "grade": ""}],
-  "projects": [{"name": "Name", "tech": "Stack", "description": "Description", "link": ""}]
-}
-Return only raw JSON."""
-
-    prompt = f"USER RAW DETAILS:\n{json.dumps(req.basic_details, indent=2)}\n\nTARGET JOB DESCRIPTION:\n{req.job_description}"
-    
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt}
-    ]
-    
-    generated_json_str = await get_groq_completion(messages, temperature=0.7)
-    
+    """
+    Full AI Resume Generator Pipeline:
+    1. analyze_jd
+    2. structure_user_data
+    3. generate_resume
+    """
     try:
-        parsed = json.loads(generated_json_str)
-        return {"data": parsed}
+        generated_data = await generate_full_resume(req.basic_details, req.job_description)
+        return {"data": generated_data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse AI response into JSON: {str(e)}")
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"AI Generation failed: {str(e)}")
 
 import io
 from fastapi import UploadFile, File
@@ -339,6 +318,9 @@ async def ai_rewrite_section(
         raise HTTPException(status_code=404, detail="Resume not found")
 
     system_prompt = f"You are an expert resume writer. Improve the following {req.section_name} section to be more professional, action-oriented, and impactful."
+    if req.section_name == "Skills":
+        system_prompt += " Return a clean, comma-separated list of technical and soft skills. Do NOT include categories or extra text."
+    
     if req.job_description:
         system_prompt += f" Ensure it uses keywords relevant to this job description: {req.job_description[:500]}..."
         

@@ -129,6 +129,16 @@ export default function VisualResumeEditor() {
         
         if (section === 'Summary') {
           handleChange(prev => ({ ...prev, summary: data.content }));
+        } else if (section === 'Skills') {
+          // AI returns a comma separated list or similar
+          const newSkills = data.content.split(',').map((s: string) => s.trim()).filter(Boolean);
+          handleChange(prev => ({ ...prev, skills: newSkills }));
+        } else if (section === 'Project Description' && index !== null) {
+          handleChange(prev => {
+            const newProjects = [...prev.projects];
+            newProjects[index].description = data.content;
+            return { ...prev, projects: newProjects };
+          });
         } else if (section === 'Experience Bullet' && index !== null) {
           // data.content contains the new bullet
           const bulletParts = index.toString().split('-');
@@ -254,7 +264,16 @@ export default function VisualResumeEditor() {
 
             {activeTab === 'skills' && (
               <div>
-                <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px' }}>Skills (Press Enter to add)</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', margin: 0 }}>Skills (Press Enter to add)</p>
+                  <button 
+                    onClick={() => handleAiRewrite('Skills', resume.skills.join(', '), -2)}
+                    disabled={rewritingIndex === -2}
+                    className="btn" style={{ fontSize: '11px', padding: '2px 6px', background: 'var(--primary-glow)', color: 'var(--primary)', border: 'none', borderRadius: '4px' }}
+                  >
+                    {rewritingIndex === -2 ? '✨ Improving...' : '✨ Smart Grouping'}
+                  </button>
+                </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
                   {resume.skills.map((skill: string, idx: number) => (
                     <div key={idx} style={{ background: 'var(--primary-glow)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '16px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -346,6 +365,14 @@ export default function VisualResumeEditor() {
                       <input type="text" placeholder="Project Name" value={proj.name || ''} onChange={e => handleChange(prev => { const n = [...prev.projects]; n[idx].name = e.target.value; return {...prev, projects: n}; })} className="form-input" />
                       <input type="text" placeholder="Tech Stack (e.g. React, Node)" value={proj.tech || ''} onChange={e => handleChange(prev => { const n = [...prev.projects]; n[idx].tech = e.target.value; return {...prev, projects: n}; })} className="form-input" />
                       <input type="url" placeholder="Link (Optional)" value={proj.link || ''} onChange={e => handleChange(prev => { const n = [...prev.projects]; n[idx].link = e.target.value; return {...prev, projects: n}; })} className="form-input" />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>Description</label>
+                        <button 
+                          onClick={() => handleAiRewrite('Project Description', proj.description, idx)}
+                          disabled={rewritingIndex === idx}
+                          style={{ fontSize: '10px', background: 'transparent', border: 'none', color: 'var(--primary)', cursor: 'pointer', textDecoration: 'underline' }}
+                        >✨ AI Improve</button>
+                      </div>
                       <textarea placeholder="Description" rows={3} value={proj.description || ''} onChange={e => handleChange(prev => { const n = [...prev.projects]; n[idx].description = e.target.value; return {...prev, projects: n}; })} className="form-input" />
                     </div>
                   </div>

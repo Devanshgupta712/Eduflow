@@ -18,6 +18,12 @@ export default function ResumeEnhanceMode() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [aiStatus, setAiStatus] = useState('');
+  const [results, setResults] = useState<{ score: number, insights: any, original: any, enhanced: any, keywords?: any } | null>(null);
+  const [showDiff, setShowDiff] = useState(false);
+  const [acceptedSkills, setAcceptedSkills] = useState<string[]>([]);
+  const [ignoredSkills, setIgnoredSkills] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -77,38 +83,78 @@ export default function ResumeEnhanceMode() {
     }
   };
 
-  const handleEnhance = async () => {
-    if (!resumeText.trim() || !jobDescription.trim()) {
-      alert("Please provide both your resume and the job description.");
-      return;
-    }
-    
-    setIsEnhancing(true);
-    try {
-        // 1. Call AI to generate enhanced JSON
-        const aiRes = await fetch(`${API_BASE}/api/resume/enhance`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${getToken()}`
-            },
-            body: JSON.stringify({
-                resume_text: resumeText,
-                job_description: jobDescription
-            })
-        });
-        
-        let enhancedData = null;
-        if (aiRes.ok) {
-            const result = await aiRes.json();
-            enhancedData = result.data;
-        } else {
-            const errorData = await aiRes.json();
-            throw new Error(errorData.detail || "AI enhancement failed");
+    const handleEnhance = async () => {
+        if (!resumeText.trim() || !jobDescription.trim()) {
+            alert("Please provide both your resume and the job description.");
+            return;
         }
+        
+        setIsEnhancing(true);
+        setAiStatus('Analyzing Job Description...');
+        
+        // Progress simulation for better UX
+        const statusSteps = [
+            { text: 'Parsing Resume Structure...', delay: 2000 },
+            { text: 'Finding Experience Gaps...', delay: 4000 },
+            { text: 'Optimizing Skills & Keywords...', delay: 7000 },
+            { text: 'Finalizing ATS Alignment...', delay: 9000 }
+        ];
+        
+        statusSteps.forEach(step => {
+            setTimeout(() => {
+                if (setIsEnhancing) setAiStatus(step.text);
+            }, step.delay);
+        });
 
-        // 2. Save the enhanced JSON back to the Resume object
-        if (enhancedData && resumeId) {
+        try {
+            const aiRes = await fetch(`${API_BASE}/api/resume/enhance`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getToken()}`
+                },
+                body: JSON.stringify({
+                    resume_text: resumeText,
+                    job_description: jobDescription
+                })
+            });
+            
+            if (!aiRes.ok) {
+                const errorData = await aiRes.json();
+                throw new Error(errorData.detail || "AI enhancement failed");
+            }
+            
+            const result = await aiRes.json();
+            const { resume: enhancedData, match_score, insights, original_parsed } = result.data;
+
+            setResults({ 
+                score: match_score, 
+                insights, 
+                original: original_parsed,
+                enhanced: enhancedData,
+                keywords: result.data.keywords
+            });
+            
+            // Initialize accepted skills with what AI already put in 'enhanced', 
+            // but we'll let users add more from the 'missing_skills' list.
+            setAcceptedSkills([]); 
+            setStep(3); // Move to results/suggestions step
+        } catch (err: any) {
+            console.error(err);
+            alert(err.message || "An error occurred during AI processing.");
+        } finally {
+            setIsEnhancing(false);
+        }
+    };
+
+    const handleFinalSave = async () => {
+        if (!results || !resumeId) return;
+        
+        setIsSaving(true);
+        try {
+            // Combine enhanced data with user-accepted suggestions
+            const finalSkills = [...new Set([...results.enhanced.skills, ...acceptedSkills])];
+            
             const updateRes = await fetch(`${API_BASE}/api/resume/${resumeId}`, {
                 method: 'PUT',
                 headers: {
@@ -116,29 +162,27 @@ export default function ResumeEnhanceMode() {
                     'Authorization': `Bearer ${getToken()}`
                 },
                 body: JSON.stringify({
-                    summary: enhancedData.summary || "",
-                    skills: JSON.stringify(enhancedData.skills || []),
-                    experience: JSON.stringify(enhancedData.experience || []),
-                    education: JSON.stringify(enhancedData.education || []),
-                    projects: JSON.stringify(enhancedData.projects || []),
+                    summary: results.enhanced.summary || "",
+                    skills: JSON.stringify(finalSkills),
+                    experience: JSON.stringify(results.enhanced.experience || []),
+                    education: JSON.stringify(results.enhanced.education || []),
+                    projects: JSON.stringify(results.enhanced.projects || []),
                     original_resume_text: resumeText,
                     job_description: jobDescription
                 })
             });
             
             if (updateRes.ok) {
-                // Navigate to visual editor to review/edit
                 router.push(`/student/resume/visual?id=${resumeId}`);
             } else {
-                throw new Error("Failed to save enhanced resume");
+                throw new Error("Failed to save final resume");
             }
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setIsSaving(false);
         }
-    } catch (err: any) {
-        console.error(err);
-        alert(err.message || "An error occurred during AI processing.");
-        setIsEnhancing(false);
-    }
-  };
+    };
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
@@ -152,8 +196,9 @@ export default function ResumeEnhanceMode() {
         
         {/* Progress Tracker */}
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-8)' }}>
-            <div style={{ flex: 1, padding: '12px', background: step >= 1 ? 'var(--primary)' : 'var(--bg-secondary)', color: step >= 1 ? '#fff' : 'var(--text-secondary)', borderRadius: '8px', fontWeight: 700, textAlign: 'center' }}>1. Your Resume</div>
-            <div style={{ flex: 1, padding: '12px', background: step >= 2 ? 'var(--primary)' : 'var(--bg-secondary)', color: step >= 2 ? '#fff' : 'var(--text-secondary)', borderRadius: '8px', fontWeight: 700, textAlign: 'center' }}>2. Job Description</div>
+            <div style={{ flex: 1, padding: '12px', background: step >= 1 ? 'var(--primary)' : 'var(--bg-secondary)', color: step >= 1 ? '#fff' : 'var(--text-secondary)', borderRadius: '8px', fontWeight: 700, textAlign: 'center', fontSize: '13px' }}>1. Your Resume</div>
+            <div style={{ flex: 1, padding: '12px', background: step >= 2 ? 'var(--primary)' : 'var(--bg-secondary)', color: step >= 2 ? '#fff' : 'var(--text-secondary)', borderRadius: '8px', fontWeight: 700, textAlign: 'center', fontSize: '13px' }}>2. Job Description</div>
+            <div style={{ flex: 1, padding: '12px', background: step >= 3 ? 'var(--primary)' : 'var(--bg-secondary)', color: step >= 3 ? '#fff' : 'var(--text-secondary)', borderRadius: '8px', fontWeight: 700, textAlign: 'center', fontSize: '13px' }}>3. Results</div>
         </div>
 
         {step === 1 && (
@@ -244,11 +289,163 @@ export default function ResumeEnhanceMode() {
                         {isEnhancing ? (
                           <>
                             <div className="spinner-small" style={{ border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
-                            <span>AI is restructuring your resume... (this takes ~10s)</span>
+                            <span>{aiStatus}</span>
                           </>
                         ) : '✨ Enhance Resume'}
                     </button>
                 </div>
+            </div>
+        )}
+
+        {step === 3 && results && (
+            <div className="card shadow-lg" style={{ padding: 'var(--space-8)', border: '1px solid var(--primary)', background: 'linear-gradient(to bottom right, var(--bg-primary), var(--primary-glow))' }}>
+                <div style={{ textAlign: 'center', marginBottom: 'var(--space-8)' }}>
+                    <div style={{ 
+                        width: '100px', height: '100px', borderRadius: '50%', background: 'var(--primary)', 
+                        color: '#fff', fontSize: '32px', fontWeight: 800, display: 'flex', 
+                        alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
+                        boxShadow: '0 0 20px var(--primary-glow)'
+                    }}>
+                        {results.score}%
+                    </div>
+                    <h2 style={{ fontSize: '24px', fontWeight: 800 }}>ATS Match Score</h2>
+                    <p style={{ color: 'var(--text-secondary)' }}>Your resume has been successfully optimized for the target role.</p>
+                </div>
+
+                {/* Keyword Match Visualization */}
+                <div style={{ marginBottom: 'var(--space-8)', padding: '20px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        🎯 Keyword Match Analysis
+                    </h3>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                        {results.keywords?.jd_skills.map((skill: string, idx: number) => {
+                            const isMatched = results.keywords.matched_skills.includes(skill.toLowerCase());
+                            return (
+                                <span key={idx} style={{ 
+                                    padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                                    background: isMatched ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                    color: isMatched ? 'rgb(22, 163, 74)' : 'rgb(220, 38, 38)',
+                                    border: `1px solid ${isMatched ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                                    display: 'flex', alignItems: 'center', gap: '6px'
+                                }}>
+                                    {isMatched ? '✓' : '✗'} {skill}
+                                </span>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
+                    <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                        <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginBottom: '12px', textTransform: 'uppercase' }}>Smart Skill Suggestions</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {results.insights.missing_skills.length > 0 ? results.insights.missing_skills.map((s:string, i:number) => {
+                                const isAccepted = acceptedSkills.includes(s);
+                                const isIgnored = ignoredSkills.includes(s);
+                                if (isIgnored) return null;
+                                return (
+                                    <div key={i} style={{ 
+                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+                                        padding: '10px', background: isAccepted ? 'var(--success-glow)' : 'var(--bg-primary)', 
+                                        borderRadius: '8px', border: '1px solid var(--border)' 
+                                    }}>
+                                        <span style={{ fontSize: '13px', fontWeight: 600 }}>{s}</span>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            {!isAccepted && (
+                                                <button 
+                                                    onClick={() => setAcceptedSkills([...acceptedSkills, s])}
+                                                    style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--success)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                                >
+                                                    Accept
+                                                </button>
+                                            )}
+                                            <button 
+                                                onClick={() => setIgnoredSkills([...ignoredSkills, s])}
+                                                style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }}
+                                            >
+                                                {isAccepted ? 'Remove' : 'Ignore'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            }) : <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No new skills suggested.</span>}
+                        </div>
+                    </div>
+                    <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                        <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--success)', marginBottom: '12px', textTransform: 'uppercase' }}>Content Improvements</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {results.insights.improvements.slice(0, 4).map((imp:string, i:number) => (
+                                <div key={i} style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                    <span style={{ color: 'var(--success)' }}>✔</span>
+                                    <span>{imp}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: 'var(--space-8)' }}>
+                    <button 
+                        onClick={() => setShowDiff(!showDiff)}
+                        className="btn btn-outline"
+                        style={{ flex: 1, padding: '16px', fontWeight: 700 }}
+                    >
+                        {showDiff ? 'Hide Comparison' : '🔍 Compare Changes'}
+                    </button>
+                    <button 
+                        onClick={handleFinalSave}
+                        disabled={isSaving}
+                        className="btn btn-primary"
+                        style={{ flex: 1.5, padding: '16px', fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                        {isSaving ? (
+                            <>
+                                <div className="spinner-small" style={{ border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
+                                Saving...
+                            </>
+                        ) : 'Continue to Editor →'}
+                    </button>
+                </div>
+
+                {showDiff && results.original && (
+                    <div style={{ marginTop: 'var(--space-8)', paddingTop: 'var(--space-8)', borderTop: '2px solid var(--border)' }}>
+                        <h3 style={{ fontSize: '20px', fontWeight: 800, marginBottom: 'var(--space-6)' }}>Before vs After Comparison</h3>
+                        
+                        {/* Summary Diff */}
+                        <div style={{ marginBottom: 'var(--space-6)' }}>
+                            <h4 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Summary Transformation</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                                <div style={{ padding: '16px', background: '#fff5f5', borderRadius: '8px', border: '1px solid #feb2b2', color: '#c53030', fontSize: '13px' }}>
+                                    <strong>Before:</strong><br />{results.original.summary || 'No summary provided.'}
+                                </div>
+                                <div style={{ padding: '16px', background: '#f0fff4', borderRadius: '8px', border: '1px solid #9ae6b4', color: '#276749', fontSize: '13px' }}>
+                                    <strong>After:</strong><br />{results.enhanced.summary}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Experience Diff */}
+                        <div style={{ marginBottom: 'var(--space-6)' }}>
+                            <h4 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Experience Improvements</h4>
+                            {results.enhanced.experience.map((exp: any, i: number) => {
+                                const origExp = results.original.experience?.[i] || {};
+                                return (
+                                    <div key={i} style={{ marginBottom: 'var(--space-4)', padding: '16px', background: 'var(--bg-secondary)', borderRadius: '12px' }}>
+                                        <div style={{ fontWeight: 700, marginBottom: '8px' }}>{exp.role} @ {exp.company}</div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                                            <ul style={{ margin: 0, paddingLeft: '18px', color: '#c53030', fontSize: '12px', listStyleType: 'circle' }}>
+                                                {(origExp.bullets || []).map((b: string, j: number) => <li key={j} style={{ marginBottom: '4px' }}>{b}</li>)}
+                                            </ul>
+                                            <ul style={{ margin: 0, paddingLeft: '18px', color: '#276749', fontSize: '12px', fontWeight: 600 }}>
+                                                {(exp.bullets || []).map((b: string, j: number) => <li key={j} style={{ marginBottom: '4px' }}>{b}</li>)}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
         )}
 
