@@ -230,6 +230,7 @@ function StudentAssessmentsContent() {
                 }
                 setContent(JSON.stringify(savedAnsMap));
                 
+                setShowAssignmentReview(false);
                 setIsProctoringActive(true);
                 setSubmitDone(false);
                 setFile(null);
