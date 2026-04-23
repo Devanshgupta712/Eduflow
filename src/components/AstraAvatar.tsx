@@ -329,21 +329,41 @@ export default function AstraAvatar() {
                 },
                 body: JSON.stringify({
                     message: text,
-                    history: messages
+                    history: messages.map(m => ({ role: m.role, content: m.content }))
                 })
             });
 
-            if (res.ok) {
-                const data = await res.json();
-                const aiResponse = data.reply;
-                setMessages(prev => [...prev, { role: 'assistant', content: aiResponse }]);
-                speak(aiResponse);
-            } else {
-                const errMessage = "I'm having trouble connecting to my servers right now.";
-                setMessages(prev => [...prev, { role: 'assistant', content: errMessage }]);
-                speak(errMessage);
+            if (!res.ok) throw new Error('API Error');
+
+            const reader = res.body?.getReader();
+            const decoder = new TextDecoder();
+            let assistantContent = '';
+
+            setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+            if (!reader) throw new Error('Empty response');
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                assistantContent += chunk;
+
+                setMessages(prev => {
+                    const others = prev.slice(0, -1);
+                    return [...others, { role: 'assistant', content: assistantContent }];
+                });
             }
+
+            decoder.decode();
+
+            if (assistantContent && isOpen) {
+                speak(assistantContent);
+            }
+
         } catch (error) {
+            console.error('Chat Error:', error);
             const errMessage = "Sorry, my systems are currently offline.";
             setMessages(prev => [...prev, { role: 'assistant', content: errMessage }]);
             speak(errMessage);
