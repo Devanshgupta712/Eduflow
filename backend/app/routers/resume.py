@@ -43,6 +43,7 @@ class ResumeUpdateRequest(BaseModel):
     languages: Optional[str] = None
     original_resume_text: Optional[str] = None
     job_description: Optional[str] = None
+    layout_metadata: Optional[str] = None
 
 class AIEnhanceRequest(BaseModel):
     resume_text: str
@@ -182,6 +183,7 @@ async def update_resume(
     if req.languages is not None: resume.languages = req.languages
     if req.original_resume_text is not None: resume.original_resume_text = req.original_resume_text
     if req.job_description is not None: resume.job_description = req.job_description
+    if req.layout_metadata is not None: resume.layout_metadata = req.layout_metadata
     
     # If this is being set as primary, unset others for this user
     if req.is_primary:
@@ -368,7 +370,8 @@ async def export_resume_pdf(
         "education": json.loads(resume.education) if resume.education else [],
         "projects": json.loads(resume.projects) if resume.projects else [],
         "certifications": json.loads(resume.certifications) if resume.certifications else [],
-        "languages": json.loads(resume.languages) if resume.languages else []
+        "languages": json.loads(resume.languages) if resume.languages else [],
+        "layout": json.loads(resume.layout_metadata or "{}")
     }
 
     # Setup Jinja environment

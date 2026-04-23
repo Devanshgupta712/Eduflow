@@ -28,6 +28,7 @@ class Resume(Base):
     projects: Mapped[str] = mapped_column(Text, default="[]")
     certifications: Mapped[str] = mapped_column(Text, default="[]")
     languages: Mapped[str] = mapped_column(Text, default="[]")
+    layout_metadata: Mapped[str] = mapped_column(Text, default="{}")
     
     # Context used for AI generation (Mode 2 & 3)
     original_resume_text: Mapped[str | None] = mapped_column(Text, nullable=True)

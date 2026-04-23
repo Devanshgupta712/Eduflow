@@ -98,44 +98,30 @@ async def analyze_jd(job_description: str) -> Dict[str, Any]:
     response_str = await get_groq_completion(messages, temperature=0.2, max_tokens=800)
     return json.loads(response_str)
 
-async def parse_resume(resume_text: str) -> Dict[str, Any]:
-    """2. parse_resume(resume_text) - Convert resume into structured JSON."""
-    system_prompt = """You are a highly accurate resume parser. Convert the provided unstructured resume text into a clean, structured JSON format.
+async def parse_resume_with_layout(resume_text: str) -> Dict[str, Any]:
+    """Parses resume text and analyzes layout structure."""
+    prompt = f"""
+    Analyze the following resume text and extract the content into JSON.
+    ALSO identify the original layout structure.
     
-    STRICT RULES:
-    1. Do NOT invent or hallucinate any details.
-    2. Maintain the user's original experience and project details accurately.
-    3. Ensure the JSON structure matches exactly.
+    TEXT:
+    {resume_text}
     
-    EXPECTED OUTPUT:
-    {
-      "summary": "Full professional summary",
-      "skills": ["Skill 1", "Skill 2"],
-      "experience": [
-        {
-          "company": "Company Name",
-          "role": "Job Title",
-          "from": "Start Date",
-          "to": "End Date",
-          "bullets": ["Achievement 1", "Achievement 2"]
-        }
-      ],
-      "projects": [
-        {
-          "name": "Project Name",
-          "tech": "Technologies used",
-          "description": "Short project description"
-        }
-      ]
-    }"""
-    
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Parse this resume text:\n{resume_text}"}
-    ]
-    
-    response_str = await get_groq_completion(messages, temperature=0.1, max_tokens=1200)
-    return json.loads(response_str)
+    JSON format:
+    {{
+        "content": {{ "summary": "", "skills": [], "experience": [], "projects": [], "education": [] }},
+        "layout": {{ 
+            "columns": 1 or 2,
+            "font_feel": "serif" or "sans-serif",
+            "section_order": ["summary", "skills", "experience", etc],
+            "alignment": "left" or "center",
+            "has_sidebar": true or false
+        }}
+    }}
+    """
+    messages = [{"role": "user", "content": prompt}]
+    res = await get_groq_completion(messages, temperature=0.1, json_mode=True)
+    return json.loads(res)
 
 async def analyze_gap(resume_json: Dict[str, Any], jd_json: Dict[str, Any]) -> Dict[str, Any]:
     """3. analyze_gap(resume_json, jd_json) - Compare resume against JD requirements."""
@@ -163,48 +149,31 @@ async def analyze_gap(resume_json: Dict[str, Any], jd_json: Dict[str, Any]) -> D
     response_str = await get_groq_completion(messages, temperature=0.3, max_tokens=1000)
     return json.loads(response_str)
 
-async def optimize_resume(resume_json: Dict[str, Any], jd_json: Dict[str, Any], gap_json: Dict[str, Any]) -> Dict[str, Any]:
-    """4. optimize_resume(resume_json, jd_json, gap_json) - Improve sections and align with JD."""
-    system_prompt = """You are an elite ATS resume optimizer. Your goal is to rewrite the resume content to perfectly align with the Job Description while addressing the identified gaps.
+async def optimize_resume_inplace(resume_json: Dict[str, Any], jd_analysis: Dict[str, Any], gap_analysis: Dict[str, Any], layout: Dict[str, Any]) -> Dict[str, Any]:
+    """Optimizes content while strictly preserving length and structure."""
+    prompt = f"""
+    You are an expert editor. Improve the content of this resume to match the Job Description.
     
-    STRICT RULES:
-    1. NEVER hallucinate or invent experience, companies, or projects.
-    2. ONLY improve existing content by rephrasing, emphasizing relevant keywords, and using strong action verbs.
-    3. Use action verbs like: 'Spearheaded', 'Optimized', 'Orchestrated', 'Architected'.
-    4. Bullet points must be concise, punchy, and result-oriented.
-    5. Ensure high keyword density for terms found in the JD analysis.
-    6. Maintain a clean, professional ATS-friendly structure.
+    CRITICAL CONSTRAINT:
+    - PRESERVE the original structure exactly.
+    - KEEP the text length similar to the original to avoid layout breaking.
+    - DO NOT add new sections.
+    - ONLY rewrite the text to be more impactful and keyword-rich.
     
-    OUTPUT FORMAT (STRICT JSON ONLY):
-    {
-      "summary": "Improved summary",
-      "skills": ["Skill 1", "Skill 2"],
-      "experience": [
-        {
-          "company": "Company Name",
-          "role": "Job Title",
-          "from": "Start Date",
-          "to": "End Date",
-          "bullets": ["Enhanced bullet 1", "Enhanced bullet 2"]
-        }
-      ],
-      "projects": [
-        {
-          "name": "Project Name",
-          "tech": "Stack",
-          "description": "Improved description"
-        }
-      ]
-    }"""
+    JOB DESCRIPTION:
+    {jd_analysis}
     
-    user_content = f"RESUME JSON:\n{json.dumps(resume_json)}\n\nJD ANALYSIS:\n{json.dumps(jd_json)}\n\nGAPS ANALYSIS:\n{json.dumps(gap_json)}"
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_content}
-    ]
+    GAPS IDENTIFIED:
+    {gap_analysis}
     
-    response_str = await get_groq_completion(messages, temperature=0.3, max_tokens=3000)
-    return json.loads(response_str)
+    ORIGINAL RESUME:
+    {resume_json}
+    
+    Return the optimized resume JSON.
+    """
+    messages = [{"role": "user", "content": prompt}]
+    res = await get_groq_completion(messages, temperature=0.3, json_mode=True)
+    return json.loads(res)
 
 async def structure_user_data(user_input: Dict[str, Any]) -> Dict[str, Any]:
     """2. structure_user_data(user_input) - Convert raw user input into structured JSON for generator."""
@@ -279,14 +248,16 @@ async def enhance_resume(resume_text: str, job_description: str, retries: int = 
         # Step 1: analyze_jd
         jd_analysis = await analyze_jd(job_description)
         
-        # Step 2: parse_resume
-        parsed_resume = await parse_resume(resume_text)
+        # Step 2: parse_resume (and analyze layout)
+        parsed_data = await parse_resume_with_layout(resume_text)
+        parsed_resume = parsed_data["content"]
+        layout_metadata = parsed_data["layout"]
         
         # Step 3: analyze_gap
         gap_analysis = await analyze_gap(parsed_resume, jd_analysis)
         
-        # Step 4: optimize_resume
-        optimized_resume = await optimize_resume(parsed_resume, jd_analysis, gap_analysis)
+        # Step 4: optimize_resume (Strictly in-place)
+        optimized_resume = await optimize_resume_inplace(parsed_resume, jd_analysis, gap_analysis, layout_metadata)
         
         # Step 5: Match Score Calculation
         match_score = calculate_match_score(parsed_resume, jd_analysis)
@@ -297,6 +268,7 @@ async def enhance_resume(resume_text: str, job_description: str, retries: int = 
         return {
             "resume": final_resume,
             "original_parsed": parsed_resume,
+            "layout_metadata": layout_metadata,
             "match_score": match_score,
             "keywords": {
                 "jd_skills": list(jd_analysis.get("skills", [])),

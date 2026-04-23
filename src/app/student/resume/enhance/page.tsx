@@ -132,7 +132,8 @@ export default function ResumeEnhanceMode() {
                 insights, 
                 original: original_parsed,
                 enhanced: enhancedData,
-                keywords: result.data.keywords
+                keywords: result.data.keywords,
+                layout: result.data.layout_metadata
             });
             
             // Initialize accepted skills with what AI already put in 'enhanced', 
@@ -168,7 +169,8 @@ export default function ResumeEnhanceMode() {
                     education: JSON.stringify(results.enhanced.education || []),
                     projects: JSON.stringify(results.enhanced.projects || []),
                     original_resume_text: resumeText,
-                    job_description: jobDescription
+                    job_description: jobDescription,
+                    layout_metadata: JSON.stringify(results.layout || {})
                 })
             });
             
