@@ -189,25 +189,29 @@ export default function AstraAvatar() {
             posRef.current = { x: window.innerWidth - 120, y: window.innerHeight - 120 };
             targetRef.current = { x: window.innerWidth - 120, y: window.innerHeight - 120 };
             
-            const handleMouseMove = (e: MouseEvent) => {
-                if (isFlying && !isOpen) {
-                    // Offset by 40px so it doesn't block the exact cursor spot
-                    targetRef.current = { x: e.clientX + 40, y: e.clientY + 40 };
-                    
-                    // Keep within bounds
-                    if (targetRef.current.x > window.innerWidth - 100) targetRef.current.x = window.innerWidth - 100;
-                    if (targetRef.current.y > window.innerHeight - 100) targetRef.current.y = window.innerHeight - 100;
-                }
-            };
-            
-            window.addEventListener('mousemove', handleMouseMove);
-            
             let animationFrameId: number;
-            const updatePosition = () => {
+            let lastChangeTime = 0;
+
+            const updatePosition = (time: number) => {
                 if (!isOpen && isFlying) {
-                    // Smooth lerp following
-                    posRef.current.x += (targetRef.current.x - posRef.current.x) * 0.08;
-                    posRef.current.y += (targetRef.current.y - posRef.current.y) * 0.08;
+                    // Check distance to target
+                    const dx = targetRef.current.x - posRef.current.x;
+                    const dy = targetRef.current.y - posRef.current.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // If close to target, or every few seconds, pick a new target
+                    if (distance < 20 || time - lastChangeTime > 4000) {
+                        // Keep within bounds, avoiding extreme edges
+                        targetRef.current = {
+                            x: Math.random() * (window.innerWidth - 200) + 50,
+                            y: Math.random() * (window.innerHeight - 200) + 50
+                        };
+                        lastChangeTime = time;
+                    }
+
+                    // Smooth, slow lerp for a relaxed floating effect
+                    posRef.current.x += dx * 0.015;
+                    posRef.current.y += dy * 0.015;
                     
                     if (containerRef.current) {
                         containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
@@ -229,10 +233,9 @@ export default function AstraAvatar() {
                 animationFrameId = requestAnimationFrame(updatePosition);
             };
             
-            updatePosition();
+            animationFrameId = requestAnimationFrame(updatePosition);
             
             return () => {
-                window.removeEventListener('mousemove', handleMouseMove);
                 cancelAnimationFrame(animationFrameId);
             };
         }
