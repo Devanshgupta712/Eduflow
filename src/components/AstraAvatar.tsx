@@ -14,13 +14,15 @@ interface Message {
 // Props for the 3D Astra core
 interface AstraCoreProps {
     status: 'idle' | 'listening' | 'thinking' | 'speaking';
+    isWaving?: boolean;
 }
 
-function RobotAvatar({ status }: AstraCoreProps) {
+function RobotAvatar({ status, isWaving }: AstraCoreProps) {
     const group = useRef<THREE.Group>(null);
     const headRef = useRef<THREE.Mesh>(null);
     const leftEyeRef = useRef<THREE.Mesh>(null);
     const rightEyeRef = useRef<THREE.Mesh>(null);
+    const rightArmRef = useRef<THREE.Mesh>(null);
     
     // Status colors
     const color = status === 'listening' ? '#10b981' : // Green
@@ -51,6 +53,21 @@ function RobotAvatar({ status }: AstraCoreProps) {
                 headRef.current.rotation.x = Math.sin(t * 15) * 0.1;
             } else {
                 headRef.current.rotation.x = THREE.MathUtils.lerp(headRef.current.rotation.x, 0, 0.1);
+            }
+        }
+
+        // Arm animations (waving greeting)
+        if (rightArmRef.current) {
+            if (isWaving) {
+                // Raise arm and wave rapidly
+                rightArmRef.current.position.y = THREE.MathUtils.lerp(rightArmRef.current.position.y, 0.5, 0.1);
+                rightArmRef.current.rotation.z = Math.sin(t * 15) * 0.3 - 1.2; 
+                rightArmRef.current.rotation.x = Math.sin(t * 5) * 0.2;
+            } else {
+                // Return to normal idle hover
+                rightArmRef.current.position.y = THREE.MathUtils.lerp(rightArmRef.current.position.y, -0.1, 0.1);
+                rightArmRef.current.rotation.z = THREE.MathUtils.lerp(rightArmRef.current.rotation.z, 0.2, 0.1);
+                rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0, 0.1);
             }
         }
     });
@@ -110,7 +127,7 @@ function RobotAvatar({ status }: AstraCoreProps) {
             </mesh>
 
             {/* Right Hover Arm */}
-            <mesh position={[0.8, -0.1, 0]} rotation={[0, 0, 0.2]}>
+            <mesh ref={rightArmRef} position={[0.8, -0.1, 0]} rotation={[0, 0, 0.2]}>
                 <boxGeometry args={[0.3, 0.8, 0.3]} />
                 <meshStandardMaterial color="#ffffff" metalness={0.3} roughness={0.2} />
             </mesh>
@@ -137,6 +154,7 @@ export default function AstraAvatar() {
     const synthRef = useRef<SpeechSynthesis | null>(null);
     const [volume, setVolume] = useState(1); // 1 is 100% volume
     const [isFlying, setIsFlying] = useState(true); // Default to flying mode
+    const [isWaving, setIsWaving] = useState(false);
 
     // For flying animation
     const containerRef = useRef<HTMLDivElement>(null);
@@ -245,6 +263,12 @@ export default function AstraAvatar() {
     useEffect(() => {
         if (!isOpen) {
             stopAudioAndListening();
+            setIsWaving(false);
+        } else {
+            // Trigger waving animation when opened
+            setIsWaving(true);
+            const timer = setTimeout(() => setIsWaving(false), 3000);
+            return () => clearTimeout(timer);
         }
     }, [isOpen]);
 
@@ -566,7 +590,7 @@ export default function AstraAvatar() {
                     <ambientLight intensity={0.5} />
                     <directionalLight position={[10, 10, 5]} intensity={1} />
                     <Environment preset="city" />
-                    <RobotAvatar status={currentStatus} />
+                    <RobotAvatar status={currentStatus} isWaving={isWaving} />
                 </Canvas>
                 
                 {/* Tooltip hint when closed */}
