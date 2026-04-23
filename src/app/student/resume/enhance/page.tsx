@@ -19,7 +19,7 @@ export default function ResumeEnhanceMode() {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [aiStatus, setAiStatus] = useState('');
-  const [results, setResults] = useState<{ score: number, insights: any, original: any, enhanced: any, keywords?: any } | null>(null);
+  const [results, setResults] = useState<{ score: number, insights: any, original: any, enhanced: any, keywords?: any, layout?: any } | null>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [acceptedSkills, setAcceptedSkills] = useState<string[]>([]);
   const [ignoredSkills, setIgnoredSkills] = useState<string[]>([]);
