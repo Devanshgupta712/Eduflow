@@ -16,45 +16,111 @@ interface AstraCoreProps {
     status: 'idle' | 'listening' | 'thinking' | 'speaking';
 }
 
-function AstraCore({ status }: AstraCoreProps) {
-    const meshRef = useRef<THREE.Mesh>(null);
+function RobotAvatar({ status }: AstraCoreProps) {
+    const group = useRef<THREE.Group>(null);
+    const headRef = useRef<THREE.Mesh>(null);
+    const leftEyeRef = useRef<THREE.Mesh>(null);
+    const rightEyeRef = useRef<THREE.Mesh>(null);
     
-    // Dynamic properties based on status
-    const distort = status === 'speaking' ? 0.6 : status === 'thinking' ? 0.4 : 0.2;
-    const speed = status === 'speaking' ? 4 : status === 'thinking' ? 2 : 1;
-    const color = status === 'listening' ? '#10b981' : // Green for listening
-                  status === 'thinking' ? '#8b5cf6' : // Purple for thinking
-                  status === 'speaking' ? '#3b82f6' : // Blue for speaking
-                  '#6366f1'; // Default Indigo
-                  
+    // Status colors
+    const color = status === 'listening' ? '#10b981' : // Green
+                  status === 'thinking' ? '#8b5cf6' : // Purple
+                  status === 'speaking' ? '#3b82f6' : '#6366f1'; // Blue / Indigo
+
     useFrame((state) => {
-        if (meshRef.current) {
-            // Subtle pulsing scale when speaking
+        const t = state.clock.elapsedTime;
+        
+        if (group.current) {
+            // Bobbing hover motion
+            group.current.position.y = Math.sin(t * 2) * 0.1 - 0.5;
+            
+            // Look around slowly if idle, frantic if thinking
+            const lookSpeed = status === 'thinking' ? 5 : 1;
+            group.current.rotation.y = Math.sin(t * lookSpeed) * 0.2;
+            group.current.rotation.z = Math.cos(t * lookSpeed * 0.8) * 0.05;
+        }
+
+        // Blinking logic (close eyes occasionally)
+        const blink = Math.sin(t * 4) > 0.95 ? 0.1 : 1;
+        if (leftEyeRef.current) leftEyeRef.current.scale.y = blink;
+        if (rightEyeRef.current) rightEyeRef.current.scale.y = blink;
+
+        // Speaking animation (head tilts slightly up and down)
+        if (headRef.current) {
             if (status === 'speaking') {
-                const scale = 1 + Math.sin(state.clock.elapsedTime * 10) * 0.05;
-                meshRef.current.scale.set(scale, scale, scale);
+                headRef.current.rotation.x = Math.sin(t * 15) * 0.1;
             } else {
-                // Smoothly return to normal scale
-                meshRef.current.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
+                headRef.current.rotation.x = THREE.MathUtils.lerp(headRef.current.rotation.x, 0, 0.1);
             }
         }
     });
 
     return (
-        <Float speed={speed * 2} rotationIntensity={1} floatIntensity={2}>
-            <Sphere ref={meshRef} args={[1, 64, 64]}>
-                <MeshDistortMaterial
-                    color={color}
-                    envMapIntensity={1}
-                    clearcoat={1}
-                    clearcoatRoughness={0.1}
-                    metalness={0.8}
-                    roughness={0.2}
-                    distort={distort}
-                    speed={speed}
-                />
-            </Sphere>
-        </Float>
+        <group ref={group} scale={[0.8, 0.8, 0.8]}>
+            {/* Antenna */}
+            <mesh position={[0, 1.4, 0]}>
+                <cylinderGeometry args={[0.02, 0.02, 0.4]} />
+                <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
+            </mesh>
+            <mesh position={[0, 1.6, 0]}>
+                <sphereGeometry args={[0.12, 16, 16]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={status === 'speaking' ? 2 : 1} />
+            </mesh>
+
+            {/* Head */}
+            <mesh ref={headRef} position={[0, 0.8, 0]}>
+                <boxGeometry args={[1.2, 0.9, 1]} />
+                <meshStandardMaterial color="#ffffff" metalness={0.2} roughness={0.1} />
+                
+                {/* Face Screen (Black visor) */}
+                <mesh position={[0, 0, 0.51]}>
+                    <planeGeometry args={[1.0, 0.6]} />
+                    <meshStandardMaterial color="#0f172a" />
+                </mesh>
+
+                {/* Left Eye */}
+                <mesh ref={leftEyeRef} position={[-0.25, 0, 0.52]}>
+                    <sphereGeometry args={[0.1, 16, 16]} />
+                    <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} />
+                </mesh>
+
+                {/* Right Eye */}
+                <mesh ref={rightEyeRef} position={[0.25, 0, 0.52]}>
+                    <sphereGeometry args={[0.1, 16, 16]} />
+                    <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} />
+                </mesh>
+            </mesh>
+
+            {/* Body */}
+            <mesh position={[0, -0.1, 0]}>
+                <cylinderGeometry args={[0.5, 0.4, 0.9, 32]} />
+                <meshStandardMaterial color="#e2e8f0" metalness={0.5} roughness={0.2} />
+            </mesh>
+            
+            {/* Core / Heart */}
+            <mesh position={[0, 0, 0.45]}>
+                <sphereGeometry args={[0.25, 32, 32]} />
+                <MeshDistortMaterial color={color} emissive={color} emissiveIntensity={0.5} distort={0.4} speed={status === 'speaking' ? 4 : 1} />
+            </mesh>
+
+            {/* Left Hover Arm */}
+            <mesh position={[-0.8, -0.1, 0]} rotation={[0, 0, -0.2]}>
+                <boxGeometry args={[0.3, 0.8, 0.3]} />
+                <meshStandardMaterial color="#ffffff" metalness={0.3} roughness={0.2} />
+            </mesh>
+
+            {/* Right Hover Arm */}
+            <mesh position={[0.8, -0.1, 0]} rotation={[0, 0, 0.2]}>
+                <boxGeometry args={[0.3, 0.8, 0.3]} />
+                <meshStandardMaterial color="#ffffff" metalness={0.3} roughness={0.2} />
+            </mesh>
+            
+            {/* Hover Engine Glow (Bottom) */}
+            <mesh position={[0, -0.6, 0]}>
+                <cylinderGeometry args={[0.3, 0.3, 0.1, 32]} />
+                <meshStandardMaterial color="#0ea5e9" emissive="#0ea5e9" emissiveIntensity={1} />
+            </mesh>
+        </group>
     );
 }
 
@@ -483,7 +549,7 @@ export default function AstraAvatar() {
                     <ambientLight intensity={0.5} />
                     <directionalLight position={[10, 10, 5]} intensity={1} />
                     <Environment preset="city" />
-                    <AstraCore status={currentStatus} />
+                    <RobotAvatar status={currentStatus} />
                 </Canvas>
                 
                 {/* Tooltip hint when closed */}
