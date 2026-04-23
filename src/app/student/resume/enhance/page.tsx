@@ -102,7 +102,7 @@ export default function ResumeEnhanceMode() {
         
         statusSteps.forEach(step => {
             setTimeout(() => {
-                if (setIsEnhancing) setAiStatus(step.text);
+                if (isEnhancing) setAiStatus(step.text);
             }, step.delay);
         });
 
