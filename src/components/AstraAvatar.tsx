@@ -1,0 +1,449 @@
+'use client';
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { MeshDistortMaterial, Sphere, Float, Environment } from '@react-three/drei';
+import * as THREE from 'three';
+import { API_BASE, getStoredUser } from '@/lib/api';
+
+interface Message {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
+// Props for the 3D Astra core
+interface AstraCoreProps {
+    status: 'idle' | 'listening' | 'thinking' | 'speaking';
+}
+
+function AstraCore({ status }: AstraCoreProps) {
+    const meshRef = useRef<THREE.Mesh>(null);
+    
+    // Dynamic properties based on status
+    const distort = status === 'speaking' ? 0.6 : status === 'thinking' ? 0.4 : 0.2;
+    const speed = status === 'speaking' ? 4 : status === 'thinking' ? 2 : 1;
+    const color = status === 'listening' ? '#10b981' : // Green for listening
+                  status === 'thinking' ? '#8b5cf6' : // Purple for thinking
+                  status === 'speaking' ? '#3b82f6' : // Blue for speaking
+                  '#6366f1'; // Default Indigo
+                  
+    useFrame((state) => {
+        if (meshRef.current) {
+            // Subtle pulsing scale when speaking
+            if (status === 'speaking') {
+                const scale = 1 + Math.sin(state.clock.elapsedTime * 10) * 0.05;
+                meshRef.current.scale.set(scale, scale, scale);
+            } else {
+                // Smoothly return to normal scale
+                meshRef.current.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
+            }
+        }
+    });
+
+    return (
+        <Float speed={speed * 2} rotationIntensity={1} floatIntensity={2}>
+            <Sphere ref={meshRef} args={[1, 64, 64]}>
+                <MeshDistortMaterial
+                    color={color}
+                    envMapIntensity={1}
+                    clearcoat={1}
+                    clearcoatRoughness={0.1}
+                    metalness={0.8}
+                    roughness={0.2}
+                    distort={distort}
+                    speed={speed}
+                />
+            </Sphere>
+        </Float>
+    );
+}
+
+export default function AstraAvatar() {
+    const [isOpen, setIsOpen] = useState(false);
+    const [user, setUser] = useState<any>(null);
+    const [isListening, setIsListening] = useState(false);
+    const [isThinking, setIsThinking] = useState(false);
+    const [isSpeaking, setIsSpeaking] = useState(false);
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [inputValue, setInputValue] = useState('');
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const recognitionRef = useRef<any>(null);
+    const synthRef = useRef<SpeechSynthesis | null>(null);
+    const [volume, setVolume] = useState(1); // 1 is 100% volume
+
+    // Determine current status for 3D Core
+    const currentStatus = isSpeaking ? 'speaking' : isThinking ? 'thinking' : isListening ? 'listening' : 'idle';
+
+    // Initialize User, Speech Recognition and Synthesis
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const storedVol = localStorage.getItem('astra_volume');
+            if (storedVol !== null) {
+                setVolume(parseFloat(storedVol));
+            }
+            const stored = getStoredUser();
+            setUser(stored);
+
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                recognitionRef.current = new SpeechRecognition();
+                recognitionRef.current.continuous = false;
+                recognitionRef.current.interimResults = false;
+                recognitionRef.current.lang = 'en-US';
+
+                recognitionRef.current.onresult = (event: any) => {
+                    const transcript = event.results[0][0].transcript;
+                    handleSendMessage(transcript);
+                };
+
+                recognitionRef.current.onend = () => {
+                    setIsListening(false);
+                };
+            }
+            synthRef.current = window.speechSynthesis;
+            // Pre-load voices to avoid silent first-try in Chrome
+            if (synthRef.current.onvoiceschanged !== undefined) {
+                synthRef.current.onvoiceschanged = () => {
+                    synthRef.current?.getVoices();
+                };
+            }
+        }
+    }, []);
+
+    // Stop all speech and listening when window is closed
+    useEffect(() => {
+        if (!isOpen) {
+            stopAudioAndListening();
+        }
+    }, [isOpen]);
+
+    const stopAudioAndListening = () => {
+        if (synthRef.current) {
+            synthRef.current.cancel();
+        }
+        if (recognitionRef.current && isListening) {
+            recognitionRef.current.stop();
+        }
+        setIsSpeaking(false);
+        setIsListening(false);
+        setIsThinking(false);
+    };
+
+    const toggleListening = () => {
+        if (isSpeaking) {
+            if (synthRef.current) synthRef.current.cancel();
+            setIsSpeaking(false);
+        }
+
+        if (isListening) {
+            recognitionRef.current?.stop();
+            setIsListening(false);
+        } else {
+            try {
+                recognitionRef.current?.start();
+                setIsListening(true);
+            } catch (e) {
+                console.error("Speech recognition error:", e);
+            }
+        }
+    };
+
+    const speak = (text: string) => {
+        if (!synthRef.current) return;
+        
+        // Stop any ongoing speech
+        synthRef.current.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        // Find a good female voice (Google US English or similar)
+        const voices = synthRef.current.getVoices();
+        const preferredVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Samantha') || v.name.includes('Female')) || voices[0];
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+        }
+
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1; // Slightly higher pitch for a friendlier AI
+        utterance.volume = volume;
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+
+        synthRef.current.speak(utterance);
+    };
+
+    const handleSendMessage = async (text: string) => {
+        if (!text.trim()) return;
+
+        // Stop any ongoing speech when user sends a new message
+        if (synthRef.current) {
+            synthRef.current.cancel();
+            setIsSpeaking(false);
+        }
+
+        const newUserMessage = { role: 'user', content: text };
+        setMessages(prev => [...prev, newUserMessage as Message]);
+        setInputValue('');
+        setIsThinking(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/api/ai/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({
+                    message: text,
+                    history: messages
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const aiResponse = data.reply;
+                setMessages(prev => [...prev, { role: 'assistant', content: aiResponse }]);
+                speak(aiResponse);
+            } else {
+                const errMessage = "I'm having trouble connecting to my servers right now.";
+                setMessages(prev => [...prev, { role: 'assistant', content: errMessage }]);
+                speak(errMessage);
+            }
+        } catch (error) {
+            const errMessage = "Sorry, my systems are currently offline.";
+            setMessages(prev => [...prev, { role: 'assistant', content: errMessage }]);
+            speak(errMessage);
+        } finally {
+            setIsThinking(false);
+        }
+    };
+
+    const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newVol = parseFloat(e.target.value);
+        setVolume(newVol);
+        localStorage.setItem('astra_volume', newVol.toString());
+        // Do not interrupt current speech just for volume change, it will apply to next speech
+    };
+
+    // Auto-scroll chat
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [messages, isThinking]);
+
+    return (
+        <div style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            gap: '12px'
+        }}>
+            
+            {/* Chat Window */}
+            {isOpen && (
+                <div style={{
+                    width: '350px',
+                    height: '500px',
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '24px',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}>
+                    {/* Header */}
+                    <div style={{
+                        padding: '16px 20px',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        background: 'rgba(0, 0, 0, 0.2)'
+                    }}>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ 
+                                    width: '8px', 
+                                    height: '8px', 
+                                    borderRadius: '50%', 
+                                    background: currentStatus === 'idle' ? '#6366f1' : 
+                                                currentStatus === 'listening' ? '#10b981' : 
+                                                currentStatus === 'thinking' ? '#8b5cf6' : '#3b82f6',
+                                    boxShadow: `0 0 10px ${currentStatus === 'idle' ? '#6366f1' : currentStatus === 'listening' ? '#10b981' : currentStatus === 'thinking' ? '#8b5cf6' : '#3b82f6'}`
+                                }} />
+                                Astra 3D
+                            </h3>
+                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>AI Mentor & Counselor</span>
+                        </div>
+                        
+                        {/* Volume Control */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '14px' }}>{volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}</span>
+                            <input 
+                                type="range" 
+                                min="0" 
+                                max="1" 
+                                step="0.1" 
+                                value={volume} 
+                                onChange={handleVolumeChange}
+                                style={{ width: '60px', accentColor: 'var(--primary)' }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Chat Area */}
+                    <div ref={scrollRef} style={{
+                        flex: 1,
+                        padding: '20px',
+                        overflowY: 'auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '16px',
+                        scrollBehavior: 'smooth'
+                    }}>
+                        {messages.length === 0 && (
+                            <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '40px', fontSize: '14px' }}>
+                                <p>Hi {user?.name?.split(' ')[0] || 'there'}! I'm Astra.</p>
+                                <p>How can I help you today?</p>
+                            </div>
+                        )}
+                        {messages.map((msg, i) => (
+                            <div key={i} style={{
+                                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                                background: msg.role === 'user' ? 'var(--primary)' : 'rgba(255, 255, 255, 0.1)',
+                                color: '#fff',
+                                padding: '12px 16px',
+                                borderRadius: msg.role === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
+                                maxWidth: '85%',
+                                fontSize: '14px',
+                                lineHeight: '1.5'
+                            }}>
+                                {msg.content}
+                            </div>
+                        ))}
+                        {isThinking && (
+                            <div style={{ alignSelf: 'flex-start', color: '#8b5cf6', fontSize: '14px', padding: '12px 16px', background: 'rgba(139, 92, 246, 0.1)', borderRadius: '20px 20px 20px 4px' }}>
+                                Astra is thinking...
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Input Area */}
+                    <div style={{
+                        padding: '16px',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                        display: 'flex',
+                        gap: '12px',
+                        background: 'rgba(0, 0, 0, 0.2)'
+                    }}>
+                        <input
+                            type="text"
+                            value={inputValue}
+                            onChange={e => setInputValue(e.target.value)}
+                            onKeyPress={e => e.key === 'Enter' && handleSendMessage(inputValue)}
+                            placeholder="Type a message..."
+                            disabled={isThinking}
+                            style={{
+                                flex: 1,
+                                padding: '12px 16px',
+                                borderRadius: '20px',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                color: '#fff',
+                                outline: 'none',
+                                fontSize: '14px'
+                            }}
+                        />
+                        <button
+                            onClick={toggleListening}
+                            disabled={isThinking}
+                            style={{
+                                width: '44px',
+                                height: '44px',
+                                borderRadius: '50%',
+                                border: 'none',
+                                background: isListening ? '#ef4444' : 'var(--primary)',
+                                color: '#fff',
+                                cursor: isThinking ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                fontSize: '20px'
+                            }}
+                        >
+                            {isListening ? '🛑' : '🎤'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 3D Orb Container */}
+            <div 
+                onClick={() => setIsOpen(!isOpen)}
+                style={{
+                    width: isOpen ? '80px' : '100px',
+                    height: isOpen ? '80px' : '100px',
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    boxShadow: isOpen ? '0 0 0 transparent' : '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    overflow: 'hidden',
+                    transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                    transform: isOpen ? 'scale(1)' : 'scale(1.1)',
+                    position: 'relative'
+                }}
+            >
+                <Canvas camera={{ position: [0, 0, 3] }} style={{ pointerEvents: 'none' }}>
+                    <ambientLight intensity={0.5} />
+                    <directionalLight position={[10, 10, 5]} intensity={1} />
+                    <Environment preset="city" />
+                    <AstraCore status={currentStatus} />
+                </Canvas>
+                
+                {/* Tooltip hint when closed */}
+                {!isOpen && (
+                    <div style={{
+                        position: 'absolute',
+                        top: '-10px',
+                        right: '0',
+                        background: '#ef4444',
+                        color: 'white',
+                        fontSize: '10px',
+                        padding: '4px 8px',
+                        borderRadius: '10px',
+                        fontWeight: 'bold',
+                        animation: 'pulse 2s infinite'
+                    }}>
+                        Astra 3D
+                    </div>
+                )}
+            </div>
+
+            <style dangerouslySetInnerHTML={{__html: `
+                @keyframes slideUp {
+                    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.1); }
+                    100% { transform: scale(1); }
+                }
+            `}} />
+        </div>
+    );
+}
