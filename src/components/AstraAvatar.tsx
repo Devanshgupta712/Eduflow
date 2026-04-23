@@ -70,6 +70,12 @@ export default function AstraAvatar() {
     const recognitionRef = useRef<any>(null);
     const synthRef = useRef<SpeechSynthesis | null>(null);
     const [volume, setVolume] = useState(1); // 1 is 100% volume
+    const [isFlying, setIsFlying] = useState(true); // Default to flying mode
+
+    // For flying animation
+    const containerRef = useRef<HTMLDivElement>(null);
+    const posRef = useRef({ x: 0, y: 0 });
+    const targetRef = useRef({ x: 0, y: 0 });
 
     // Determine current status for 3D Core
     const currentStatus = isSpeaking ? 'speaking' : isThinking ? 'thinking' : isListening ? 'listening' : 'idle';
@@ -109,6 +115,62 @@ export default function AstraAvatar() {
             }
         }
     }, []);
+
+    // Flying logic
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            // Initial position bottom right
+            posRef.current = { x: window.innerWidth - 120, y: window.innerHeight - 120 };
+            targetRef.current = { x: window.innerWidth - 120, y: window.innerHeight - 120 };
+            
+            const handleMouseMove = (e: MouseEvent) => {
+                if (isFlying && !isOpen) {
+                    // Offset by 40px so it doesn't block the exact cursor spot
+                    targetRef.current = { x: e.clientX + 40, y: e.clientY + 40 };
+                    
+                    // Keep within bounds
+                    if (targetRef.current.x > window.innerWidth - 100) targetRef.current.x = window.innerWidth - 100;
+                    if (targetRef.current.y > window.innerHeight - 100) targetRef.current.y = window.innerHeight - 100;
+                }
+            };
+            
+            window.addEventListener('mousemove', handleMouseMove);
+            
+            let animationFrameId: number;
+            const updatePosition = () => {
+                if (!isOpen && isFlying) {
+                    // Smooth lerp following
+                    posRef.current.x += (targetRef.current.x - posRef.current.x) * 0.08;
+                    posRef.current.y += (targetRef.current.y - posRef.current.y) * 0.08;
+                    
+                    if (containerRef.current) {
+                        containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
+                        containerRef.current.style.right = 'auto';
+                        containerRef.current.style.bottom = 'auto';
+                        containerRef.current.style.left = '0px';
+                        containerRef.current.style.top = '0px';
+                    }
+                } else {
+                     // Docked position (when open or flying disabled)
+                     if (containerRef.current) {
+                        containerRef.current.style.transform = 'none';
+                        containerRef.current.style.left = 'auto';
+                        containerRef.current.style.top = 'auto';
+                        containerRef.current.style.right = '24px';
+                        containerRef.current.style.bottom = '24px';
+                     }
+                }
+                animationFrameId = requestAnimationFrame(updatePosition);
+            };
+            
+            updatePosition();
+            
+            return () => {
+                window.removeEventListener('mousemove', handleMouseMove);
+                cancelAnimationFrame(animationFrameId);
+            };
+        }
+    }, [isOpen, isFlying]);
 
     // Stop all speech and listening when window is closed
     useEffect(() => {
@@ -236,15 +298,14 @@ export default function AstraAvatar() {
     }, [messages, isThinking]);
 
     return (
-        <div style={{
+        <div ref={containerRef} style={{
             position: 'fixed',
-            bottom: '24px',
-            right: '24px',
             zIndex: 9999,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'flex-end',
-            gap: '12px'
+            gap: '12px',
+            willChange: 'transform' // Optimize for animation
         }}>
             
             {/* Chat Window */}
@@ -284,7 +345,18 @@ export default function AstraAvatar() {
                                 }} />
                                 Astra 3D
                             </h3>
-                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>AI Mentor & Counselor</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                <span style={{ fontSize: '12px', color: '#94a3b8' }}>AI Mentor & Counselor</span>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '10px', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px', color: '#cbd5e1' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={isFlying} 
+                                        onChange={(e) => setIsFlying(e.target.checked)}
+                                        style={{ accentColor: 'var(--primary)' }}
+                                    />
+                                    Flying Mode
+                                </label>
+                            </div>
                         </div>
                         
                         {/* Volume Control */}
