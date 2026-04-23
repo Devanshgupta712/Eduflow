@@ -224,11 +224,14 @@ async def lifespan(app: FastAPI):
                         languages TEXT DEFAULT '[]',
                         original_resume_text TEXT,
                         job_description TEXT,
+                        layout_metadata TEXT DEFAULT '{}',
                         created_at TIMESTAMP DEFAULT NOW(),
                         updated_at TIMESTAMP DEFAULT NOW()
                     )""",
                     # Violations: screenshot evidence
                     "ALTER TABLE violations ADD COLUMN IF NOT EXISTS screenshot_url TEXT",
+                    # NEW: Resume Layout Metadata
+                    "ALTER TABLE resumes ADD COLUMN IF NOT EXISTS layout_metadata TEXT DEFAULT '{}'",
                 ]
                 for sql in pg_migrations:
                     try:
