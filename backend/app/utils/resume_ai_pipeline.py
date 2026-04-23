@@ -272,7 +272,7 @@ async def enhance_resume(resume_text: str, job_description: str, retries: int = 
             "match_score": match_score,
             "keywords": {
                 "jd_skills": list(jd_analysis.get("skills", [])),
-                "matched_skills": list(set([s.lower() for s in parsed_resume.get("skills", [])]).intersection(set([s.lower() for s in jd_analysis.get("skills", [])])))
+                "matched_skills": list(set([str(s).lower() for s in parsed_resume.get("skills", []) if s]).intersection(set([str(s).lower() for s in jd_analysis.get("skills", []) if s])))
             },
             "insights": {
                 "missing_skills": gap_analysis.get("missing_skills", []),
@@ -329,8 +329,8 @@ def validate_resume_json(resume_json: Dict[str, Any], fallback: Optional[Dict[st
 def calculate_match_score(resume_json: Dict[str, Any], jd_analysis: Dict[str, Any]) -> int:
     """Simple algorithm to calculate match score (0-100)."""
     try:
-        resume_skills = set([s.lower() for s in resume_json.get("skills", [])])
-        jd_skills = set([s.lower() for s in jd_analysis.get("skills", [])])
+        resume_skills = set([str(s).lower() for s in resume_json.get("skills", []) if s])
+        jd_skills = set([str(s).lower() for s in jd_analysis.get("skills", []) if s])
         
         if not jd_skills: return 70 # Default if JD has no skills
         
