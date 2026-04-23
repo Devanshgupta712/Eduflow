@@ -530,25 +530,19 @@ export default function AstraAvatar() {
                 </div>
             )}
 
-            {/* 3D Orb Container */}
+            {/* 3D Avatar Container */}
             <div 
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
-                    width: isOpen ? '80px' : '100px',
-                    height: isOpen ? '80px' : '100px',
-                    borderRadius: '50%',
+                    width: isOpen ? '80px' : '120px',
+                    height: isOpen ? '80px' : '120px',
                     cursor: 'pointer',
-                    boxShadow: isOpen ? '0 0 0 transparent' : '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    overflow: 'hidden',
                     transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     transform: isOpen ? 'scale(1)' : 'scale(1.1)',
                     position: 'relative'
                 }}
             >
-                <Canvas camera={{ position: [0, 0, 3] }} style={{ pointerEvents: 'none' }}>
+                <Canvas camera={{ position: [0, 0, 3] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
                     <ambientLight intensity={0.5} />
                     <directionalLight position={[10, 10, 5]} intensity={1} />
                     <Environment preset="city" />
