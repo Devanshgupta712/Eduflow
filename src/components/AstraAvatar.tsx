@@ -17,13 +17,13 @@ interface AstraCoreProps {
     isWaving?: boolean;
 }
 
-function PremiumChromaAvatar({ status, isWaving }: AstraCoreProps) {
+function StandingPremiumAvatar({ status, isWaving }: AstraCoreProps) {
     const group = useRef<THREE.Group>(null);
     const bodyRef = useRef<THREE.Mesh>(null);
     const armRef = useRef<THREE.Mesh>(null);
     
-    const bodyTex = useTexture('/ranma_final_body.png');
-    const armTex = useTexture('/ranma_final_arm.png');
+    const bodyTex = useTexture('/ranma_standing_body.png');
+    const armTex = useTexture('/ranma_standing_arm.png');
     
     const statusColor = status === 'listening' ? '#10b981' : 
                         status === 'thinking' ? '#8b5cf6' : 
@@ -68,28 +68,27 @@ function PremiumChromaAvatar({ status, isWaving }: AstraCoreProps) {
         const t = state.clock.elapsedTime;
         
         if (group.current) {
-            // Realistic breathing/hovering
-            group.current.position.y = Math.sin(t * 1.5) * 0.08;
-            group.current.rotation.y = Math.sin(t * 0.4) * 0.05;
+            // Realistic breathing/hovering for standing pose
+            group.current.position.y = Math.sin(t * 1.5) * 0.05;
+            group.current.rotation.y = Math.sin(t * 0.3) * 0.04;
         }
 
         if (bodyRef.current && status === 'speaking') {
-            // Subtle pulse when speaking
-            const s = 1 + Math.sin(t * 12) * 0.015;
+            const s = 1 + Math.sin(t * 12) * 0.012;
             bodyRef.current.scale.set(s, s, 1);
         }
 
         if (armRef.current) {
             if (isWaving) {
-                // Smooth waving animation
-                armRef.current.position.y = THREE.MathUtils.lerp(armRef.current.position.y, 0.4, 0.1);
-                armRef.current.position.x = THREE.MathUtils.lerp(armRef.current.position.x, 0.5, 0.1);
-                armRef.current.rotation.z = Math.sin(t * 15) * 0.3;
-                armRef.current.scale.set(1.1, 1.1, 1);
+                // Smooth waving animation for the RIGHT arm (on our LEFT)
+                armRef.current.position.y = THREE.MathUtils.lerp(armRef.current.position.y, 0.45, 0.1);
+                armRef.current.position.x = THREE.MathUtils.lerp(armRef.current.position.x, -0.4, 0.1);
+                armRef.current.rotation.z = Math.sin(t * 15) * 0.25;
+                armRef.current.scale.set(1.15, 1.15, 1);
             } else {
-                // Resting position
-                armRef.current.position.y = THREE.MathUtils.lerp(armRef.current.position.y, -0.25, 0.1);
-                armRef.current.position.x = THREE.MathUtils.lerp(armRef.current.position.x, 0.38, 0.1);
+                // Resting position at the character's side (our left)
+                armRef.current.position.y = THREE.MathUtils.lerp(armRef.current.position.y, -0.1, 0.1);
+                armRef.current.position.x = THREE.MathUtils.lerp(armRef.current.position.x, -0.45, 0.1);
                 armRef.current.rotation.z = THREE.MathUtils.lerp(armRef.current.rotation.z, 0, 0.1);
                 armRef.current.scale.set(1, 1, 1);
             }
@@ -97,34 +96,34 @@ function PremiumChromaAvatar({ status, isWaving }: AstraCoreProps) {
     });
 
     return (
-        <group ref={group}>
-            {/* --- BODY LAYER --- */}
+        <group ref={group} position={[0, -0.5, 0]}>
+            {/* --- BODY LAYER (Standing) --- */}
             <mesh ref={bodyRef} position={[0, 0, 0]}>
-                <planeGeometry args={[3.2, 3.2]} />
+                <planeGeometry args={[3.2, 4.5]} />
                 <primitive object={chromaMaterial(bodyTex)} attach="material" />
             </mesh>
 
-            {/* --- WAVING ARM LAYER --- */}
-            <mesh ref={armRef} position={[0.38, -0.25, 0.1]}>
-                <planeGeometry args={[1.4, 1.4]} />
+            {/* --- WAVING RIGHT ARM LAYER (Our Left) --- */}
+            <mesh ref={armRef} position={[-0.45, -0.1, 0.1]}>
+                <planeGeometry args={[1.6, 1.6]} />
                 <primitive object={chromaMaterial(armTex)} attach="material" />
             </mesh>
 
             {/* --- STATUS RING & SHADOW --- */}
-            <group position={[0, -1.4, -0.1]}>
+            <group position={[0, -2.1, -0.1]}>
                 {/* Contact Shadow */}
                 <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-                    <planeGeometry args={[1.5, 1.5]} />
-                    <meshBasicMaterial color="#000" transparent opacity={0.2} />
+                    <planeGeometry args={[1.8, 1.8]} />
+                    <meshBasicMaterial color="#000" transparent opacity={0.15} />
                 </mesh>
                 {/* Status Glow Ring */}
                 <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                    <ringGeometry args={[0.8, 0.9, 64]} />
-                    <meshBasicMaterial color={statusColor} transparent opacity={0.8} side={THREE.DoubleSide} />
+                    <ringGeometry args={[1.0, 1.1, 64]} />
+                    <meshBasicMaterial color={statusColor} transparent opacity={0.7} side={THREE.DoubleSide} />
                 </mesh>
             </group>
             
-            <pointLight position={[0, 1, 2]} distance={6} intensity={2} color={statusColor} />
+            <pointLight position={[0, 1, 3]} distance={7} intensity={2} color={statusColor} />
         </group>
     );
 }
@@ -529,20 +528,20 @@ export default function AstraAvatar() {
             <div 
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
-                    width: isOpen ? '220px' : '320px',
-                    height: isOpen ? '220px' : '320px',
+                    width: isOpen ? '240px' : '350px',
+                    height: isOpen ? '240px' : '350px',
                     cursor: 'pointer',
                     transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     transform: isOpen ? 'scale(1)' : 'scale(1.1)',
                     position: 'relative'
                 }}
             >
-                <Canvas camera={{ position: [0, 0, 5] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
+                <Canvas camera={{ position: [0, 0, 6] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
                     <ambientLight intensity={1} />
                     <directionalLight position={[10, 10, 5]} intensity={1} />
                     <Environment preset="city" />
                     <React.Suspense fallback={null}>
-                        <PremiumChromaAvatar status={currentStatus} isWaving={isWaving} />
+                        <StandingPremiumAvatar status={currentStatus} isWaving={isWaving} />
                     </React.Suspense>
                 </Canvas>
                 
