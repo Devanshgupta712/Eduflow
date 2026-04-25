@@ -160,7 +160,7 @@ function HumanoidModel({ status, isWaving }: AstraCoreProps) {
                     <Capsule args={[0.12, 0.5]} position={[0, -0.3, 0]}><meshStandardMaterial color="#dc2626" /></Capsule>
                     {/* PROPER HAND */}
                     <group position={[0, -0.65, 0]} rotation={[0, -Math.PI / 2, 0]}>
-                        <Hand side="right" isWaving={isWaving} t={THREE.MathUtils.lerp(0, 5, 0.5)} />
+                        <Hand side="right" isWaving={!!isWaving} t={THREE.MathUtils.lerp(0, 5, 0.5)} />
                     </group>
                 </group>
             </group>
