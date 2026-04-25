@@ -11,31 +11,24 @@ interface Message {
     content: string;
 }
 
-// Props for the 3D Anime Avatar
-interface AstraCoreProps {
-    status: 'idle' | 'listening' | 'thinking' | 'speaking';
-    isWaving?: boolean;
-}
-
-function ArticulatedPremiumAvatar({ status, isWaving }: AstraCoreProps) {
+// Master Articulated Avatar Component
+function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWaving: boolean }) {
     const group = useRef<THREE.Group>(null);
-    const torsoRef = useRef<THREE.Mesh>(null);
+    const bodyRef = useRef<THREE.Mesh>(null);
     const armPivotRef = useRef<THREE.Group>(null);
-    const legsRef = useRef<THREE.Mesh>(null);
     
-    const torsoTex = useTexture('/ranma_premium_torso.png');
-    const armTex = useTexture('/ranma_premium_arm.png');
-    const legsTex = useTexture('/ranma_premium_legs.png');
+    const bodyTex = useTexture('/ranma_body_master.png');
+    const armTex = useTexture('/ranma_arm_master.png');
     
     const statusColor = status === 'listening' ? '#10b981' : 
                         status === 'thinking' ? '#8b5cf6' : 
                         status === 'speaking' ? '#3b82f6' : '#6366f1';
 
-    // Chroma Key Shader
+    // Chroma Key Shader (Removes Magenta #FF00FF)
     const chromaMaterial = (tex: THREE.Texture) => new THREE.ShaderMaterial({
         uniforms: {
             uTexture: { value: tex },
-            uKeyColor: { value: new THREE.Color(1, 0, 1) }, // Magenta
+            uKeyColor: { value: new THREE.Color(1, 0, 1) },
             uSimilarity: { value: 0.45 },
             uSmoothness: { value: 0.08 }
         },
@@ -67,64 +60,60 @@ function ArticulatedPremiumAvatar({ status, isWaving }: AstraCoreProps) {
         const t = state.clock.elapsedTime;
         
         if (group.current) {
-            group.current.position.y = Math.sin(t * 1.5) * 0.08;
+            // High-quality floating/breathing animation
+            group.current.position.y = Math.sin(t * 1.5) * 0.1;
+            group.current.rotation.y = Math.sin(t * 0.4) * 0.05;
         }
 
-        // --- Moveable Legs ---
-        if (legsRef.current) {
-            legsRef.current.rotation.z = Math.sin(t * 1.2) * 0.04;
-            legsRef.current.position.y = THREE.MathUtils.lerp(legsRef.current.position.y, -0.75, 0.1);
-        }
-
-        // --- Moveable Arm ---
         if (armPivotRef.current) {
             if (isWaving) {
-                armPivotRef.current.rotation.z = Math.sin(t * 15) * 0.25;
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 1.0, 0.1);
+                // Wave from the shoulder pivot with natural easing
+                armPivotRef.current.rotation.z = Math.sin(t * 12) * 0.25;
+                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 1.25, 0.1);
                 armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.65, 0.1);
             } else {
+                // Return to shoulder position
                 armPivotRef.current.rotation.z = THREE.MathUtils.lerp(armPivotRef.current.rotation.z, 0, 0.1);
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.95, 0.1);
+                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 1.15, 0.1);
                 armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.7, 0.1);
             }
+        }
+
+        if (bodyRef.current && status === 'speaking') {
+            const s = 1 + Math.sin(t * 12) * 0.015;
+            bodyRef.current.scale.set(s, s, 1);
         }
     });
 
     return (
-        <group ref={group} scale={[1.2, 1.2, 1.2]}>
-            {/* --- TORSO & HEAD LAYER --- */}
-            <mesh ref={torsoRef} position={[0, 0.5, 0]}>
-                <planeGeometry args={[2.8, 2.8]} />
-                <primitive object={chromaMaterial(torsoTex)} attach="material" />
+        <group ref={group} scale={[1.1, 1.1, 1.1]} position={[0, -0.5, 0]}>
+            {/* --- MASTER BODY LAYER (Unified Torso + Legs) --- */}
+            <mesh ref={bodyRef} position={[0, 0, 0]}>
+                <planeGeometry args={[3.5, 5.0]} />
+                <primitive object={chromaMaterial(bodyTex)} attach="material" />
             </mesh>
 
-            {/* --- MOVEABLE LEGS LAYER (Aligned to Torso) --- */}
-            <mesh ref={legsRef} position={[0, -0.75, -0.05]}>
-                <planeGeometry args={[2.2, 2.2]} />
-                <primitive object={chromaMaterial(legsTex)} attach="material" />
-            </mesh>
-
-            {/* --- MOVEABLE ARM LAYER (Aligned to Shoulder) --- */}
-            <group ref={armPivotRef} position={[-0.7, 0.95, 0.1]}>
-                <mesh position={[0.25, -0.4, 0]}>
-                    <planeGeometry args={[1.2, 1.2]} />
+            {/* --- MASTER ARM LAYER (Right Arm Attached to Shoulder) --- */}
+            <group ref={armPivotRef} position={[-0.7, 1.15, 0.1]}>
+                <mesh position={[0.2, -0.4, 0]}>
+                    <planeGeometry args={[1.4, 1.4]} />
                     <primitive object={chromaMaterial(armTex)} attach="material" />
                 </mesh>
             </group>
 
-            {/* --- STATUS RING --- */}
-            <group position={[0, -1.8, -0.1]}>
-                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-                    <planeGeometry args={[1.8, 1.8]} />
-                    <meshBasicMaterial color="#000" transparent opacity={0.15} />
-                </mesh>
+            {/* --- STATUS GLOW RING --- */}
+            <group position={[0, -2.4, -0.1]}>
                 <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                    <ringGeometry args={[0.9, 1.0, 64]} />
-                    <meshBasicMaterial color={statusColor} transparent opacity={0.7} side={THREE.DoubleSide} />
+                    <ringGeometry args={[1.0, 1.1, 64]} />
+                    <meshBasicMaterial color={statusColor} transparent opacity={0.8} side={THREE.DoubleSide} />
+                </mesh>
+                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+                    <planeGeometry args={[2, 2]} />
+                    <meshBasicMaterial color="#000" transparent opacity={0.2} />
                 </mesh>
             </group>
             
-            <pointLight position={[0, 1, 3]} distance={7} intensity={2} color={statusColor} />
+            <pointLight position={[0, 1, 3]} distance={8} intensity={2} color={statusColor} />
         </group>
     );
 }
@@ -144,7 +133,6 @@ export default function AstraAvatar() {
     const [isFlying, setIsFlying] = useState(true);
     const [isWaving, setIsWaving] = useState(false);
 
-    // Draggable & Flying State
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const posRef = useRef({ x: 0, y: 0 });
@@ -170,7 +158,6 @@ export default function AstraAvatar() {
         }
     }, []);
 
-    // Interactive Dragging and Flying Logic
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
@@ -186,7 +173,6 @@ export default function AstraAvatar() {
                 const dy = targetRef.current.y - posRef.current.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
-                // Active roaming across whole screen
                 if (distance < 50 || time - lastChangeTime > 4000) {
                     targetRef.current = {
                         x: Math.random() * (window.innerWidth - 350) + 50,
@@ -206,7 +192,6 @@ export default function AstraAvatar() {
                     containerRef.current.style.top = '0px';
                 }
             } else if (!isDragging) {
-                // Dock to right corner when open or flying disabled
                 if (containerRef.current) {
                     containerRef.current.style.transform = 'none';
                     containerRef.current.style.left = 'auto';
@@ -223,7 +208,6 @@ export default function AstraAvatar() {
         return () => cancelAnimationFrame(animationFrameId);
     }, [isOpen, isFlying, isDragging]);
 
-    // Drag events
     const handleMouseDown = (e: React.MouseEvent) => {
         if (isOpen) return;
         setIsDragging(true);
@@ -335,7 +319,6 @@ export default function AstraAvatar() {
                 transition: isOpen ? 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)' : 'none'
             }}
         >
-            {/* Chat Window */}
             {isOpen && (
                 <div style={{
                     width: '350px', height: '500px', background: 'rgba(15, 23, 42, 0.95)', backdropFilter: 'blur(16px)',
@@ -366,17 +349,16 @@ export default function AstraAvatar() {
                 </div>
             )}
 
-            {/* 3D Avatar Container */}
             <div 
                 onClick={(e) => { if (!isDragging) setIsOpen(!isOpen); }}
-                style={{ width: isOpen ? '280px' : '350px', height: isOpen ? '280px' : '350px', position: 'relative' }}
+                style={{ width: isOpen ? '300px' : '380px', height: isOpen ? '300px' : '380px', position: 'relative' }}
             >
                 <Canvas camera={{ position: [0, 0, 5] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
                     <ambientLight intensity={1} />
                     <directionalLight position={[10, 10, 5]} intensity={1} />
                     <Environment preset="city" />
                     <React.Suspense fallback={null}>
-                        <ArticulatedPremiumAvatar status={currentStatus} isWaving={isWaving} />
+                        <MasterArticulatedAvatar status={currentStatus} isWaving={isWaving} />
                     </React.Suspense>
                 </Canvas>
                 {!isOpen && (
