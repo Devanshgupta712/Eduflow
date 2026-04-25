@@ -17,22 +17,25 @@ interface AstraCoreProps {
     isWaving?: boolean;
 }
 
-function PremiumLayeredAvatar({ status, isWaving }: AstraCoreProps) {
+function PremiumChromaAvatar({ status, isWaving }: AstraCoreProps) {
     const group = useRef<THREE.Group>(null);
     const bodyRef = useRef<THREE.Mesh>(null);
     const armRef = useRef<THREE.Mesh>(null);
     
-    const bodyTex = useTexture('/ranma_body.png');
-    const armTex = useTexture('/ranma_arm.png');
+    const bodyTex = useTexture('/ranma_final_body.png');
+    const armTex = useTexture('/ranma_final_arm.png');
     
     const statusColor = status === 'listening' ? '#10b981' : 
                         status === 'thinking' ? '#8b5cf6' : 
                         status === 'speaking' ? '#3b82f6' : '#6366f1';
 
-    // Shader material to remove white background
-    const transparentMaterial = (tex: THREE.Texture) => new THREE.ShaderMaterial({
+    // Chroma Key Shader (Removes Magenta #FF00FF)
+    const chromaMaterial = (tex: THREE.Texture) => new THREE.ShaderMaterial({
         uniforms: {
-            uTexture: { value: tex }
+            uTexture: { value: tex },
+            uKeyColor: { value: new THREE.Color(1, 0, 1) }, // Magenta
+            uSimilarity: { value: 0.45 },
+            uSmoothness: { value: 0.08 }
         },
         vertexShader: `
             varying vec2 vUv;
@@ -43,14 +46,19 @@ function PremiumLayeredAvatar({ status, isWaving }: AstraCoreProps) {
         `,
         fragmentShader: `
             uniform sampler2D uTexture;
+            uniform vec3 uKeyColor;
+            uniform float uSimilarity;
+            uniform float uSmoothness;
             varying vec2 vUv;
+
             void main() {
                 vec4 texColor = texture2D(uTexture, vUv);
-                // Remove white background (adjust threshold as needed)
-                if (texColor.r > 0.95 && texColor.g > 0.95 && texColor.b > 0.95) {
-                    discard;
-                }
-                gl_FragColor = texColor;
+                float dist = distance(texColor.rgb, uKeyColor);
+                float alpha = smoothstep(uSimilarity, uSimilarity + uSmoothness, dist);
+                
+                if (alpha < 0.1) discard;
+                
+                gl_FragColor = vec4(texColor.rgb, alpha);
             }
         `,
         transparent: true
@@ -60,27 +68,30 @@ function PremiumLayeredAvatar({ status, isWaving }: AstraCoreProps) {
         const t = state.clock.elapsedTime;
         
         if (group.current) {
-            // Gentle floating/breathing
-            group.current.position.y = Math.sin(t * 1.5) * 0.1;
-            group.current.rotation.y = Math.sin(t * 0.5) * 0.05;
+            // Realistic breathing/hovering
+            group.current.position.y = Math.sin(t * 1.5) * 0.08;
+            group.current.rotation.y = Math.sin(t * 0.4) * 0.05;
         }
 
         if (bodyRef.current && status === 'speaking') {
-            const s = 1 + Math.sin(t * 15) * 0.02;
+            // Subtle pulse when speaking
+            const s = 1 + Math.sin(t * 12) * 0.015;
             bodyRef.current.scale.set(s, s, 1);
         }
 
         if (armRef.current) {
             if (isWaving) {
-                // Raise arm and wave
+                // Smooth waving animation
                 armRef.current.position.y = THREE.MathUtils.lerp(armRef.current.position.y, 0.4, 0.1);
                 armRef.current.position.x = THREE.MathUtils.lerp(armRef.current.position.x, 0.5, 0.1);
                 armRef.current.rotation.z = Math.sin(t * 15) * 0.3;
+                armRef.current.scale.set(1.1, 1.1, 1);
             } else {
-                // Lower arm to lap
-                armRef.current.position.y = THREE.MathUtils.lerp(armRef.current.position.y, -0.2, 0.1);
-                armRef.current.position.x = THREE.MathUtils.lerp(armRef.current.position.x, 0.35, 0.1);
+                // Resting position
+                armRef.current.position.y = THREE.MathUtils.lerp(armRef.current.position.y, -0.25, 0.1);
+                armRef.current.position.x = THREE.MathUtils.lerp(armRef.current.position.x, 0.38, 0.1);
                 armRef.current.rotation.z = THREE.MathUtils.lerp(armRef.current.rotation.z, 0, 0.1);
+                armRef.current.scale.set(1, 1, 1);
             }
         }
     });
@@ -89,23 +100,31 @@ function PremiumLayeredAvatar({ status, isWaving }: AstraCoreProps) {
         <group ref={group}>
             {/* --- BODY LAYER --- */}
             <mesh ref={bodyRef} position={[0, 0, 0]}>
-                <planeGeometry args={[2.8, 2.8]} />
-                <primitive object={transparentMaterial(bodyTex)} attach="material" />
+                <planeGeometry args={[3.2, 3.2]} />
+                <primitive object={chromaMaterial(bodyTex)} attach="material" />
             </mesh>
 
-            {/* --- WAVING ARM LAYER (Positioned slightly forward) --- */}
-            <mesh ref={armRef} position={[0.35, -0.2, 0.1]}>
-                <planeGeometry args={[1.2, 1.2]} />
-                <primitive object={transparentMaterial(armTex)} attach="material" />
+            {/* --- WAVING ARM LAYER --- */}
+            <mesh ref={armRef} position={[0.38, -0.25, 0.1]}>
+                <planeGeometry args={[1.4, 1.4]} />
+                <primitive object={chromaMaterial(armTex)} attach="material" />
             </mesh>
 
-            {/* --- STATUS RING --- */}
-            <mesh position={[0, -1.3, -0.1]} rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[0.7, 0.8, 64]} />
-                <meshBasicMaterial color={statusColor} transparent opacity={0.6} side={THREE.DoubleSide} />
-            </mesh>
+            {/* --- STATUS RING & SHADOW --- */}
+            <group position={[0, -1.4, -0.1]}>
+                {/* Contact Shadow */}
+                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+                    <planeGeometry args={[1.5, 1.5]} />
+                    <meshBasicMaterial color="#000" transparent opacity={0.2} />
+                </mesh>
+                {/* Status Glow Ring */}
+                <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                    <ringGeometry args={[0.8, 0.9, 64]} />
+                    <meshBasicMaterial color={statusColor} transparent opacity={0.8} side={THREE.DoubleSide} />
+                </mesh>
+            </group>
             
-            <pointLight position={[0, 1, 1]} distance={5} intensity={2} color={statusColor} />
+            <pointLight position={[0, 1, 2]} distance={6} intensity={2} color={statusColor} />
         </group>
     );
 }
@@ -510,20 +529,20 @@ export default function AstraAvatar() {
             <div 
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
-                    width: isOpen ? '180px' : '280px',
-                    height: isOpen ? '180px' : '280px',
+                    width: isOpen ? '220px' : '320px',
+                    height: isOpen ? '220px' : '320px',
                     cursor: 'pointer',
                     transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     transform: isOpen ? 'scale(1)' : 'scale(1.1)',
                     position: 'relative'
                 }}
             >
-                <Canvas camera={{ position: [0, 0, 4] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
+                <Canvas camera={{ position: [0, 0, 5] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
                     <ambientLight intensity={1} />
                     <directionalLight position={[10, 10, 5]} intensity={1} />
                     <Environment preset="city" />
                     <React.Suspense fallback={null}>
-                        <PremiumLayeredAvatar status={currentStatus} isWaving={isWaving} />
+                        <PremiumChromaAvatar status={currentStatus} isWaving={isWaving} />
                     </React.Suspense>
                 </Canvas>
                 
