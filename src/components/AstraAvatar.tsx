@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useTexture, Environment } from '@react-three/drei';
+import { useGLTF, useAnimations, Environment, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { API_BASE, getStoredUser } from '@/lib/api';
 
@@ -11,108 +11,81 @@ interface Message {
     content: string;
 }
 
-// Master Articulated Avatar with Vertex-Warp for Leg Movement
-function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWaving: boolean }) {
+// True 3D Video Game Character Component
+function VideoGameAvatar({ status, isWaving }: { status: string, isWaving: boolean }) {
+    // Using a high-quality public anime-style GLB model
+    const { scene, animations } = useGLTF('https://vazxmix.github.io/vroid-glb/characters/boy.glb');
+    const { actions, names } = useAnimations(animations, scene);
     const group = useRef<THREE.Group>(null);
-    const bodyRef = useRef<THREE.Mesh>(null);
-    const armPivotRef = useRef<THREE.Group>(null);
-    
-    const bodyTex = useTexture('/ranma_body_master.png');
-    const armTex = useTexture('/ranma_arm_master.png');
-    
+
+    // Apply Ranma Saotome colors programmatically
+    useEffect(() => {
+        scene.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                const mat = mesh.material as THREE.MeshStandardMaterial;
+                
+                // Programmatic "Code-Painting" to match Ranma
+                if (mesh.name.toLowerCase().includes('hair')) {
+                    mat.color.set('#dc2626'); // Red Hair
+                } else if (mesh.name.toLowerCase().includes('top') || mesh.name.toLowerCase().includes('shirt')) {
+                    mat.color.set('#dc2626'); // Red Jacket
+                } else if (mesh.name.toLowerCase().includes('bottom') || mesh.name.toLowerCase().includes('pants')) {
+                    mat.color.set('#0d9488'); // Teal Pants
+                }
+                
+                mat.roughness = 0.4;
+                mat.metalness = 0.1;
+            }
+        });
+    }, [scene]);
+
+    // Handle Skeletal Animations
+    useEffect(() => {
+        // Find idle and wave animations by name (vroid models usually have these)
+        const idleAction = actions[names.find(n => n.toLowerCase().includes('idle')) || names[0]];
+        const waveAction = actions[names.find(n => n.toLowerCase().includes('wave')) || names[1]];
+
+        if (idleAction) idleAction.reset().fadeIn(0.5).play();
+
+        if (isWaving && waveAction) {
+            waveAction.reset().fadeIn(0.2).play();
+            setTimeout(() => waveAction.fadeOut(0.5), 3000);
+        }
+
+        return () => {
+            actions[names[0]]?.fadeOut(0.5);
+        };
+    }, [isWaving, actions, names]);
+
+    useFrame((state) => {
+        const t = state.clock.elapsedTime;
+        if (group.current) {
+            // Subtle breathing/floating
+            group.current.position.y = Math.sin(t * 1.5) * 0.05;
+            
+            // Look at mouse/status glow
+            if (status === 'speaking') {
+                group.current.rotation.y = Math.sin(t * 10) * 0.02;
+            }
+        }
+    });
+
     const statusColor = status === 'listening' ? '#10b981' : 
                         status === 'thinking' ? '#8b5cf6' : 
                         status === 'speaking' ? '#3b82f6' : '#6366f1';
 
-    // Master Shader with Chroma-Key and Vertex-Warp
-    const masterMaterial = (tex: THREE.Texture, isBody: boolean) => new THREE.ShaderMaterial({
-        uniforms: {
-            uTexture: { value: tex },
-            uKeyColor: { value: new THREE.Color(1, 0, 1) },
-            uSimilarity: { value: 0.52 },
-            uSmoothness: { value: 0.12 },
-            uTime: { value: 0 },
-            uIsBody: { value: isBody ? 1.0 : 0.0 }
-        },
-        vertexShader: `
-            uniform float uTime;
-            uniform float uIsBody;
-            varying vec2 vUv;
-            void main() {
-                vUv = uv;
-                vec3 pos = position;
-                // Moveable legs effect: Warp the bottom vertices
-                if (uIsBody > 0.5 && uv.y < 0.4) {
-                    pos.x += sin(uTime * 1.5 + uv.y * 5.0) * (0.4 - uv.y) * 0.4;
-                }
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-            }
-        `,
-        fragmentShader: `
-            uniform sampler2D uTexture;
-            uniform vec3 uKeyColor;
-            uniform float uSimilarity;
-            uniform float uSmoothness;
-            varying vec2 vUv;
-            void main() {
-                vec4 texColor = texture2D(uTexture, vUv);
-                float dist = distance(texColor.rgb, uKeyColor);
-                float alpha = smoothstep(uSimilarity, uSimilarity + uSmoothness, dist);
-                if (alpha < 0.1) discard;
-                gl_FragColor = vec4(texColor.rgb, alpha);
-            }
-        `,
-        transparent: true
-    });
-
-    const bodyMat = useRef(masterMaterial(bodyTex, true));
-    const armMat = useRef(masterMaterial(armTex, false));
-
-    useFrame((state) => {
-        const t = state.clock.elapsedTime;
-        bodyMat.current.uniforms.uTime.value = t;
-        armMat.current.uniforms.uTime.value = t;
-        
-        if (group.current) {
-            group.current.position.y = Math.sin(t * 1.5) * 0.1;
-            group.current.rotation.y = Math.sin(t * 0.4) * 0.05;
-        }
-
-        if (armPivotRef.current) {
-            if (isWaving) {
-                armPivotRef.current.rotation.z = Math.sin(t * 12) * 0.25;
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.7, 0.1);
-                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.32, 0.1);
-            } else {
-                armPivotRef.current.rotation.z = THREE.MathUtils.lerp(armPivotRef.current.rotation.z, 0, 0.1);
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.6, 0.1);
-                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.35, 0.1);
-            }
-        }
-    });
-
     return (
-        <group ref={group} scale={[1.1, 1.1, 1.1]} position={[0, -0.5, 0]}>
-            <mesh ref={bodyRef} position={[0, 0, 0]}>
-                <planeGeometry args={[3.5, 5.0, 16, 16]} />
-                <primitive object={bodyMat.current} attach="material" />
+        <group ref={group} scale={[2.5, 2.5, 2.5]} position={[0, -2.5, 0]}>
+            <primitive object={scene} />
+            
+            {/* Status Glow Ring */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+                <ringGeometry args={[0.6, 0.7, 64]} />
+                <meshBasicMaterial color={statusColor} transparent opacity={0.8} />
             </mesh>
 
-            <group ref={armPivotRef} position={[-0.35, 0.6, 0.1]}>
-                <mesh position={[0.2, -0.4, 0]}>
-                    <planeGeometry args={[1.1, 1.1]} />
-                    <primitive object={armMat.current} attach="material" />
-                </mesh>
-            </group>
-
-            <group position={[0, -2.4, -0.1]}>
-                <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                    <ringGeometry args={[0.9, 1.0, 64]} />
-                    <meshBasicMaterial color={statusColor} transparent opacity={0.8} side={THREE.DoubleSide} />
-                </mesh>
-            </group>
-            
-            <pointLight position={[0, 1, 3]} distance={8} intensity={2} color={new THREE.Color(statusColor)} />
+            <pointLight position={[0, 2, 2]} distance={5} intensity={2} color={statusColor} />
         </group>
     );
 }
@@ -356,8 +329,9 @@ export default function AstraAvatar() {
                     <ambientLight intensity={1} />
                     <directionalLight position={[10, 10, 5]} intensity={1} />
                     <Environment preset="city" />
+                    <ContactShadows opacity={0.4} scale={10} blur={2.4} far={4.5} />
                     <React.Suspense fallback={null}>
-                        <MasterArticulatedAvatar status={currentStatus} isWaving={isWaving} />
+                        <VideoGameAvatar status={currentStatus} isWaving={isWaving} />
                     </React.Suspense>
                 </Canvas>
                 {!isOpen && (
@@ -372,3 +346,5 @@ export default function AstraAvatar() {
         </div>
     );
 }
+
+useGLTF.preload('https://vazxmix.github.io/vroid-glb/characters/boy.glb');
