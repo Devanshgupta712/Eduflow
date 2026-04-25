@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
@@ -11,21 +11,49 @@ interface Message {
     content: string;
 }
 
-// True 3D Video Game Character Component
+// Robust 3D Video Game Character Component
 function VideoGameAvatar({ status, isWaving }: { status: string, isWaving: boolean }) {
-    // Using a high-quality public anime-style GLB model
-    const { scene, animations } = useGLTF('https://vazxmix.github.io/vroid-glb/characters/boy.glb');
-    const { actions, names } = useAnimations(animations, scene);
+    // High-quality public anime model
+    const gltf = useGLTF('https://vazxmix.github.io/vroid-glb/characters/boy.glb');
+    const { actions, names } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
+
+    // Safety checks for animations
+    useEffect(() => {
+        if (!actions || names.length === 0) return;
+
+        try {
+            // Find appropriate animations safely
+            const idleName = names.find(n => n.toLowerCase().includes('idle')) || names[0];
+            const waveName = names.find(n => n.toLowerCase().includes('wave')) || names[1] || names[0];
+
+            const idleAction = actions[idleName];
+            const waveAction = actions[waveName];
+
+            if (idleAction) {
+                idleAction.reset().fadeIn(0.5).play();
+            }
+
+            if (isWaving && waveAction) {
+                waveAction.reset().fadeIn(0.2).play();
+                const timer = setTimeout(() => {
+                    if (waveAction) waveAction.fadeOut(0.5);
+                }, 3000);
+                return () => clearTimeout(timer);
+            }
+        } catch (err) {
+            console.warn("Animation error:", err);
+        }
+    }, [isWaving, actions, names]);
 
     // Apply Ranma Saotome colors programmatically
     useEffect(() => {
-        scene.traverse((child) => {
+        if (!gltf.scene) return;
+        gltf.scene.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
                 const mesh = child as THREE.Mesh;
                 const mat = mesh.material as THREE.MeshStandardMaterial;
                 
-                // Programmatic "Code-Painting" to match Ranma
                 if (mesh.name.toLowerCase().includes('hair')) {
                     mat.color.set('#dc2626'); // Red Hair
                 } else if (mesh.name.toLowerCase().includes('top') || mesh.name.toLowerCase().includes('shirt')) {
@@ -33,40 +61,17 @@ function VideoGameAvatar({ status, isWaving }: { status: string, isWaving: boole
                 } else if (mesh.name.toLowerCase().includes('bottom') || mesh.name.toLowerCase().includes('pants')) {
                     mat.color.set('#0d9488'); // Teal Pants
                 }
-                
-                mat.roughness = 0.4;
-                mat.metalness = 0.1;
+                mat.roughness = 0.5;
             }
         });
-    }, [scene]);
-
-    // Handle Skeletal Animations
-    useEffect(() => {
-        // Find idle and wave animations by name (vroid models usually have these)
-        const idleAction = actions[names.find(n => n.toLowerCase().includes('idle')) || names[0]];
-        const waveAction = actions[names.find(n => n.toLowerCase().includes('wave')) || names[1]];
-
-        if (idleAction) idleAction.reset().fadeIn(0.5).play();
-
-        if (isWaving && waveAction) {
-            waveAction.reset().fadeIn(0.2).play();
-            setTimeout(() => waveAction.fadeOut(0.5), 3000);
-        }
-
-        return () => {
-            actions[names[0]]?.fadeOut(0.5);
-        };
-    }, [isWaving, actions, names]);
+    }, [gltf.scene]);
 
     useFrame((state) => {
         const t = state.clock.elapsedTime;
         if (group.current) {
-            // Subtle breathing/floating
             group.current.position.y = Math.sin(t * 1.5) * 0.05;
-            
-            // Look at mouse/status glow
             if (status === 'speaking') {
-                group.current.rotation.y = Math.sin(t * 10) * 0.02;
+                group.current.rotation.y = Math.sin(t * 10) * 0.03;
             }
         }
     });
@@ -77,16 +82,25 @@ function VideoGameAvatar({ status, isWaving }: { status: string, isWaving: boole
 
     return (
         <group ref={group} scale={[2.5, 2.5, 2.5]} position={[0, -2.5, 0]}>
-            <primitive object={scene} />
+            <primitive object={gltf.scene} />
             
-            {/* Status Glow Ring */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
                 <ringGeometry args={[0.6, 0.7, 64]} />
                 <meshBasicMaterial color={statusColor} transparent opacity={0.8} />
             </mesh>
 
-            <pointLight position={[0, 2, 2]} distance={5} intensity={2} color={statusColor} />
+            <pointLight position={[0, 2, 2]} distance={5} intensity={2} color={new THREE.Color(statusColor)} />
         </group>
+    );
+}
+
+// Fallback for when the model is loading
+function LoadingFallback() {
+    return (
+        <mesh>
+            <sphereGeometry args={[0.5, 16, 16]} />
+            <meshStandardMaterial color="#6366f1" wireframe />
+        </mesh>
     );
 }
 
@@ -158,20 +172,13 @@ export default function AstraAvatar() {
                 
                 if (containerRef.current) {
                     containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
-                    containerRef.current.style.right = 'auto';
-                    containerRef.current.style.bottom = 'auto';
-                    containerRef.current.style.left = '0px';
-                    containerRef.current.style.top = '0px';
                 }
-            } else if (!isDragging) {
-                if (containerRef.current) {
-                    containerRef.current.style.transform = 'none';
-                    containerRef.current.style.left = 'auto';
-                    containerRef.current.style.top = 'auto';
-                    containerRef.current.style.right = '24px';
-                    containerRef.current.style.bottom = '24px';
-                    posRef.current = { x: window.innerWidth - 350, y: window.innerHeight - 350 };
-                }
+            } else if (!isDragging && containerRef.current) {
+                containerRef.current.style.transform = 'none';
+                containerRef.current.style.right = '24px';
+                containerRef.current.style.bottom = '24px';
+                containerRef.current.style.left = 'auto';
+                containerRef.current.style.top = 'auto';
             }
             animationFrameId = requestAnimationFrame(updatePosition);
         };
@@ -330,9 +337,9 @@ export default function AstraAvatar() {
                     <directionalLight position={[10, 10, 5]} intensity={1} />
                     <Environment preset="city" />
                     <ContactShadows opacity={0.4} scale={10} blur={2.4} far={4.5} />
-                    <React.Suspense fallback={null}>
+                    <Suspense fallback={<LoadingFallback />}>
                         <VideoGameAvatar status={currentStatus} isWaving={isWaving} />
-                    </React.Suspense>
+                    </Suspense>
                 </Canvas>
                 {!isOpen && (
                     <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#ef4444', color: 'white', fontSize: '12px', padding: '4px 12px', borderRadius: '12px', fontWeight: 'bold', animation: 'pulse 2s infinite' }}>Hello</div>
