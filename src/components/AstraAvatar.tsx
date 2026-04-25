@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, Environment, Sphere, Capsule, Torus, Cone, Cylinder } from '@react-three/drei';
+import { Float, Environment, Sphere, Capsule, Torus, Cone, Cylinder, Box } from '@react-three/drei';
 import * as THREE from 'three';
 import { API_BASE, getStoredUser } from '@/lib/api';
 
