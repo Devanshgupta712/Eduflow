@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useTexture, Float, Environment, Html } from '@react-three/drei';
+import { Float, Environment, Sphere, Capsule, Cylinder, Torus, Box } from '@react-three/drei';
 import * as THREE from 'three';
 import { API_BASE, getStoredUser } from '@/lib/api';
 
@@ -17,12 +17,13 @@ interface AstraCoreProps {
     isWaving?: boolean;
 }
 
-function AnimeAvatar({ status, isWaving }: AstraCoreProps) {
+function HumanoidAvatar({ status, isWaving }: AstraCoreProps) {
     const group = useRef<THREE.Group>(null);
-    const spriteRef = useRef<THREE.Mesh>(null);
-    const texture = useTexture('/anime_avatar.png');
+    const headRef = useRef<THREE.Group>(null);
+    const rightArmRef = useRef<THREE.Group>(null);
+    const leftArmRef = useRef<THREE.Group>(null);
     
-    // Status colors for the glow
+    // Status colors for the glow and eyes
     const color = status === 'listening' ? '#10b981' : // Green
                   status === 'thinking' ? '#8b5cf6' : // Purple
                   status === 'speaking' ? '#3b82f6' : '#6366f1'; // Blue / Indigo
@@ -31,68 +32,155 @@ function AnimeAvatar({ status, isWaving }: AstraCoreProps) {
         const t = state.clock.elapsedTime;
         
         if (group.current) {
-            // Bobbing hover motion
-            group.current.position.y = Math.sin(t * 1.5) * 0.1 - 0.2;
+            // Bobbing hover motion (Breathing)
+            group.current.position.y = Math.sin(t * 1.5) * 0.05;
             
-            // Subtle rotation
-            const lookSpeed = status === 'thinking' ? 4 : 0.8;
-            group.current.rotation.y = Math.sin(t * lookSpeed) * 0.15;
+            // Subtle body sway
+            group.current.rotation.y = Math.sin(t * 0.5) * 0.1;
+        }
+
+        if (headRef.current) {
+            // Look around
+            const lookSpeed = status === 'thinking' ? 5 : 1;
+            headRef.current.rotation.y = Math.sin(t * lookSpeed) * 0.15;
             
-            // Waving animation (tilt and scale pulse)
-            if (isWaving) {
-                group.current.rotation.z = Math.sin(t * 12) * 0.15;
-                group.current.position.y += Math.abs(Math.sin(t * 12)) * 0.1;
+            // Speaking animation (nodding/tilting)
+            if (status === 'speaking') {
+                headRef.current.rotation.x = Math.sin(t * 12) * 0.1;
             } else {
-                group.current.rotation.z = THREE.MathUtils.lerp(group.current.rotation.z, 0, 0.1);
+                headRef.current.rotation.x = THREE.MathUtils.lerp(headRef.current.rotation.x, 0, 0.1);
             }
         }
 
-        if (spriteRef.current) {
-            // Speaking pulse
-            if (status === 'speaking') {
-                const s = 1 + Math.sin(t * 10) * 0.05;
-                spriteRef.current.scale.set(s, s, 1);
+        // Waving Animation for Right Arm
+        if (rightArmRef.current) {
+            if (isWaving) {
+                // Raise arm and wave
+                rightArmRef.current.rotation.z = THREE.MathUtils.lerp(rightArmRef.current.rotation.z, -1.8, 0.1);
+                rightArmRef.current.rotation.x = Math.sin(t * 15) * 0.5;
             } else {
-                spriteRef.current.scale.x = THREE.MathUtils.lerp(spriteRef.current.scale.x, 1, 0.1);
-                spriteRef.current.scale.y = THREE.MathUtils.lerp(spriteRef.current.scale.y, 1, 0.1);
+                // Idle arm position
+                rightArmRef.current.rotation.z = THREE.MathUtils.lerp(rightArmRef.current.rotation.z, -0.4, 0.1);
+                rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0, 0.1);
             }
+        }
+
+        // Left arm idle motion
+        if (leftArmRef.current) {
+            leftArmRef.current.rotation.z = 0.4 + Math.sin(t * 1.5) * 0.05;
         }
     });
 
     return (
-        <group ref={group}>
-            {/* Ambient Glow behind character */}
-            <mesh position={[0, 0, -0.1]}>
-                <planeGeometry args={[2.5, 2.5]} />
-                <meshBasicMaterial 
-                    color={color} 
-                    transparent 
-                    opacity={0.2} 
-                    blending={THREE.AdditiveBlending}
-                />
-            </mesh>
+        <group ref={group} scale={[0.9, 0.9, 0.9]} position={[0, -0.5, 0]}>
+            {/* --- HEAD GROUP --- */}
+            <group ref={headRef} position={[0, 1.4, 0]}>
+                {/* Face */}
+                <Sphere args={[0.5, 32, 32]}>
+                    <meshStandardMaterial color="#ffdbac" roughness={0.3} />
+                </Sphere>
+                
+                {/* Eyes */}
+                <Sphere position={[-0.15, 0.05, 0.4]} args={[0.06, 16, 16]}>
+                    <meshStandardMaterial color="#111827" />
+                </Sphere>
+                <Sphere position={[0.15, 0.05, 0.4]} args={[0.06, 16, 16]}>
+                    <meshStandardMaterial color="#111827" />
+                </Sphere>
 
-            {/* Character Sprite */}
-            <mesh ref={spriteRef}>
-                <planeGeometry args={[2.2, 2.2]} />
-                <meshBasicMaterial map={texture} transparent={true} />
-            </mesh>
+                {/* Hair (Main cap) */}
+                <group position={[0, 0.1, 0]}>
+                    <Sphere args={[0.52, 32, 32]} position={[0, 0.05, -0.05]}>
+                        <meshStandardMaterial color="#dc2626" />
+                    </Sphere>
+                    {/* Hair spikes / volume */}
+                    <Sphere args={[0.3, 16, 16]} position={[-0.3, 0.3, 0.2]}>
+                        <meshStandardMaterial color="#dc2626" />
+                    </Sphere>
+                    <Sphere args={[0.3, 16, 16]} position={[0.3, 0.3, 0.2]}>
+                        <meshStandardMaterial color="#dc2626" />
+                    </Sphere>
+                    <Sphere args={[0.35, 16, 16]} position={[0, 0.4, 0]}>
+                        <meshStandardMaterial color="#dc2626" />
+                    </Sphere>
+                    {/* Braid in back */}
+                    <Capsule args={[0.08, 0.4]} position={[0, -0.4, -0.45]} rotation={[0.4, 0, 0]}>
+                        <meshStandardMaterial color="#dc2626" />
+                    </Capsule>
+                </group>
+            </group>
 
-            {/* Status Ring / Halo */}
-            <mesh position={[0, -1.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[0.5, 0.6, 32]} />
-                <meshBasicMaterial color={color} transparent opacity={0.8} side={THREE.DoubleSide} />
+            {/* --- BODY --- */}
+            <group position={[0, 0.5, 0]}>
+                {/* Torso (Red Shirt) */}
+                <Capsule args={[0.35, 0.8]} position={[0, 0, 0]}>
+                    <meshStandardMaterial color="#dc2626" />
+                </Capsule>
+                
+                {/* White Cuffs / Collar detail */}
+                <Torus args={[0.36, 0.03, 16, 32]} position={[0, 0.4, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                    <meshStandardMaterial color="#ffffff" />
+                </Torus>
+
+                {/* Right Arm */}
+                <group ref={rightArmRef} position={[0.4, 0.3, 0]}>
+                    <Capsule args={[0.12, 0.5]} position={[0, -0.25, 0]} rotation={[0, 0, 0]}>
+                        <meshStandardMaterial color="#dc2626" />
+                    </Capsule>
+                    {/* Hand */}
+                    <Sphere args={[0.14, 16, 16]} position={[0, -0.6, 0]}>
+                        <meshStandardMaterial color="#ffdbac" />
+                    </Sphere>
+                </group>
+
+                {/* Left Arm */}
+                <group ref={leftArmRef} position={[-0.4, 0.3, 0]}>
+                    <Capsule args={[0.12, 0.5]} position={[0, -0.25, 0]}>
+                        <meshStandardMaterial color="#dc2626" />
+                    </Capsule>
+                    {/* Hand */}
+                    <Sphere args={[0.14, 16, 16]} position={[0, -0.6, 0]}>
+                        <meshStandardMaterial color="#ffdbac" />
+                    </Sphere>
+                </group>
+            </group>
+
+            {/* --- LEGS (Sitting Cross-legged) --- */}
+            <group position={[0, -0.1, 0]}>
+                {/* Left Leg */}
+                <Capsule args={[0.18, 0.6]} position={[-0.3, -0.2, 0.3]} rotation={[0, 1.5, 1.5]}>
+                    <meshStandardMaterial color="#134e4a" />
+                </Capsule>
+                {/* Right Leg */}
+                <Capsule args={[0.18, 0.6]} position={[0.3, -0.2, 0.3]} rotation={[0, -1.5, -1.5]}>
+                    <meshStandardMaterial color="#134e4a" />
+                </Capsule>
+            </group>
+
+            {/* --- THE PIG (P-chan) --- */}
+            <group position={[0, 0.1, 0.45]}>
+                <Sphere args={[0.2, 16, 16]}>
+                    <meshStandardMaterial color="#111827" />
+                </Sphere>
+                {/* Pig Ears */}
+                <Box args={[0.05, 0.15, 0.05]} position={[-0.1, 0.15, 0]} rotation={[0, 0, 0.4]}>
+                    <meshStandardMaterial color="#111827" />
+                </Box>
+                <Box args={[0.05, 0.15, 0.05]} position={[0.1, 0.15, 0]} rotation={[0, 0, -0.4]}>
+                    <meshStandardMaterial color="#111827" />
+                </Box>
+                {/* Yellow Bandana */}
+                <Torus args={[0.21, 0.02, 8, 32]} rotation={[Math.PI / 2, 0, 0]}>
+                    <meshStandardMaterial color="#eab308" />
+                </Torus>
+            </group>
+
+            {/* --- BASE / GLOW --- */}
+            <mesh position={[0, -0.6, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.8, 1.0, 32]} />
+                <meshBasicMaterial color={color} transparent opacity={0.5} side={THREE.DoubleSide} />
             </mesh>
-            
-            {/* Thinking / Speaking Particles */}
-            {(status === 'thinking' || status === 'speaking') && (
-                <Float speed={5} rotationIntensity={2} floatIntensity={2}>
-                    <mesh position={[0.8, 0.8, 0]}>
-                        <sphereGeometry args={[0.05, 16, 16]} />
-                        <meshBasicMaterial color={color} />
-                    </mesh>
-                </Float>
-            )}
+            <pointLight position={[0, 0, 1]} distance={3} intensity={2} color={color} />
         </group>
     );
 }
@@ -160,8 +248,8 @@ export default function AstraAvatar() {
     useEffect(() => {
         if (typeof window !== 'undefined') {
             // Initial position bottom right
-            posRef.current = { x: window.innerWidth - 120, y: window.innerHeight - 120 };
-            targetRef.current = { x: window.innerWidth - 120, y: window.innerHeight - 120 };
+            posRef.current = { x: window.innerWidth - 150, y: window.innerHeight - 150 };
+            targetRef.current = { x: window.innerWidth - 150, y: window.innerHeight - 150 };
             
             let animationFrameId: number;
             let lastChangeTime = 0;
@@ -177,8 +265,8 @@ export default function AstraAvatar() {
                     if (distance < 20 || time - lastChangeTime > 4000) {
                         // Keep within bounds, avoiding extreme edges
                         targetRef.current = {
-                            x: Math.random() * (window.innerWidth - 200) + 50,
-                            y: Math.random() * (window.innerHeight - 200) + 50
+                            x: Math.random() * (window.innerWidth - 250) + 50,
+                            y: Math.random() * (window.innerHeight - 250) + 50
                         };
                         lastChangeTime = time;
                     }
@@ -356,7 +444,6 @@ export default function AstraAvatar() {
         const newVol = parseFloat(e.target.value);
         setVolume(newVol);
         localStorage.setItem('astra_volume', newVol.toString());
-        // Do not interrupt current speech just for volume change, it will apply to next speech
     };
 
     // Auto-scroll chat
@@ -374,7 +461,7 @@ export default function AstraAvatar() {
             flexDirection: 'column',
             alignItems: 'flex-end',
             gap: '12px',
-            willChange: 'transform' // Optimize for animation
+            willChange: 'transform'
         }}>
             
             {/* Chat Window */}
@@ -428,14 +515,11 @@ export default function AstraAvatar() {
                             </div>
                         </div>
                         
-                        {/* Volume Control */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ fontSize: '14px' }}>{volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}</span>
                             <input 
                                 type="range" 
-                                min="0" 
-                                max="1" 
-                                step="0.1" 
+                                min="0" max="1" step="0.1" 
                                 value={volume} 
                                 onChange={handleVolumeChange}
                                 style={{ width: '60px', accentColor: 'var(--primary)' }}
@@ -534,29 +618,29 @@ export default function AstraAvatar() {
             <div 
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
-                    width: isOpen ? '100px' : '150px',
-                    height: isOpen ? '100px' : '150px',
+                    width: isOpen ? '120px' : '180px',
+                    height: isOpen ? '120px' : '180px',
                     cursor: 'pointer',
                     transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     transform: isOpen ? 'scale(1)' : 'scale(1.1)',
                     position: 'relative'
                 }}
             >
-                <Canvas camera={{ position: [0, 0, 3] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
-                    <ambientLight intensity={1} />
-                    <directionalLight position={[10, 10, 5]} intensity={1} />
+                <Canvas camera={{ position: [0, 0, 4] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
+                    <ambientLight intensity={0.7} />
+                    <directionalLight position={[10, 10, 5]} intensity={1.5} />
+                    <pointLight position={[-5, 5, 5]} intensity={1} color="#fff" />
                     <Environment preset="city" />
                     <React.Suspense fallback={null}>
-                        <AnimeAvatar status={currentStatus} isWaving={isWaving} />
+                        <HumanoidAvatar status={currentStatus} isWaving={isWaving} />
                     </React.Suspense>
                 </Canvas>
                 
-                {/* Tooltip hint when closed */}
                 {!isOpen && (
                     <div style={{
                         position: 'absolute',
-                        top: '0',
-                        right: '0',
+                        top: '10px',
+                        right: '10px',
                         background: '#ef4444',
                         color: 'white',
                         fontSize: '12px',
