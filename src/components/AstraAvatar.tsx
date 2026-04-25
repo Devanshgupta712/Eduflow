@@ -93,13 +93,11 @@ function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWavin
 
     return (
         <group ref={group} scale={[1.1, 1.1, 1.1]} position={[0, -0.5, 0]}>
-            {/* --- MASTER BODY LAYER --- */}
             <mesh ref={bodyRef} position={[0, 0, 0]}>
                 <planeGeometry args={[3.5, 5.0, 16, 16]} />
                 <primitive object={bodyMat.current} attach="material" />
             </mesh>
 
-            {/* --- CORRECTED ARM LAYER (Scaled & Aligned) --- */}
             <group ref={armPivotRef} position={[-0.35, 0.6, 0.1]}>
                 <mesh position={[0.2, -0.4, 0]}>
                     <planeGeometry args={[1.1, 1.1]} />
@@ -107,7 +105,6 @@ function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWavin
                 </mesh>
             </group>
 
-            {/* --- STATUS RING --- */}
             <group position={[0, -2.4, -0.1]}>
                 <mesh rotation={[-Math.PI / 2, 0, 0]}>
                     <ringGeometry args={[0.9, 1.0, 64]} />
@@ -115,24 +112,7 @@ function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWavin
                 </mesh>
             </group>
             
-            <pointLight position={[0, 1, 3]} distance={8} intensity={2} color={statusColor} />
-        </group>
-    );
-}
-
-            {/* --- STATUS GLOW RING --- */}
-            <group position={[0, -2.4, -0.1]}>
-                <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                    <ringGeometry args={[1.0, 1.1, 64]} />
-                    <meshBasicMaterial color={statusColor} transparent opacity={0.8} side={THREE.DoubleSide} />
-                </mesh>
-                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-                    <planeGeometry args={[2, 2]} />
-                    <meshBasicMaterial color="#000" transparent opacity={0.2} />
-                </mesh>
-            </group>
-            
-            <pointLight position={[0, 1, 3]} distance={8} intensity={2} color={statusColor} />
+            <pointLight position={[0, 1, 3]} distance={8} intensity={2} color={new THREE.Color(statusColor)} />
         </group>
     );
 }
