@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { MeshDistortMaterial, Sphere, Float, Environment } from '@react-three/drei';
+import { useTexture, Float, Environment, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { API_BASE, getStoredUser } from '@/lib/api';
 
@@ -11,20 +11,18 @@ interface Message {
     content: string;
 }
 
-// Props for the 3D Astra core
+// Props for the 3D Anime Avatar
 interface AstraCoreProps {
     status: 'idle' | 'listening' | 'thinking' | 'speaking';
     isWaving?: boolean;
 }
 
-function RobotAvatar({ status, isWaving }: AstraCoreProps) {
+function AnimeAvatar({ status, isWaving }: AstraCoreProps) {
     const group = useRef<THREE.Group>(null);
-    const headRef = useRef<THREE.Mesh>(null);
-    const leftEyeRef = useRef<THREE.Mesh>(null);
-    const rightEyeRef = useRef<THREE.Mesh>(null);
-    const rightArmRef = useRef<THREE.Mesh>(null);
+    const spriteRef = useRef<THREE.Mesh>(null);
+    const texture = useTexture('/anime_avatar.png');
     
-    // Status colors
+    // Status colors for the glow
     const color = status === 'listening' ? '#10b981' : // Green
                   status === 'thinking' ? '#8b5cf6' : // Purple
                   status === 'speaking' ? '#3b82f6' : '#6366f1'; // Blue / Indigo
@@ -34,109 +32,67 @@ function RobotAvatar({ status, isWaving }: AstraCoreProps) {
         
         if (group.current) {
             // Bobbing hover motion
-            group.current.position.y = Math.sin(t * 2) * 0.1 - 0.5;
+            group.current.position.y = Math.sin(t * 1.5) * 0.1 - 0.2;
             
-            // Look around slowly if idle, frantic if thinking
-            const lookSpeed = status === 'thinking' ? 5 : 1;
-            group.current.rotation.y = Math.sin(t * lookSpeed) * 0.2;
-            group.current.rotation.z = Math.cos(t * lookSpeed * 0.8) * 0.05;
-        }
-
-        // Blinking logic (close eyes occasionally)
-        const blink = Math.sin(t * 4) > 0.95 ? 0.1 : 1;
-        if (leftEyeRef.current) leftEyeRef.current.scale.y = blink;
-        if (rightEyeRef.current) rightEyeRef.current.scale.y = blink;
-
-        // Speaking animation (head tilts slightly up and down)
-        if (headRef.current) {
-            if (status === 'speaking') {
-                headRef.current.rotation.x = Math.sin(t * 15) * 0.1;
+            // Subtle rotation
+            const lookSpeed = status === 'thinking' ? 4 : 0.8;
+            group.current.rotation.y = Math.sin(t * lookSpeed) * 0.15;
+            
+            // Waving animation (tilt and scale pulse)
+            if (isWaving) {
+                group.current.rotation.z = Math.sin(t * 12) * 0.15;
+                group.current.position.y += Math.abs(Math.sin(t * 12)) * 0.1;
             } else {
-                headRef.current.rotation.x = THREE.MathUtils.lerp(headRef.current.rotation.x, 0, 0.1);
+                group.current.rotation.z = THREE.MathUtils.lerp(group.current.rotation.z, 0, 0.1);
             }
         }
 
-        // Arm animations (waving greeting)
-        if (rightArmRef.current) {
-            if (isWaving) {
-                // Raise arm and wave rapidly
-                rightArmRef.current.position.y = THREE.MathUtils.lerp(rightArmRef.current.position.y, 0.5, 0.1);
-                rightArmRef.current.rotation.z = Math.sin(t * 15) * 0.3 - 1.2; 
-                rightArmRef.current.rotation.x = Math.sin(t * 5) * 0.2;
+        if (spriteRef.current) {
+            // Speaking pulse
+            if (status === 'speaking') {
+                const s = 1 + Math.sin(t * 10) * 0.05;
+                spriteRef.current.scale.set(s, s, 1);
             } else {
-                // Return to normal idle hover
-                rightArmRef.current.position.y = THREE.MathUtils.lerp(rightArmRef.current.position.y, -0.1, 0.1);
-                rightArmRef.current.rotation.z = THREE.MathUtils.lerp(rightArmRef.current.rotation.z, 0.2, 0.1);
-                rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0, 0.1);
+                spriteRef.current.scale.x = THREE.MathUtils.lerp(spriteRef.current.scale.x, 1, 0.1);
+                spriteRef.current.scale.y = THREE.MathUtils.lerp(spriteRef.current.scale.y, 1, 0.1);
             }
         }
     });
 
     return (
-        <group ref={group} scale={[0.8, 0.8, 0.8]}>
-            {/* Antenna */}
-            <mesh position={[0, 1.4, 0]}>
-                <cylinderGeometry args={[0.02, 0.02, 0.4]} />
-                <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
-            </mesh>
-            <mesh position={[0, 1.6, 0]}>
-                <sphereGeometry args={[0.12, 16, 16]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={status === 'speaking' ? 2 : 1} />
-            </mesh>
-
-            {/* Head */}
-            <mesh ref={headRef} position={[0, 0.8, 0]}>
-                <boxGeometry args={[1.2, 0.9, 1]} />
-                <meshStandardMaterial color="#ffffff" metalness={0.2} roughness={0.1} />
-                
-                {/* Face Screen (Black visor) */}
-                <mesh position={[0, 0, 0.51]}>
-                    <planeGeometry args={[1.0, 0.6]} />
-                    <meshStandardMaterial color="#0f172a" />
-                </mesh>
-
-                {/* Left Eye */}
-                <mesh ref={leftEyeRef} position={[-0.25, 0, 0.52]}>
-                    <sphereGeometry args={[0.1, 16, 16]} />
-                    <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} />
-                </mesh>
-
-                {/* Right Eye */}
-                <mesh ref={rightEyeRef} position={[0.25, 0, 0.52]}>
-                    <sphereGeometry args={[0.1, 16, 16]} />
-                    <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} />
-                </mesh>
+        <group ref={group}>
+            {/* Ambient Glow behind character */}
+            <mesh position={[0, 0, -0.1]}>
+                <planeGeometry args={[2.5, 2.5]} />
+                <meshBasicMaterial 
+                    color={color} 
+                    transparent 
+                    opacity={0.2} 
+                    blending={THREE.AdditiveBlending}
+                />
             </mesh>
 
-            {/* Body */}
-            <mesh position={[0, -0.1, 0]}>
-                <cylinderGeometry args={[0.5, 0.4, 0.9, 32]} />
-                <meshStandardMaterial color="#e2e8f0" metalness={0.5} roughness={0.2} />
+            {/* Character Sprite */}
+            <mesh ref={spriteRef}>
+                <planeGeometry args={[2.2, 2.2]} />
+                <meshBasicMaterial map={texture} transparent={true} />
+            </mesh>
+
+            {/* Status Ring / Halo */}
+            <mesh position={[0, -1.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.5, 0.6, 32]} />
+                <meshBasicMaterial color={color} transparent opacity={0.8} side={THREE.DoubleSide} />
             </mesh>
             
-            {/* Core / Heart */}
-            <mesh position={[0, 0, 0.45]}>
-                <sphereGeometry args={[0.25, 32, 32]} />
-                <MeshDistortMaterial color={color} emissive={color} emissiveIntensity={0.5} distort={0.4} speed={status === 'speaking' ? 4 : 1} />
-            </mesh>
-
-            {/* Left Hover Arm */}
-            <mesh position={[-0.8, -0.1, 0]} rotation={[0, 0, -0.2]}>
-                <boxGeometry args={[0.3, 0.8, 0.3]} />
-                <meshStandardMaterial color="#ffffff" metalness={0.3} roughness={0.2} />
-            </mesh>
-
-            {/* Right Hover Arm */}
-            <mesh ref={rightArmRef} position={[0.8, -0.1, 0]} rotation={[0, 0, 0.2]}>
-                <boxGeometry args={[0.3, 0.8, 0.3]} />
-                <meshStandardMaterial color="#ffffff" metalness={0.3} roughness={0.2} />
-            </mesh>
-            
-            {/* Hover Engine Glow (Bottom) */}
-            <mesh position={[0, -0.6, 0]}>
-                <cylinderGeometry args={[0.3, 0.3, 0.1, 32]} />
-                <meshStandardMaterial color="#0ea5e9" emissive="#0ea5e9" emissiveIntensity={1} />
-            </mesh>
+            {/* Thinking / Speaking Particles */}
+            {(status === 'thinking' || status === 'speaking') && (
+                <Float speed={5} rotationIntensity={2} floatIntensity={2}>
+                    <mesh position={[0.8, 0.8, 0]}>
+                        <sphereGeometry args={[0.05, 16, 16]} />
+                        <meshBasicMaterial color={color} />
+                    </mesh>
+                </Float>
+            )}
         </group>
     );
 }
@@ -456,7 +412,7 @@ export default function AstraAvatar() {
                                                 currentStatus === 'thinking' ? '#8b5cf6' : '#3b82f6',
                                     boxShadow: `0 0 10px ${currentStatus === 'idle' ? '#6366f1' : currentStatus === 'listening' ? '#10b981' : currentStatus === 'thinking' ? '#8b5cf6' : '#3b82f6'}`
                                 }} />
-                                Astra 3D
+                                Hello
                             </h3>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                                 <span style={{ fontSize: '12px', color: '#94a3b8' }}>AI Mentor & Counselor</span>
@@ -499,8 +455,8 @@ export default function AstraAvatar() {
                     }}>
                         {messages.length === 0 && (
                             <div style={{ textAlign: 'center', color: '#94a3b8', marginTop: '40px', fontSize: '14px' }}>
-                                <p>Hi {user?.name?.split(' ')[0] || 'there'}! I'm Astra.</p>
-                                <p>How can I help you today?</p>
+                                <p>Hi {user?.name?.split(' ')[0] || 'there'}! I'm here to help.</p>
+                                <p>How can I assist you today?</p>
                             </div>
                         )}
                         {messages.map((msg, i) => (
@@ -519,7 +475,7 @@ export default function AstraAvatar() {
                         ))}
                         {isThinking && (
                             <div style={{ alignSelf: 'flex-start', color: '#8b5cf6', fontSize: '14px', padding: '12px 16px', background: 'rgba(139, 92, 246, 0.1)', borderRadius: '20px 20px 20px 4px' }}>
-                                Astra is thinking...
+                                Assistant is thinking...
                             </div>
                         )}
                     </div>
@@ -578,8 +534,8 @@ export default function AstraAvatar() {
             <div 
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
-                    width: isOpen ? '80px' : '120px',
-                    height: isOpen ? '80px' : '120px',
+                    width: isOpen ? '100px' : '150px',
+                    height: isOpen ? '100px' : '150px',
                     cursor: 'pointer',
                     transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     transform: isOpen ? 'scale(1)' : 'scale(1.1)',
@@ -587,27 +543,30 @@ export default function AstraAvatar() {
                 }}
             >
                 <Canvas camera={{ position: [0, 0, 3] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
-                    <ambientLight intensity={0.5} />
+                    <ambientLight intensity={1} />
                     <directionalLight position={[10, 10, 5]} intensity={1} />
                     <Environment preset="city" />
-                    <RobotAvatar status={currentStatus} isWaving={isWaving} />
+                    <React.Suspense fallback={null}>
+                        <AnimeAvatar status={currentStatus} isWaving={isWaving} />
+                    </React.Suspense>
                 </Canvas>
                 
                 {/* Tooltip hint when closed */}
                 {!isOpen && (
                     <div style={{
                         position: 'absolute',
-                        top: '-10px',
+                        top: '0',
                         right: '0',
                         background: '#ef4444',
                         color: 'white',
-                        fontSize: '10px',
-                        padding: '4px 8px',
-                        borderRadius: '10px',
+                        fontSize: '12px',
+                        padding: '4px 12px',
+                        borderRadius: '12px',
                         fontWeight: 'bold',
-                        animation: 'pulse 2s infinite'
+                        animation: 'pulse 2s infinite',
+                        boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)'
                     }}>
-                        Astra 3D
+                        Hello
                     </div>
                 )}
             </div>
@@ -619,7 +578,7 @@ export default function AstraAvatar() {
                 }
                 @keyframes pulse {
                     0% { transform: scale(1); }
-                    50% { transform: scale(1.1); }
+                    50% { transform: scale(1.05); }
                     100% { transform: scale(1); }
                 }
             `}} />
