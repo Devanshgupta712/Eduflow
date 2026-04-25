@@ -29,8 +29,8 @@ function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWavin
         uniforms: {
             uTexture: { value: tex },
             uKeyColor: { value: new THREE.Color(1, 0, 1) },
-            uSimilarity: { value: 0.45 },
-            uSmoothness: { value: 0.08 }
+            uSimilarity: { value: 0.52 }, // Increased to remove pink edges
+            uSmoothness: { value: 0.12 }  // Smoother transition
         },
         vertexShader: `
             varying vec2 vUv;
@@ -69,13 +69,13 @@ function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWavin
             if (isWaving) {
                 // Wave from the shoulder pivot with natural easing
                 armPivotRef.current.rotation.z = Math.sin(t * 12) * 0.25;
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 1.25, 0.1);
-                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.65, 0.1);
+                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.95, 0.1);
+                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.38, 0.1);
             } else {
                 // Return to shoulder position
                 armPivotRef.current.rotation.z = THREE.MathUtils.lerp(armPivotRef.current.rotation.z, 0, 0.1);
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 1.15, 0.1);
-                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.7, 0.1);
+                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.85, 0.1);
+                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.4, 0.1);
             }
         }
 
@@ -94,7 +94,7 @@ function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWavin
             </mesh>
 
             {/* --- MASTER ARM LAYER (Right Arm Attached to Shoulder) --- */}
-            <group ref={armPivotRef} position={[-0.7, 1.15, 0.1]}>
+            <group ref={armPivotRef} position={[-0.4, 0.85, 0.1]}>
                 <mesh position={[0.2, -0.4, 0]}>
                     <planeGeometry args={[1.4, 1.4]} />
                     <primitive object={chromaMaterial(armTex)} attach="material" />
