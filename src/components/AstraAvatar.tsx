@@ -67,48 +67,46 @@ function ArticulatedPremiumAvatar({ status, isWaving }: AstraCoreProps) {
         const t = state.clock.elapsedTime;
         
         if (group.current) {
-            // General floating/breathing
             group.current.position.y = Math.sin(t * 1.5) * 0.08;
         }
 
         // --- Moveable Legs ---
         if (legsRef.current) {
-            // Subtle leg sway for "moveability"
-            legsRef.current.rotation.z = Math.sin(t * 1.2) * 0.03;
-            legsRef.current.position.y = THREE.MathUtils.lerp(legsRef.current.position.y, -1.2, 0.1);
+            legsRef.current.rotation.z = Math.sin(t * 1.2) * 0.04;
+            legsRef.current.position.y = THREE.MathUtils.lerp(legsRef.current.position.y, -0.75, 0.1);
         }
 
         // --- Moveable Arm ---
         if (armPivotRef.current) {
             if (isWaving) {
-                armPivotRef.current.rotation.z = Math.sin(t * 15) * 0.2;
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.8, 0.1);
-                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.45, 0.1);
+                armPivotRef.current.rotation.z = Math.sin(t * 15) * 0.25;
+                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 1.0, 0.1);
+                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.65, 0.1);
             } else {
                 armPivotRef.current.rotation.z = THREE.MathUtils.lerp(armPivotRef.current.rotation.z, 0, 0.1);
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.75, 0.1);
-                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.5, 0.1);
+                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.95, 0.1);
+                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.7, 0.1);
             }
         }
     });
 
     return (
-        <group ref={group}>
+        <group ref={group} scale={[1.2, 1.2, 1.2]}>
             {/* --- TORSO & HEAD LAYER --- */}
             <mesh ref={torsoRef} position={[0, 0.5, 0]}>
                 <planeGeometry args={[2.8, 2.8]} />
                 <primitive object={chromaMaterial(torsoTex)} attach="material" />
             </mesh>
 
-            {/* --- MOVEABLE LEGS LAYER --- */}
-            <mesh ref={legsRef} position={[0, -1.2, -0.05]}>
-                <planeGeometry args={[2.5, 2.5]} />
+            {/* --- MOVEABLE LEGS LAYER (Aligned to Torso) --- */}
+            <mesh ref={legsRef} position={[0, -0.75, -0.05]}>
+                <planeGeometry args={[2.2, 2.2]} />
                 <primitive object={chromaMaterial(legsTex)} attach="material" />
             </mesh>
 
-            {/* --- MOVEABLE ARM LAYER --- */}
-            <group ref={armPivotRef} position={[-0.5, 0.75, 0.1]}>
-                <mesh position={[0.2, -0.35, 0]}>
+            {/* --- MOVEABLE ARM LAYER (Aligned to Shoulder) --- */}
+            <group ref={armPivotRef} position={[-0.7, 0.95, 0.1]}>
+                <mesh position={[0.25, -0.4, 0]}>
                     <planeGeometry args={[1.2, 1.2]} />
                     <primitive object={chromaMaterial(armTex)} attach="material" />
                 </mesh>
@@ -176,8 +174,8 @@ export default function AstraAvatar() {
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        posRef.current = { x: window.innerWidth - 300, y: window.innerHeight - 300 };
-        targetRef.current = { x: window.innerWidth - 300, y: window.innerHeight - 300 };
+        posRef.current = { x: window.innerWidth - 350, y: window.innerHeight - 350 };
+        targetRef.current = { x: window.innerWidth - 350, y: window.innerHeight - 350 };
         
         let animationFrameId: number;
         let lastChangeTime = 0;
@@ -188,16 +186,17 @@ export default function AstraAvatar() {
                 const dy = targetRef.current.y - posRef.current.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
-                if (distance < 30 || time - lastChangeTime > 5000) {
+                // Active roaming across whole screen
+                if (distance < 50 || time - lastChangeTime > 4000) {
                     targetRef.current = {
-                        x: Math.random() * (window.innerWidth - 300) + 50,
-                        y: Math.random() * (window.innerHeight - 300) + 50
+                        x: Math.random() * (window.innerWidth - 350) + 50,
+                        y: Math.random() * (window.innerHeight - 350) + 50
                     };
                     lastChangeTime = time;
                 }
 
-                posRef.current.x += dx * 0.012;
-                posRef.current.y += dy * 0.012;
+                posRef.current.x += dx * 0.015;
+                posRef.current.y += dy * 0.015;
                 
                 if (containerRef.current) {
                     containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
@@ -206,13 +205,15 @@ export default function AstraAvatar() {
                     containerRef.current.style.left = '0px';
                     containerRef.current.style.top = '0px';
                 }
-            } else if (!isDragging && !isOpen) {
+            } else if (!isDragging) {
+                // Dock to right corner when open or flying disabled
                 if (containerRef.current) {
                     containerRef.current.style.transform = 'none';
                     containerRef.current.style.left = 'auto';
                     containerRef.current.style.top = 'auto';
                     containerRef.current.style.right = '24px';
                     containerRef.current.style.bottom = '24px';
+                    posRef.current = { x: window.innerWidth - 350, y: window.innerHeight - 350 };
                 }
             }
             animationFrameId = requestAnimationFrame(updatePosition);
@@ -330,22 +331,26 @@ export default function AstraAvatar() {
                 flexDirection: 'column',
                 alignItems: 'flex-end',
                 gap: '12px',
-                cursor: isDragging ? 'grabbing' : isOpen ? 'default' : 'grab'
+                cursor: isDragging ? 'grabbing' : isOpen ? 'default' : 'grab',
+                transition: isOpen ? 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)' : 'none'
             }}
         >
             {/* Chat Window */}
             {isOpen && (
                 <div style={{
-                    width: '350px', height: '500px', background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(16px)',
+                    width: '350px', height: '500px', background: 'rgba(15, 23, 42, 0.95)', backdropFilter: 'blur(16px)',
                     border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
                     display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}>
                     <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#fff' }}>Hello</h3>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: '#cbd5e1' }}>
-                            <input type="checkbox" checked={isFlying} onChange={(e) => setIsFlying(e.target.checked)} />
-                            Flying Mode
-                        </label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: '#cbd5e1' }}>
+                                <input type="checkbox" checked={isFlying} onChange={(e) => setIsFlying(e.target.checked)} />
+                                Flying Mode
+                            </label>
+                            <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '18px' }}>×</button>
+                        </div>
                     </div>
                     <div ref={scrollRef} style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {messages.map((msg, i) => (
@@ -364,7 +369,7 @@ export default function AstraAvatar() {
             {/* 3D Avatar Container */}
             <div 
                 onClick={(e) => { if (!isDragging) setIsOpen(!isOpen); }}
-                style={{ width: isOpen ? '240px' : '350px', height: isOpen ? '240px' : '350px', position: 'relative' }}
+                style={{ width: isOpen ? '280px' : '350px', height: isOpen ? '280px' : '350px', position: 'relative' }}
             >
                 <Canvas camera={{ position: [0, 0, 5] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
                     <ambientLight intensity={1} />
