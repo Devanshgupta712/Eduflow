@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, Environment, Sphere, Capsule, Torus, Cone, Cylinder, Box } from '@react-three/drei';
+import { Float, Environment, Sphere, Capsule, Torus, Cone, Box, Cylinder } from '@react-three/drei';
 import * as THREE from 'three';
 import { API_BASE, getStoredUser } from '@/lib/api';
 
@@ -17,192 +17,191 @@ interface AstraCoreProps {
     isWaving?: boolean;
 }
 
-function Hand({ side, isWaving, t }: { side: 'left' | 'right', isWaving: boolean, t: number }) {
-    const group = useRef<THREE.Group>(null);
-    
+function Finger({ t, i, isWaving }: { t: number, i: number, isWaving: boolean }) {
     return (
-        <group ref={group}>
-            {/* Palm */}
-            <Box args={[0.18, 0.08, 0.2]} position={[0, -0.05, 0]}>
-                <meshStandardMaterial color="#ffe0bd" />
-            </Box>
-            {/* Fingers */}
-            {[0, 1, 2, 3].map((i) => (
-                <Cylinder 
-                    key={i} 
-                    args={[0.02, 0.02, 0.12]} 
-                    position={[0.07 - i * 0.045, -0.12, 0.05]}
-                    rotation={[isWaving && side === 'right' ? Math.sin(t * 15 + i) * 0.3 : 0.2, 0, 0]}
-                >
-                    <meshStandardMaterial color="#ffe0bd" />
-                </Cylinder>
-            ))}
-            {/* Thumb */}
-            <Cylinder 
-                args={[0.025, 0.025, 0.1]} 
-                position={[side === 'right' ? 0.1 : -0.1, -0.08, 0.05]} 
-                rotation={[0, 0, side === 'right' ? -0.8 : 0.8]}
-            >
-                <meshStandardMaterial color="#ffe0bd" />
+        <group position={[0.08 - i * 0.04, 0, 0]}>
+            {/* Base segment */}
+            <Cylinder args={[0.015, 0.015, 0.08]} rotation={[isWaving ? Math.sin(t * 15 + i) * 0.2 + 0.2 : 0.1, 0, 0]}>
+                <meshPhysicalMaterial color="#ffe0bd" roughness={0.3} />
             </Cylinder>
+            {/* Tip segment */}
+            <group position={[0, -0.06, 0.02]} rotation={[0.4, 0, 0]}>
+                <Cylinder args={[0.012, 0.012, 0.06]}>
+                    <meshPhysicalMaterial color="#ffe0bd" roughness={0.3} />
+                </Cylinder>
+            </group>
         </group>
     );
 }
 
-function HumanoidModel({ status, isWaving }: AstraCoreProps) {
+function PremiumHumanoid({ status, isWaving }: AstraCoreProps) {
     const group = useRef<THREE.Group>(null);
     const headRef = useRef<THREE.Group>(null);
-    const upperTorsoRef = useRef<THREE.Group>(null);
     const rightArmRef = useRef<THREE.Group>(null);
     const rightForearmRef = useRef<THREE.Group>(null);
     const leftArmRef = useRef<THREE.Group>(null);
     
-    const color = status === 'listening' ? '#10b981' : 
-                  status === 'thinking' ? '#8b5cf6' : 
-                  status === 'speaking' ? '#3b82f6' : '#6366f1';
+    const statusColor = status === 'listening' ? '#10b981' : 
+                        status === 'thinking' ? '#8b5cf6' : 
+                        status === 'speaking' ? '#3b82f6' : '#6366f1';
 
     useFrame((state) => {
         const t = state.clock.elapsedTime;
         
         if (group.current) {
-            group.current.position.y = Math.sin(t * 1.5) * 0.04;
-            group.current.rotation.y = Math.sin(t * 0.4) * 0.08;
+            group.current.position.y = Math.sin(t * 1.2) * 0.03;
+            group.current.rotation.y = Math.sin(t * 0.3) * 0.05;
         }
 
         if (headRef.current) {
-            headRef.current.rotation.y = Math.sin(t * 1.2) * 0.12;
+            headRef.current.rotation.y = Math.sin(t * 0.8) * 0.1;
             if (status === 'speaking') {
-                headRef.current.rotation.x = Math.sin(t * 12) * 0.06;
+                headRef.current.rotation.x = Math.sin(t * 15) * 0.05;
             }
         }
 
-        // Advanced Human-like Waving
+        // Realistic Human Waving Animation
         if (rightArmRef.current && rightForearmRef.current) {
             if (isWaving) {
-                // Shoulder lift
-                rightArmRef.current.rotation.z = THREE.MathUtils.lerp(rightArmRef.current.rotation.z, -1.6, 0.1);
-                rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, -0.6, 0.1);
-                // Elbow wave
-                rightForearmRef.current.rotation.z = Math.sin(t * 15) * 0.4 - 0.2;
+                // Natural shoulder rotation
+                rightArmRef.current.rotation.z = THREE.MathUtils.lerp(rightArmRef.current.rotation.z, -1.8, 0.1);
+                rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, -0.4, 0.1);
+                // Fluid elbow wave
+                rightForearmRef.current.rotation.z = Math.sin(t * 12) * 0.5 - 0.2;
             } else {
-                // Relaxed human pose
-                rightArmRef.current.rotation.z = THREE.MathUtils.lerp(rightArmRef.current.rotation.z, 0.5, 0.1);
-                rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0.2, 0.1);
-                rightForearmRef.current.rotation.z = THREE.MathUtils.lerp(rightForearmRef.current.rotation.z, 0.4, 0.1);
+                // Idle resting pose
+                rightArmRef.current.rotation.z = THREE.MathUtils.lerp(rightArmRef.current.rotation.z, 0.4, 0.05);
+                rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0.1, 0.05);
+                rightForearmRef.current.rotation.z = THREE.MathUtils.lerp(rightForearmRef.current.rotation.z, 0.3, 0.05);
             }
         }
 
         if (leftArmRef.current) {
-            leftArmRef.current.rotation.z = -0.5 + Math.sin(t * 1.2) * 0.04;
+            leftArmRef.current.rotation.z = -0.4 + Math.sin(t * 1.2) * 0.03;
         }
     });
 
     return (
-        <group ref={group} scale={[0.8, 0.8, 0.8]} position={[0, -1.2, 0]}>
+        <group ref={group} scale={[0.85, 0.85, 0.85]} position={[0, -1.5, 0]}>
             
-            {/* --- HEAD (Human Oval Shape) --- */}
-            <group ref={headRef} position={[0, 2.6, 0]}>
-                <Sphere args={[0.45, 32, 32]} scale={[1, 1.2, 0.9]}>
-                    <meshStandardMaterial color="#ffe0bd" roughness={0.5} />
+            {/* --- HEAD --- */}
+            <group ref={headRef} position={[0, 3.2, 0]}>
+                {/* Anatomical Head Shape */}
+                <Sphere args={[0.38, 32, 32]} scale={[1, 1.15, 0.95]}>
+                    <meshPhysicalMaterial color="#ffe0bd" roughness={0.3} clearcoat={1} />
                 </Sphere>
                 
-                {/* Hair Spikes (Human scale) */}
-                <group position={[0, 0.2, 0]}>
-                    {[...Array(15)].map((_, i) => (
+                {/* Hair Spikes (Premium Refined) */}
+                <group position={[0, 0.1, 0]}>
+                    {[...Array(18)].map((_, i) => (
                         <Cone 
                             key={i} 
-                            args={[0.12, 0.5, 8]} 
-                            position={[Math.sin(i) * 0.35, Math.cos(i * 0.5) * 0.3 + 0.2, Math.cos(i) * 0.3]}
+                            args={[0.08, 0.55, 8]} 
+                            position={[Math.sin(i * 1.1) * 0.35, Math.cos(i * 0.4) * 0.25 + 0.2, Math.cos(i * 1.1) * 0.3]}
                             rotation={[Math.sin(i), 0, Math.cos(i)]}
                         >
-                            <meshStandardMaterial color="#1e40af" />
+                            <meshPhysicalMaterial color="#1e40af" roughness={0.2} clearcoat={1} />
                         </Cone>
                     ))}
-                    <Sphere args={[0.48, 16, 16]} position={[0, 0, -0.1]}>
-                        <meshStandardMaterial color="#1e40af" />
+                    <Sphere args={[0.39, 16, 16]} position={[0, 0.05, -0.05]}>
+                        <meshPhysicalMaterial color="#1e40af" roughness={0.2} clearcoat={1} />
                     </Sphere>
                 </group>
 
                 {/* Face Detail */}
-                <Sphere position={[-0.15, 0.1, 0.35]} args={[0.05, 16, 16]}><meshStandardMaterial color="#111827" /></Sphere>
-                <Sphere position={[0.15, 0.1, 0.35]} args={[0.05, 16, 16]}><meshStandardMaterial color="#111827" /></Sphere>
-                <Box args={[0.05, 0.08, 0.05]} position={[0, 0, 0.4]}><meshStandardMaterial color="#ffe0bd" /></Box>
+                <Sphere position={[-0.12, 0.05, 0.3]} args={[0.04, 16, 16]}><meshPhysicalMaterial color="#111827" /></Sphere>
+                <Sphere position={[0.12, 0.05, 0.3]} args={[0.04, 16, 16]}><meshPhysicalMaterial color="#111827" /></Sphere>
+                <Box args={[0.03, 0.06, 0.04]} position={[0, -0.05, 0.35]}><meshPhysicalMaterial color="#ffe0bd" /></Box>
             </group>
 
             {/* --- NECK --- */}
-            <Cylinder args={[0.1, 0.12, 0.3]} position={[0, 2.3, 0]}>
-                <meshStandardMaterial color="#ffe0bd" />
+            <Cylinder args={[0.08, 0.09, 0.25]} position={[0, 2.95, 0]}>
+                <meshPhysicalMaterial color="#ffe0bd" roughness={0.3} />
             </Cylinder>
 
-            {/* --- TORSO (Anatomical) --- */}
-            <group position={[0, 1.5, 0]}>
-                {/* Upper Chest */}
-                <Capsule args={[0.35, 0.6]} position={[0, 0.3, 0]} rotation={[0, 0, Math.PI / 2]}>
-                    <meshStandardMaterial color="#dc2626" />
-                </Capsule>
-                {/* Abdomen */}
-                <Capsule args={[0.28, 0.7]} position={[0, -0.1, 0]}>
-                    <meshStandardMaterial color="#dc2626" />
-                </Capsule>
-                {/* Hips */}
-                <Sphere args={[0.4, 16, 16]} position={[0, -0.5, 0]}>
-                    <meshStandardMaterial color="#0d9488" />
-                </Sphere>
+            {/* --- TORSO (Human Shape) --- */}
+            <group position={[0, 2, 0]}>
+                {/* Tapered Chest Box (Red Jacket) */}
+                <Box args={[0.7, 0.8, 0.45]} position={[0, 0.4, 0]}>
+                    <meshPhysicalMaterial color="#dc2626" roughness={0.4} clearcoat={0.5} />
+                </Box>
+                {/* White Collar */}
+                <Torus args={[0.25, 0.04, 16, 32]} position={[0, 0.85, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                    <meshPhysicalMaterial color="#ffffff" />
+                </Torus>
+                {/* Abdomen (Teal) */}
+                <Cylinder args={[0.28, 0.35, 0.6]} position={[0, -0.1, 0]}>
+                    <meshPhysicalMaterial color="#0d9488" roughness={0.4} />
+                </Cylinder>
             </group>
 
-            {/* --- ARMS (Proper Structure) --- */}
+            {/* --- ARMS --- */}
             {/* Right Arm */}
-            <group ref={rightArmRef} position={[0.45, 1.9, 0]}>
-                <Sphere args={[0.14, 16, 16]}><meshStandardMaterial color="#dc2626" /></Sphere>
-                <Capsule args={[0.12, 0.5]} position={[0, -0.3, 0]}><meshStandardMaterial color="#dc2626" /></Capsule>
-                <group ref={rightForearmRef} position={[0, -0.6, 0]}>
-                    <Sphere args={[0.1, 16, 16]}><meshStandardMaterial color="#dc2626" /></Sphere>
-                    <Capsule args={[0.12, 0.5]} position={[0, -0.3, 0]}><meshStandardMaterial color="#dc2626" /></Capsule>
-                    {/* PROPER HAND */}
-                    <group position={[0, -0.65, 0]} rotation={[0, -Math.PI / 2, 0]}>
-                        <Hand side="right" isWaving={!!isWaving} t={THREE.MathUtils.lerp(0, 5, 0.5)} />
+            <group ref={rightArmRef} position={[0.45, 2.5, 0]}>
+                <Sphere args={[0.12, 16, 16]}><meshPhysicalMaterial color="#dc2626" /></Sphere>
+                <Capsule args={[0.09, 0.6]} position={[0, -0.35, 0]}><meshPhysicalMaterial color="#dc2626" /></Capsule>
+                {/* Elbow Joint */}
+                <group ref={rightForearmRef} position={[0, -0.75, 0]}>
+                    <Sphere args={[0.08, 16, 16]}><meshPhysicalMaterial color="#dc2626" /></Sphere>
+                    <Capsule args={[0.09, 0.6]} position={[0, -0.35, 0]}><meshPhysicalMaterial color="#dc2626" /></Capsule>
+                    {/* ADVANCED HAND */}
+                    <group position={[0, -0.75, 0]} rotation={[0, -Math.PI / 2, 0]}>
+                        <Box args={[0.15, 0.06, 0.2]} position={[0, 0, 0]}>
+                            <meshPhysicalMaterial color="#ffe0bd" />
+                        </Box>
+                        <group position={[0, -0.05, 0]}>
+                            {[0, 1, 2, 3].map((i) => (
+                                <Finger key={i} i={i} t={THREE.MathUtils.lerp(0, 5, 0.5)} isWaving={isWaving || false} />
+                            ))}
+                        </group>
                     </group>
                 </group>
             </group>
 
             {/* Left Arm */}
-            <group ref={leftArmRef} position={[-0.45, 1.9, 0]}>
-                <Sphere args={[0.14, 16, 16]}><meshStandardMaterial color="#dc2626" /></Sphere>
-                <Capsule args={[0.12, 0.5]} position={[0, -0.3, 0]}><meshStandardMaterial color="#dc2626" /></Capsule>
-                <group position={[0, -0.6, 0]}>
-                    <Sphere args={[0.1, 16, 16]}><meshStandardMaterial color="#dc2626" /></Sphere>
-                    <Capsule args={[0.12, 0.5]} position={[0, -0.3, 0]}><meshStandardMaterial color="#dc2626" /></Capsule>
-                    {/* PROPER HAND */}
-                    <group position={[0, -0.65, 0]} rotation={[0, Math.PI / 2, 0]}>
-                        <Hand side="left" isWaving={false} t={0} />
+            <group ref={leftArmRef} position={[-0.45, 2.5, 0]}>
+                <Sphere args={[0.12, 16, 16]}><meshPhysicalMaterial color="#dc2626" /></Sphere>
+                <Capsule args={[0.09, 0.6]} position={[0, -0.35, 0]}><meshPhysicalMaterial color="#dc2626" /></Capsule>
+                <group position={[0, -0.75, 0]}>
+                    <Sphere args={[0.08, 16, 16]}><meshPhysicalMaterial color="#dc2626" /></Sphere>
+                    <Capsule args={[0.09, 0.6]} position={[0, -0.35, 0]}><meshPhysicalMaterial color="#dc2626" /></Capsule>
+                    <group position={[0, -0.75, 0]} rotation={[0, Math.PI / 2, 0]}>
+                        <Box args={[0.15, 0.06, 0.2]} position={[0, 0, 0]}>
+                            <meshPhysicalMaterial color="#ffe0bd" />
+                        </Box>
+                        <group position={[0, -0.05, 0]}>
+                            {[0, 1, 2, 3].map((i) => (
+                                <Finger key={i} i={i} t={0} isWaving={false} />
+                            ))}
+                        </group>
                     </group>
                 </group>
             </group>
 
-            {/* --- LEGS (Standard Sitting) --- */}
-            <group position={[0, 0.8, 0]}>
+            {/* --- LEGS (Standard Human Proportions) --- */}
+            <group position={[0, 1.2, 0]}>
                 {/* Right Leg */}
-                <group position={[0.25, 0, 0]} rotation={[0.4, -0.2, 0]}>
-                    <Capsule args={[0.18, 0.7]} position={[0, -0.4, 0.2]} rotation={[1.2, 0, 0]}><meshStandardMaterial color="#0d9488" /></Capsule>
+                <group position={[0.2, 0, 0]} rotation={[1.2, -0.1, 0]}>
+                    <Capsule args={[0.15, 0.8]} position={[0, -0.4, 0]}><meshPhysicalMaterial color="#0d9488" /></Capsule>
+                    <group position={[0, -0.9, 0]} rotation={[-0.8, 0, 0]}>
+                        <Capsule args={[0.14, 0.8]} position={[0, -0.4, 0]}><meshPhysicalMaterial color="#0d9488" /></Capsule>
+                    </group>
                 </group>
                 {/* Left Leg */}
-                <group position={[-0.25, 0, 0]} rotation={[0.4, 0.2, 0]}>
-                    <Capsule args={[0.18, 0.7]} position={[0, -0.4, 0.2]} rotation={[1.2, 0, 0]}><meshStandardMaterial color="#0d9488" /></Capsule>
+                <group position={[-0.2, 0, 0]} rotation={[1.2, 0.1, 0]}>
+                    <Capsule args={[0.15, 0.8]} position={[0, -0.4, 0]}><meshPhysicalMaterial color="#0d9488" /></Capsule>
+                    <group position={[0, -0.9, 0]} rotation={[-0.8, 0, 0]}>
+                        <Capsule args={[0.14, 0.8]} position={[0, -0.4, 0]}><meshPhysicalMaterial color="#0d9488" /></Capsule>
+                    </group>
                 </group>
             </group>
 
-            {/* --- PIG (Integrated) --- */}
-            <group position={[0, 0.9, 0.5]}>
-                <Sphere args={[0.22, 16, 16]}><meshStandardMaterial color="#111827" /></Sphere>
-                <Torus args={[0.23, 0.02, 8, 32]} rotation={[Math.PI / 2, 0, 0]}><meshStandardMaterial color="#eab308" /></Torus>
-            </group>
-
-            {/* Status Ring */}
-            <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[1.2, 1.4, 64]} />
-                <meshBasicMaterial color={color} transparent opacity={0.4} side={THREE.DoubleSide} />
+            {/* Status Glow Ring */}
+            <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[1.5, 1.7, 64]} />
+                <meshBasicMaterial color={statusColor} transparent opacity={0.3} side={THREE.DoubleSide} />
             </mesh>
-            <pointLight position={[0, 2, 2]} distance={5} intensity={2} color={color} />
+            <pointLight position={[0, 3, 3]} distance={8} intensity={2} color={statusColor} />
         </group>
     );
 }
@@ -607,20 +606,20 @@ export default function AstraAvatar() {
             <div 
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
-                    width: isOpen ? '180px' : '280px',
-                    height: isOpen ? '180px' : '280px',
+                    width: isOpen ? '220px' : '320px',
+                    height: isOpen ? '220px' : '320px',
                     cursor: 'pointer',
                     transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     transform: isOpen ? 'scale(1)' : 'scale(1.1)',
                     position: 'relative'
                 }}
             >
-                <Canvas camera={{ position: [0, 0, 5] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
+                <Canvas camera={{ position: [0, 0, 6] }} style={{ pointerEvents: 'none', background: 'transparent' }}>
                     <ambientLight intensity={1} />
                     <directionalLight position={[10, 10, 5]} intensity={1} />
                     <Environment preset="city" />
                     <React.Suspense fallback={null}>
-                        <HumanoidModel status={currentStatus} isWaving={isWaving} />
+                        <PremiumHumanoid status={currentStatus} isWaving={isWaving} />
                     </React.Suspense>
                 </Canvas>
                 
