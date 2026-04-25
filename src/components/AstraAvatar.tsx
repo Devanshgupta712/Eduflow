@@ -11,7 +11,7 @@ interface Message {
     content: string;
 }
 
-// Master Articulated Avatar Component
+// Master Articulated Avatar with Vertex-Warp for Leg Movement
 function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWaving: boolean }) {
     const group = useRef<THREE.Group>(null);
     const bodyRef = useRef<THREE.Mesh>(null);
@@ -24,19 +24,28 @@ function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWavin
                         status === 'thinking' ? '#8b5cf6' : 
                         status === 'speaking' ? '#3b82f6' : '#6366f1';
 
-    // Chroma Key Shader (Removes Magenta #FF00FF)
-    const chromaMaterial = (tex: THREE.Texture) => new THREE.ShaderMaterial({
+    // Master Shader with Chroma-Key and Vertex-Warp
+    const masterMaterial = (tex: THREE.Texture, isBody: boolean) => new THREE.ShaderMaterial({
         uniforms: {
             uTexture: { value: tex },
             uKeyColor: { value: new THREE.Color(1, 0, 1) },
-            uSimilarity: { value: 0.52 }, // Increased to remove pink edges
-            uSmoothness: { value: 0.12 }  // Smoother transition
+            uSimilarity: { value: 0.52 },
+            uSmoothness: { value: 0.12 },
+            uTime: { value: 0 },
+            uIsBody: { value: isBody ? 1.0 : 0.0 }
         },
         vertexShader: `
+            uniform float uTime;
+            uniform float uIsBody;
             varying vec2 vUv;
             void main() {
                 vUv = uv;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                vec3 pos = position;
+                // Moveable legs effect: Warp the bottom vertices
+                if (uIsBody > 0.5 && uv.y < 0.4) {
+                    pos.x += sin(uTime * 1.5 + uv.y * 5.0) * (0.4 - uv.y) * 0.4;
+                }
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
             }
         `,
         fragmentShader: `
@@ -56,50 +65,60 @@ function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWavin
         transparent: true
     });
 
+    const bodyMat = useRef(masterMaterial(bodyTex, true));
+    const armMat = useRef(masterMaterial(armTex, false));
+
     useFrame((state) => {
         const t = state.clock.elapsedTime;
+        bodyMat.current.uniforms.uTime.value = t;
+        armMat.current.uniforms.uTime.value = t;
         
         if (group.current) {
-            // High-quality floating/breathing animation
             group.current.position.y = Math.sin(t * 1.5) * 0.1;
             group.current.rotation.y = Math.sin(t * 0.4) * 0.05;
         }
 
         if (armPivotRef.current) {
             if (isWaving) {
-                // Wave from the shoulder pivot with natural easing
                 armPivotRef.current.rotation.z = Math.sin(t * 12) * 0.25;
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.95, 0.1);
-                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.38, 0.1);
+                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.7, 0.1);
+                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.32, 0.1);
             } else {
-                // Return to shoulder position
                 armPivotRef.current.rotation.z = THREE.MathUtils.lerp(armPivotRef.current.rotation.z, 0, 0.1);
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.85, 0.1);
-                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.4, 0.1);
+                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.6, 0.1);
+                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.35, 0.1);
             }
-        }
-
-        if (bodyRef.current && status === 'speaking') {
-            const s = 1 + Math.sin(t * 12) * 0.015;
-            bodyRef.current.scale.set(s, s, 1);
         }
     });
 
     return (
         <group ref={group} scale={[1.1, 1.1, 1.1]} position={[0, -0.5, 0]}>
-            {/* --- MASTER BODY LAYER (Unified Torso + Legs) --- */}
+            {/* --- MASTER BODY LAYER --- */}
             <mesh ref={bodyRef} position={[0, 0, 0]}>
-                <planeGeometry args={[3.5, 5.0]} />
-                <primitive object={chromaMaterial(bodyTex)} attach="material" />
+                <planeGeometry args={[3.5, 5.0, 16, 16]} />
+                <primitive object={bodyMat.current} attach="material" />
             </mesh>
 
-            {/* --- MASTER ARM LAYER (Right Arm Attached to Shoulder) --- */}
-            <group ref={armPivotRef} position={[-0.4, 0.85, 0.1]}>
+            {/* --- CORRECTED ARM LAYER (Scaled & Aligned) --- */}
+            <group ref={armPivotRef} position={[-0.35, 0.6, 0.1]}>
                 <mesh position={[0.2, -0.4, 0]}>
-                    <planeGeometry args={[1.4, 1.4]} />
-                    <primitive object={chromaMaterial(armTex)} attach="material" />
+                    <planeGeometry args={[1.1, 1.1]} />
+                    <primitive object={armMat.current} attach="material" />
                 </mesh>
             </group>
+
+            {/* --- STATUS RING --- */}
+            <group position={[0, -2.4, -0.1]}>
+                <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                    <ringGeometry args={[0.9, 1.0, 64]} />
+                    <meshBasicMaterial color={statusColor} transparent opacity={0.8} side={THREE.DoubleSide} />
+                </mesh>
+            </group>
+            
+            <pointLight position={[0, 1, 3]} distance={8} intensity={2} color={statusColor} />
+        </group>
+    );
+}
 
             {/* --- STATUS GLOW RING --- */}
             <group position={[0, -2.4, -0.1]}>
