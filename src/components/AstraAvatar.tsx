@@ -2,114 +2,129 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useTexture, Environment } from '@react-three/drei';
+import { Float, Sphere, Capsule, Cone, Box, Torus, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Master Articulated Avatar (Stable & Premium) ---
-function MasterArticulatedAvatar({ status, isWaving }: { status: string, isWaving: boolean }) {
+// --- High-Fidelity Procedural Ranma (Skeletal & Stable) ---
+function HighFidelityAvatar({ status, isWaving }: { status: string, isWaving: boolean }) {
     const group = useRef<THREE.Group>(null);
-    const bodyRef = useRef<THREE.Mesh>(null);
-    const armPivotRef = useRef<THREE.Group>(null);
-    
-    const bodyTex = useTexture('/ranma_body_master.png');
-    const armTex = useTexture('/ranma_arm_master.png');
-    
+    const headRef = useRef<THREE.Group>(null);
+    const rightArmPivot = useRef<THREE.Group>(null);
+    const leftArmPivot = useRef<THREE.Group>(null);
+    const rightLegPivot = useRef<THREE.Group>(null);
+    const leftLegPivot = useRef<THREE.Group>(null);
+
     const statusColor = status === 'listening' ? '#10b981' : 
                         status === 'thinking' ? '#8b5cf6' : 
-                        status === 'speaking' ? '#3b82f6' : '#6366f1';
-
-    // Master Shader (Chroma-Key + Warp for movement)
-    const masterMaterial = (tex: THREE.Texture, isBody: boolean) => new THREE.ShaderMaterial({
-        uniforms: {
-            uTexture: { value: tex },
-            uKeyColor: { value: new THREE.Color(1, 0, 1) }, // Magenta
-            uSimilarity: { value: 0.52 },
-            uSmoothness: { value: 0.12 },
-            uTime: { value: 0 },
-            uIsBody: { value: isBody ? 1.0 : 0.0 }
-        },
-        vertexShader: `
-            uniform float uTime;
-            uniform float uIsBody;
-            varying vec2 vUv;
-            void main() {
-                vUv = uv;
-                vec3 pos = position;
-                // Subtle leg sway within the master image
-                if (uIsBody > 0.5 && uv.y < 0.35) {
-                    pos.x += sin(uTime * 1.5 + uv.y * 6.0) * (0.35 - uv.y) * 0.3;
-                }
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-            }
-        `,
-        fragmentShader: `
-            uniform sampler2D uTexture;
-            uniform vec3 uKeyColor;
-            uniform float uSimilarity;
-            uniform float uSmoothness;
-            varying vec2 vUv;
-            void main() {
-                vec4 texColor = texture2D(uTexture, vUv);
-                float dist = distance(texColor.rgb, uKeyColor);
-                float alpha = smoothstep(uSimilarity, uSimilarity + uSmoothness, dist);
-                if (alpha < 0.1) discard;
-                gl_FragColor = vec4(texColor.rgb, alpha);
-            }
-        `,
-        transparent: true
-    });
-
-    const bodyMat = useRef(masterMaterial(bodyTex, true));
-    const armMat = useRef(masterMaterial(armTex, false));
+                        status === 'speaking' ? '#3b82f6' : '#dc2626';
 
     useFrame((state) => {
         const t = state.clock.elapsedTime;
-        bodyMat.current.uniforms.uTime.value = t;
-        armMat.current.uniforms.uTime.value = t;
         
-        if (group.current) {
-            group.current.position.y = Math.sin(t * 1.2) * 0.1;
-            group.current.rotation.y = Math.sin(t * 0.3) * 0.05;
+        // Natural Body Float
+        if (group.current) group.current.position.y = Math.sin(t * 1.2) * 0.1;
+
+        // Head Look
+        if (headRef.current) {
+            headRef.current.rotation.y = Math.sin(t * 0.5) * 0.15;
+            if (status === 'speaking') headRef.current.rotation.x = Math.sin(t * 15) * 0.05;
         }
 
-        if (armPivotRef.current) {
+        // Arm Movement
+        if (rightArmPivot.current) {
             if (isWaving) {
-                armPivotRef.current.rotation.z = Math.sin(t * 12) * 0.2;
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.75, 0.1);
-                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.32, 0.1);
+                rightArmPivot.current.rotation.z = -1.8 + Math.sin(t * 15) * 0.3;
+                rightArmPivot.current.rotation.x = -0.5;
             } else {
-                armPivotRef.current.rotation.z = THREE.MathUtils.lerp(armPivotRef.current.rotation.z, 0, 0.1);
-                armPivotRef.current.position.y = THREE.MathUtils.lerp(armPivotRef.current.position.y, 0.7, 0.1);
-                armPivotRef.current.position.x = THREE.MathUtils.lerp(armPivotRef.current.position.x, -0.35, 0.1);
+                rightArmPivot.current.rotation.z = 0.4 + Math.sin(t * 1.2) * 0.05;
+                rightArmPivot.current.rotation.x = 0;
             }
+        }
+        if (leftArmPivot.current) {
+            leftArmPivot.current.rotation.z = -0.4 - Math.sin(t * 1.2) * 0.05;
+        }
+
+        // Leg Movement (Walking/Swaying)
+        if (rightLegPivot.current && leftLegPivot.current) {
+            rightLegPivot.current.rotation.x = Math.sin(t * 1.2) * 0.1;
+            leftLegPivot.current.rotation.x = -Math.sin(t * 1.2) * 0.1;
         }
     });
 
     return (
-        <group ref={group} scale={[1.1, 1.1, 1.1]} position={[0, -0.5, 0]}>
-            {/* Unified Master Body */}
-            <mesh ref={bodyRef} position={[0, 0, 0]}>
-                <planeGeometry args={[3.5, 5.0, 16, 16]} />
-                <primitive object={bodyMat.current} attach="material" />
-            </mesh>
+        <group ref={group} scale={[1.2, 1.2, 1.2]} position={[0, -1, 0]}>
+            {/* --- HEAD & HAIR --- */}
+            <group ref={headRef} position={[0, 2.8, 0]}>
+                <Sphere args={[0.35, 32, 32]} scale={[1, 1.05, 0.95]}>
+                    <meshPhysicalMaterial color="#ffe0bd" roughness={0.3} />
+                </Sphere>
+                {/* Anime Hair Spikes */}
+                <group position={[0, 0.1, 0]}>
+                    {[...Array(15)].map((_, i) => (
+                        <Cone key={i} args={[0.08, 0.4, 8]} position={[Math.sin(i * 1.5) * 0.3, Math.cos(i * 0.5) * 0.2 + 0.15, Math.cos(i * 1.5) * 0.25]} rotation={[Math.sin(i), 0, Math.cos(i)]}>
+                            <meshPhysicalMaterial color="#dc2626" roughness={0.2} clearcoat={1} />
+                        </Cone>
+                    ))}
+                </group>
+                {/* Eyes */}
+                <group position={[0, 0, 0.32]}>
+                    <Sphere args={[0.04, 16, 16]} position={[-0.12, 0.05, 0]}><meshBasicMaterial color="#111827" /></Sphere>
+                    <Sphere args={[0.04, 16, 16]} position={[0.12, 0.05, 0]}><meshBasicMaterial color="#111827" /></Sphere>
+                </group>
+            </group>
 
-            {/* Surgical Arm Attachment (Scaled & Aligned) */}
-            <group ref={armPivotRef} position={[-0.35, 0.7, 0.1]}>
-                <mesh position={[0.2, -0.35, 0]}>
-                    <planeGeometry args={[1.05, 1.05]} />
-                    <primitive object={armMat.current} attach="material" />
-                </mesh>
+            {/* --- TORSO --- */}
+            <group position={[0, 1.8, 0]}>
+                <Capsule args={[0.3, 0.8, 16, 32]} scale={[1.2, 1, 0.8]}>
+                    <meshPhysicalMaterial color="#dc2626" roughness={0.4} clearcoat={0.5} />
+                </Capsule>
+                <Torus args={[0.28, 0.04, 16, 32]} position={[0, 0.5, 0]} rotation={[Math.PI/2, 0, 0]}>
+                    <meshBasicMaterial color="#fff" />
+                </Torus>
+            </group>
+
+            {/* --- ARMS --- */}
+            {/* Right Arm */}
+            <group ref={rightArmPivot} position={[0.45, 2.3, 0]}>
+                <Capsule args={[0.1, 0.6]} position={[0, -0.3, 0]} rotation={[0, 0, 0]}>
+                    <meshPhysicalMaterial color="#dc2626" />
+                </Capsule>
+                <group position={[0, -0.6, 0]}>
+                    <Capsule args={[0.09, 0.6]} position={[0, -0.3, 0]}><meshPhysicalMaterial color="#ffe0bd" /></Capsule>
+                </group>
+            </group>
+            {/* Left Arm */}
+            <group ref={leftArmPivot} position={[-0.45, 2.3, 0]}>
+                <Capsule args={[0.1, 0.6]} position={[0, -0.3, 0]}><meshPhysicalMaterial color="#dc2626" /></Capsule>
+                <group position={[0, -0.6, 0]}>
+                    <Capsule args={[0.09, 0.6]} position={[0, -0.3, 0]}><meshPhysicalMaterial color="#ffe0bd" /></Capsule>
+                </group>
+            </group>
+
+            {/* --- LEGS --- */}
+            {/* Right Leg */}
+            <group ref={rightLegPivot} position={[0.2, 1.2, 0]}>
+                <Capsule args={[0.14, 0.8]} position={[0, -0.4, 0]}><meshPhysicalMaterial color="#0d9488" /></Capsule>
+                <group position={[0, -0.8, 0]}>
+                    <Capsule args={[0.13, 0.8]} position={[0, -0.4, 0]}><meshPhysicalMaterial color="#0d9488" /></Capsule>
+                    <Box args={[0.2, 0.08, 0.3]} position={[0, -0.85, 0.1]}><meshPhysicalMaterial color="#111827" /></Box>
+                </group>
+            </group>
+            {/* Left Leg */}
+            <group ref={leftLegPivot} position={[-0.2, 1.2, 0]}>
+                <Capsule args={[0.14, 0.8]} position={[0, -0.4, 0]}><meshPhysicalMaterial color="#0d9488" /></Capsule>
+                <group position={[0, -0.8, 0]}>
+                    <Capsule args={[0.13, 0.8]} position={[0, -0.4, 0]}><meshPhysicalMaterial color="#0d9488" /></Capsule>
+                    <Box args={[0.2, 0.08, 0.3]} position={[0, -0.85, 0.1]}><meshPhysicalMaterial color="#111827" /></Box>
+                </group>
             </group>
 
             {/* Status Glow */}
-            <group position={[0, -2.4, -0.1]}>
-                <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                    <ringGeometry args={[0.9, 1.0, 64]} />
-                    <meshBasicMaterial color={statusColor} transparent opacity={0.8} />
-                </mesh>
-            </group>
-            
-            <pointLight position={[0, 1, 3]} distance={8} intensity={2} color={statusColor} />
+            <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, -0.5, 0]}>
+                <ringGeometry args={[1.2, 1.3, 64]} />
+                <meshBasicMaterial color={statusColor} transparent opacity={0.8} />
+            </mesh>
+            <pointLight position={[0, 2, 2]} distance={6} intensity={2} color={statusColor} />
         </group>
     );
 }
@@ -130,7 +145,7 @@ export default function AstraAvatar() {
         targetRef.current = { x: window.innerWidth - 380, y: window.innerHeight - 450 };
 
         let animationFrameId: number;
-        const updatePos = (time: number) => {
+        const updatePos = () => {
             if (!isOpen && !isDragging) {
                 const dx = targetRef.current.x - posRef.current.x;
                 const dy = targetRef.current.y - posRef.current.y;
@@ -177,23 +192,21 @@ export default function AstraAvatar() {
     return (
         <div ref={containerRef} onMouseDown={handleMouseDown} style={{ position: 'fixed', zIndex: 10000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px', cursor: isDragging ? 'grabbing' : 'pointer' }}>
             {isOpen && (
-                <div style={{ width: '350px', height: '500px', background: 'rgba(15, 23, 42, 0.98)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '32px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', color: '#fff' }}>
-                        <span>Astra AI</span>
-                        <button onClick={() => setIsOpen(false)}>×</button>
+                <div style={{ width: '350px', height: '500px', background: 'rgba(15, 23, 42, 0.98)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '32px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+                    <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span style={{ fontWeight: 'bold' }}>Astra AI</span>
+                        <button onClick={() => setIsOpen(false)} style={{ fontSize: '24px' }}>×</button>
                     </div>
                 </div>
             )}
             <div onClick={() => !isDragging && setIsOpen(!isOpen)} style={{ width: '400px', height: '400px', position: 'relative' }}>
-                <Canvas camera={{ position: [0, 0, 5] }}>
-                    <ambientLight intensity={1.5} />
+                <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
+                    <ambientLight intensity={1} />
                     <Environment preset="city" />
-                    <React.Suspense fallback={null}>
-                        <MasterArticulatedAvatar status="idle" isWaving={isOpen} />
-                    </React.Suspense>
+                    <HighFidelityAvatar status="idle" isWaving={isOpen} />
                 </Canvas>
                 {!isOpen && (
-                    <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', background: '#dc2626', color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' }}>Hello!</div>
+                    <div style={{ position: 'absolute', top: '20%', left: '50%', transform: 'translateX(-50%)', background: '#dc2626', color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' }}>Hello! Click me</div>
                 )}
             </div>
         </div>
