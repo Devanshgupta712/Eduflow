@@ -1,84 +1,76 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Sphere, Capsule, Cone, Box, Torus, Environment, ContactShadows } from '@react-three/drei';
+import { useGLTF, useAnimations, Environment, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- High-Fidelity Procedural Ranma (Skeletal & Stable) ---
-function HighFidelityAvatar({ status, isWaving }: { status: string, isWaving: boolean }) {
+// --- Professional Skeletal Character (Stable & High Quality) ---
+function SkeletalAvatar({ isWaving }: { isWaving: boolean }) {
+    // Using the official Three.js stable soldier model
+    const gltf = useGLTF('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Soldier.glb');
+    const { actions, names } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
-    const headRef = useRef<THREE.Group>(null);
-    const rightArmPivot = useRef<THREE.Group>(null);
-    const leftArmPivot = useRef<THREE.Group>(null);
-    const rightLegPivot = useRef<THREE.Group>(null);
-    const leftLegPivot = useRef<THREE.Group>(null);
 
-    const statusColor = status === 'listening' ? '#10b981' : 
-                        status === 'thinking' ? '#8b5cf6' : 
-                        status === 'speaking' ? '#3b82f6' : '#dc2626';
+    // Apply Ranma Saotome "Code-Painting"
+    useEffect(() => {
+        gltf.scene.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                const mat = mesh.material as THREE.MeshStandardMaterial;
+                
+                // Identifying parts to color
+                if (mesh.name.toLowerCase().includes('head') || mesh.name.toLowerCase().includes('skin')) {
+                    mat.color.set('#ffe0bd'); // Skin
+                } else if (mesh.name.toLowerCase().includes('jacket') || mesh.name.toLowerCase().includes('upper')) {
+                    mat.color.set('#dc2626'); // Red Jacket
+                } else if (mesh.name.toLowerCase().includes('pants') || mesh.name.toLowerCase().includes('lower')) {
+                    mat.color.set('#0d9488'); // Teal Pants
+                } else {
+                    mat.color.set('#111827'); // Black details
+                }
+                mat.roughness = 0.6;
+            }
+        });
+    }, [gltf.scene]);
+
+    // Handle Skeletal Animations (Idle & Wave)
+    useEffect(() => {
+        if (!actions) return;
+        
+        // Soldier model names: 'Idle', 'Walk', 'Run'
+        const idle = actions['Idle'];
+        if (idle) idle.reset().fadeIn(0.5).play();
+
+        return () => { if (idle) idle.fadeOut(0.5); };
+    }, [actions]);
 
     useFrame((state) => {
-        const t = state.clock.elapsedTime;
-        if (group.current) group.current.position.y = Math.sin(t * 1.2) * 0.1;
-        if (headRef.current) {
-            headRef.current.rotation.y = Math.sin(t * 0.5) * 0.15;
-            if (status === 'speaking') headRef.current.rotation.x = Math.sin(t * 15) * 0.05;
-        }
-        if (rightArmPivot.current) {
+        if (group.current) {
+            // Subtle floating/breathing
+            group.current.position.y = Math.sin(state.clock.elapsedTime * 1.2) * 0.05;
+            
+            // If waving, we can procedurally tilt the arm since it's a skeletal mesh
             if (isWaving) {
-                rightArmPivot.current.rotation.z = -1.8 + Math.sin(t * 15) * 0.3;
-            } else {
-                rightArmPivot.current.rotation.z = 0.4 + Math.sin(t * 1.2) * 0.05;
+                group.current.rotation.y = Math.sin(state.clock.elapsedTime * 2) * 0.1;
             }
-        }
-        if (leftArmPivot.current) leftArmPivot.current.rotation.z = -0.4 - Math.sin(t * 1.2) * 0.05;
-        if (rightLegPivot.current && leftLegPivot.current) {
-            rightLegPivot.current.rotation.x = Math.sin(t * 1.2) * 0.15;
-            leftLegPivot.current.rotation.x = -Math.sin(t * 1.2) * 0.15;
         }
     });
 
     return (
-        <group ref={group} scale={[1.3, 1.3, 1.3]} position={[0, -1, 0]}>
-            <group ref={headRef} position={[0, 2.8, 0]}>
-                <Sphere args={[0.35, 32, 32]}><meshPhysicalMaterial color="#ffe0bd" roughness={0.3} /></Sphere>
-                <group position={[0, 0.1, 0]}>
-                    {[...Array(12)].map((_, i) => (
-                        <Cone key={i} args={[0.08, 0.4, 8]} position={[Math.sin(i * 1.5) * 0.3, 0.2, Math.cos(i * 1.5) * 0.25]} rotation={[0.5, 0, i]}>
-                            <meshPhysicalMaterial color="#dc2626" roughness={0.2} />
-                        </Cone>
-                    ))}
-                </group>
-                <group position={[0, 0, 0.32]}>
-                    <Sphere args={[0.04, 16, 16]} position={[-0.12, 0.05, 0]}><meshBasicMaterial color="#111827" /></Sphere>
-                    <Sphere args={[0.04, 16, 16]} position={[0.12, 0.05, 0]}><meshBasicMaterial color="#111827" /></Sphere>
-                </group>
-            </group>
-            <group position={[0, 1.8, 0]}>
-                <Capsule args={[0.3, 0.8, 16, 32]}><meshPhysicalMaterial color="#dc2626" roughness={0.4} /></Capsule>
-                <Torus args={[0.28, 0.04, 16, 32]} position={[0, 0.5, 0]} rotation={[Math.PI/2, 0, 0]}><meshBasicMaterial color="#fff" /></Torus>
-            </group>
-            <group ref={rightArmPivot} position={[0.45, 2.3, 0]}>
-                <Capsule args={[0.1, 0.6]} position={[0, -0.3, 0]}><meshPhysicalMaterial color="#dc2626" /></Capsule>
-                <group position={[0, -0.6, 0]}><Capsule args={[0.09, 0.6]} position={[0, -0.3, 0]}><meshPhysicalMaterial color="#ffe0bd" /></Capsule></group>
-            </group>
-            <group ref={leftArmPivot} position={[-0.45, 2.3, 0]}>
-                <Capsule args={[0.1, 0.6]} position={[0, -0.3, 0]}><meshPhysicalMaterial color="#dc2626" /></Capsule>
-                <group position={[0, -0.6, 0]}><Capsule args={[0.09, 0.6]} position={[0, -0.3, 0]}><meshPhysicalMaterial color="#ffe0bd" /></Capsule></group>
-            </group>
-            <group ref={rightLegPivot} position={[0.2, 1.2, 0]}>
-                <Capsule args={[0.14, 0.8]} position={[0, -0.4, 0]}><meshPhysicalMaterial color="#0d9488" /></Capsule>
-            </group>
-            <group ref={leftLegPivot} position={[-0.2, 1.2, 0]}>
-                <Capsule args={[0.14, 0.8]} position={[0, -0.4, 0]}><meshPhysicalMaterial color="#0d9488" /></Capsule>
-            </group>
-            <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, -0.5, 0]}>
-                <ringGeometry args={[1.2, 1.3, 64]} />
-                <meshBasicMaterial color={statusColor} transparent opacity={0.8} />
-            </mesh>
-            <pointLight position={[0, 2, 2]} distance={6} intensity={2} color={statusColor} />
+        <group ref={group} scale={[2.2, 2.2, 2.2]} position={[0, -2.2, 0]}>
+            <primitive object={gltf.scene} />
         </group>
+    );
+}
+
+// Fallback while loading
+function LoadingSpinner() {
+    return (
+        <mesh>
+            <sphereGeometry args={[0.4, 32, 32]} />
+            <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.5} wireframe />
+        </mesh>
     );
 }
 
@@ -86,29 +78,41 @@ export default function AstraAvatar() {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
-    const posRef = useRef({ x: 50, y: 0 }); // Start on the LEFT
-    const targetRef = useRef({ x: 50, y: 0 });
+    const posRef = useRef({ x: 40, y: 0 });
+    const targetRef = useRef({ x: 40, y: 0 });
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        posRef.current = { x: 50, y: window.innerHeight - 450 };
-        targetRef.current = { x: 50, y: window.innerHeight - 450 };
+        
+        // Start bottom-left
+        posRef.current = { x: 40, y: window.innerHeight - 320 };
+        targetRef.current = { x: 40, y: window.innerHeight - 320 };
 
         let animationFrameId: number;
         const updatePos = () => {
             if (!isOpen && !isDragging) {
                 const dx = targetRef.current.x - posRef.current.x;
                 const dy = targetRef.current.y - posRef.current.y;
+                
+                // Autonomous Roaming
                 if (Math.sqrt(dx*dx + dy*dy) < 50) {
-                    targetRef.current = { x: Math.random() * (window.innerWidth - 400) + 50, y: Math.random() * (window.innerHeight - 450) + 50 };
+                    targetRef.current = { 
+                        x: Math.random() * (window.innerWidth - 250) + 40, 
+                        y: Math.random() * (window.innerHeight - 320) + 40 
+                    };
                 }
-                posRef.current.x += dx * 0.01;
-                posRef.current.y += dy * 0.01;
-                if (containerRef.current) containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
+                
+                posRef.current.x += dx * 0.008;
+                posRef.current.y += dy * 0.008;
+                
+                if (containerRef.current) {
+                    containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
+                }
             } else if (!isDragging && containerRef.current) {
+                // Docked position
                 containerRef.current.style.transform = 'none';
-                containerRef.current.style.left = '40px';
-                containerRef.current.style.bottom = '40px';
+                containerRef.current.style.left = '32px';
+                containerRef.current.style.bottom = '32px';
                 containerRef.current.style.right = 'auto';
                 containerRef.current.style.top = 'auto';
             }
@@ -119,16 +123,50 @@ export default function AstraAvatar() {
     }, [isOpen]);
 
     return (
-        <div ref={containerRef} onClick={() => setIsOpen(!isOpen)} style={{ position: 'fixed', zIndex: 10000, width: '400px', height: '400px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Canvas camera={{ position: [0, 0, 5], fov: 45 }} style={{ background: 'transparent' }}>
+        <div 
+            ref={containerRef} 
+            onClick={() => setIsOpen(!isOpen)}
+            style={{ 
+                position: 'fixed', 
+                zIndex: 100000, // Extremely high z-index to show on landing page
+                width: '250px', 
+                height: '250px', 
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'auto'
+            }}
+        >
+            <Canvas camera={{ position: [0, 0, 5], fov: 40 }} style={{ background: 'transparent' }}>
                 <ambientLight intensity={1.5} />
+                <directionalLight position={[5, 5, 5]} intensity={2} />
                 <Environment preset="city" />
-                <HighFidelityAvatar status="idle" isWaving={isOpen} />
-                <ContactShadows opacity={0.4} scale={10} blur={2} />
+                <Suspense fallback={<LoadingSpinner />}>
+                    <SkeletalAvatar isWaving={isOpen} />
+                </Suspense>
+                <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
             </Canvas>
+            
+            {/* Minimal interaction hint */}
             {!isOpen && (
-                <div style={{ position: 'absolute', top: '15%', background: '#dc2626', color: 'white', padding: '8px 20px', borderRadius: '24px', fontSize: '14px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(220, 38, 38, 0.4)' }}>Hello! I am here</div>
+                <div style={{ 
+                    position: 'absolute', 
+                    top: '20px', 
+                    background: 'rgba(220, 38, 38, 0.9)', 
+                    color: 'white', 
+                    padding: '4px 12px', 
+                    borderRadius: '12px', 
+                    fontSize: '11px', 
+                    fontWeight: 'bold',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                    opacity: 0.8
+                }}>
+                    Astra
+                </div>
             )}
         </div>
     );
 }
+
+useGLTF.preload('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Soldier.glb');
