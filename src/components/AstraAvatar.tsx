@@ -5,13 +5,14 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Skeletal Character (Priority Animation Engine) ---
+// --- Premium Skeletal Character (Advanced Interaction Engine) ---
 function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
     const gltf = useGLTF('/astra_model.glb');
     const { actions } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
     const rightArm = useRef<THREE.Object3D | null>(null);
     const leftArm = useRef<THREE.Object3D | null>(null);
+    const head = useRef<THREE.Object3D | null>(null);
 
     useEffect(() => {
         gltf.scene.traverse((child) => {
@@ -29,18 +30,24 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
                 if (child.name.toLowerCase().includes('right')) rightArm.current = child;
                 if (child.name.toLowerCase().includes('left')) leftArm.current = child;
             }
+            if (child.name.toLowerCase().includes('head') || child.name.toLowerCase().includes('neck')) {
+                head.current = child;
+            }
         });
         gltf.scene.rotation.y = Math.PI;
     }, [gltf.scene]);
 
-    // --- Animation State Machine (No Lag) ---
+    // --- Animation State Machine ---
     useEffect(() => {
         if (!actions) return;
         
-        // Priority: Status > Movement > Idle
         let activeAction = actions['Idle'];
         
-        if (status === 'listening' || status === 'waving') {
+        // Priority Chain
+        if (status === 'thinking') {
+            // No specific thinking anim? Use subtle Idle + manual head logic in useFrame
+            activeAction = actions['Idle'];
+        } else if (status === 'speaking' || status === 'waving') {
             activeAction = actions['Wave'] || actions['Idle'];
         } else if (enableRoaming && isMoving && status === 'idle') {
             activeAction = actions['Walk'] || actions['Run'];
@@ -48,10 +55,7 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
             activeAction = actions['Idle'];
         }
 
-        // Smooth transition
-        Object.values(actions).forEach(a => {
-            if (a !== activeAction) a?.fadeOut(0.3);
-        });
+        Object.values(actions).forEach(a => { if (a !== activeAction) a?.fadeOut(0.3); });
         activeAction?.reset().fadeIn(0.3).play();
     }, [actions, isMoving, status, enableRoaming]);
 
@@ -61,15 +65,26 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
             group.current.position.y = Math.sin(t * 1.5) * 0.08;
             if (autoRotate) group.current.rotation.y += 0.01;
             
-            // Speaking Gestures (only when still)
-            if (status === 'speaking') {
+            // --- ADVANCED THINKING ANIMATION ---
+            if (status === 'thinking') {
+                if (head.current) {
+                    head.current.rotation.y = Math.sin(t * 4) * 0.3; // Looking around
+                    head.current.rotation.x = Math.sin(t * 2) * 0.1; // Nodding
+                }
+                group.current.rotation.z = Math.sin(t * 2) * 0.05;
+            } 
+            // --- SPEAKING GESTURES ---
+            else if (status === 'speaking') {
                 if (rightArm.current) rightArm.current.rotation.z = -Math.PI/4 + Math.sin(t * 10) * 0.2;
                 if (leftArm.current) leftArm.current.rotation.z = Math.PI/4 + Math.cos(t * 10) * 0.2;
-                group.current.rotation.y += Math.sin(t * 12) * 0.03;
-            } else if (status === 'thinking') {
-                // Thinking Sway
-                group.current.rotation.z = Math.sin(t * 2) * 0.05;
-            } else {
+                if (head.current) head.current.rotation.y = Math.sin(t * 2) * 0.1;
+            } 
+            // --- RESET BONES ---
+            else {
+                if (head.current) {
+                    head.current.rotation.y = THREE.MathUtils.lerp(head.current.rotation.y, 0, 0.1);
+                    head.current.rotation.x = THREE.MathUtils.lerp(head.current.rotation.x, 0, 0.1);
+                }
                 if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0, 0.1);
                 if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, 0, 0.1);
                 group.current.rotation.z = THREE.MathUtils.lerp(group.current.rotation.z, 0, 0.1);
@@ -86,9 +101,9 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
 
 export default function AstraAvatar() {
     const [mounted, setMounted] = useState(false);
-    const [status, setStatus] = useState('waving'); 
+    const [status, setStatus] = useState('idle'); 
     const [isMoving, setIsMoving] = useState(false);
-    const [enableRoaming, setEnableRoaming] = useState(false); // Default OFF per user request
+    const [enableRoaming, setEnableRoaming] = useState(false);
     const [responseText, setResponseText] = useState('');
     const [autoRotate, setAutoRotate] = useState(false);
     const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -109,8 +124,6 @@ export default function AstraAvatar() {
         posRef.current = { x: 50, y: window.innerHeight - 550 };
         targetRef.current = { x: 50, y: window.innerHeight - 550 };
 
-        const waveTimer = setTimeout(() => setStatus('idle'), 3000);
-
         const loadVoices = () => {
             const v = window.speechSynthesis.getVoices();
             setVoices(v);
@@ -128,7 +141,6 @@ export default function AstraAvatar() {
                 const dx = targetRef.current.x - posRef.current.x;
                 const dy = targetRef.current.y - posRef.current.y;
                 const distance = Math.sqrt(dx*dx + dy*dy);
-                
                 if (distance < 50 || time - lastMoveTime > 8000) {
                     targetRef.current = { 
                         x: Math.random() * (window.innerWidth - 350) + 50, 
@@ -136,32 +148,27 @@ export default function AstraAvatar() {
                     };
                     lastMoveTime = time;
                 }
-                
                 if (distance > 10) {
                     setIsMoving(true);
-                    posRef.current.x += dx * 0.012; // Smoother faster walk
+                    posRef.current.x += dx * 0.012;
                     posRef.current.y += dy * 0.012;
                     if (containerRef.current) containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
-                } else {
-                    setIsMoving(false);
-                }
-            } else {
-                setIsMoving(false);
-            }
+                } else { setIsMoving(false); }
+            } else { setIsMoving(false); }
             animationFrameId = requestAnimationFrame(updatePos);
         };
         animationFrameId = requestAnimationFrame(updatePos);
 
-        return () => { cancelAnimationFrame(animationFrameId); clearTimeout(waveTimer); };
+        return () => cancelAnimationFrame(animationFrameId);
     }, [enableRoaming, status]);
 
     const handleAstraClick = () => {
-        if (status === 'speaking') {
+        if (status === 'speaking' || status === 'thinking') {
             window.speechSynthesis.cancel();
             setStatus('idle');
             return;
         }
-        setIsMoving(false); // Force stop walking on click
+        setIsMoving(false);
         setStatus('listening');
         recognitionRef.current?.start();
     };
@@ -181,14 +188,21 @@ export default function AstraAvatar() {
                         body: JSON.stringify({ message: transcript, history: [] })
                     });
                     const data = await res.json();
+                    
+                    // --- REPLY SEQUENCE ---
                     setResponseText(data.reply);
-                    setStatus('speaking');
-                    const utterance = new SpeechSynthesisUtterance(data.reply);
-                    const voice = voices.find(v => v.name === selectedVoice);
-                    if (voice) utterance.voice = voice;
-                    utterance.volume = volume;
-                    utterance.onend = () => setStatus('idle');
-                    window.speechSynthesis.speak(utterance);
+                    setStatus('waving'); // Start wave greeting
+                    
+                    setTimeout(() => {
+                        setStatus('speaking');
+                        const utterance = new SpeechSynthesisUtterance(data.reply);
+                        const voice = voices.find(v => v.name === selectedVoice);
+                        if (voice) utterance.voice = voice;
+                        utterance.volume = volume;
+                        utterance.onend = () => setStatus('idle');
+                        window.speechSynthesis.speak(utterance);
+                    }, 1000); // Wave for 1 second then talk
+                    
                 } catch (e) { setStatus('idle'); }
             };
         }
@@ -222,28 +236,23 @@ export default function AstraAvatar() {
             {showSettings && (
                 <div style={{ position: 'absolute', top: '90px', right: '40px', width: '280px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 100 }}>
                     <h4 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>Settings</h4>
-                    
                     <label style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '15px' }}>
-                        <input type="checkbox" checked={enableRoaming} onChange={() => setEnableRoaming(!enableRoaming)} /> Enable Walking / Roaming
+                        <input type="checkbox" checked={enableRoaming} onChange={() => setEnableRoaming(!enableRoaming)} /> Enable Roaming
                     </label>
-
-                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Choose Voice / Language</label>
+                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Voice Language</label>
                     <select value={selectedVoice} onChange={(e) => { setSelectedVoice(e.target.value); localStorage.setItem('astra_voice', e.target.value); }} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', marginBottom: '15px' }}>
                         {voices.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
                     </select>
-
                     <label style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '15px' }}>
-                        <input type="checkbox" checked={autoRotate} onChange={() => setAutoRotate(!autoRotate)} /> Auto-Rotate 360
+                        <input type="checkbox" checked={autoRotate} onChange={() => setAutoRotate(!autoRotate)} /> Auto-Rotate
                     </label>
-
                     <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Volume</label>
                     <input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#dc2626' }} />
-                    
                     <button onClick={() => setShowSettings(false)} style={{ width: '100%', marginTop: '20px', background: '#f1f5f9', color: '#475569', border: 'none', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Close Settings</button>
                 </div>
             )}
 
-            {status === 'speaking' && responseText && (
+            {(status === 'speaking' || status === 'waving') && responseText && (
                 <div style={{ position: 'absolute', top: '150px', left: '50%', transform: 'translateX(-50%)', width: '300px', background: 'white', padding: '20px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9' }}>
                     <p style={{ margin: 0, fontSize: '14px', color: '#334155', fontWeight: 500 }}>{responseText}</p>
                 </div>
