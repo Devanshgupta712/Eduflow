@@ -10,8 +10,6 @@ const speak = (text: string, onEnd?: () => void) => {
     if (typeof window === 'undefined') return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.1;
     utterance.onend = onEnd || null;
     window.speechSynthesis.speak(utterance);
 };
@@ -36,13 +34,15 @@ function SkeletalAvatar({ status }: { status: string }) {
             }
         });
         
-        // Correct Rotation: Facing Forward (0 instead of PI)
-        gltf.scene.rotation.y = 0;
+        // Correct Rotation: Forced Front Facing
+        gltf.scene.rotation.y = Math.PI;
         
+        // Accurate Centering
         const box = new THREE.Box3().setFromObject(gltf.scene);
         const center = box.getCenter(new THREE.Vector3());
-        gltf.scene.position.sub(center);
-        gltf.scene.position.y = -1.2;
+        gltf.scene.position.x = -center.x;
+        gltf.scene.position.y = -center.y - 1.0; // Shift down so feet are visible
+        gltf.scene.position.z = -center.z;
     }, [gltf.scene]);
 
     useEffect(() => {
@@ -57,18 +57,16 @@ function SkeletalAvatar({ status }: { status: string }) {
             group.current.position.y = Math.sin(state.clock.elapsedTime * 1.2) * 0.05;
             if (status === 'speaking') {
                 group.current.rotation.y = Math.sin(state.clock.elapsedTime * 15) * 0.08;
-                group.current.rotation.x = Math.sin(state.clock.elapsedTime * 10) * 0.05;
             } else if (status === 'listening') {
                 group.current.rotation.y = Math.sin(state.clock.elapsedTime * 2) * 0.2;
             } else {
                 group.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
-                group.current.rotation.x = 0;
             }
         }
     });
 
     return (
-        <group ref={group} scale={[2.0, 2.0, 2.0]}>
+        <group ref={group} scale={[2.2, 2.2, 2.2]}>
             <primitive object={gltf.scene} />
         </group>
     );
@@ -76,59 +74,47 @@ function SkeletalAvatar({ status }: { status: string }) {
 
 export default function AstraAvatar() {
     const [mounted, setMounted] = useState(false);
-    const [isOpen, setIsOpen] = useState(false);
     const [status, setStatus] = useState('idle'); 
     const [responseText, setResponseText] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
     const posRef = useRef({ x: 50, y: 500 });
     const targetRef = useRef({ x: 50, y: 500 });
-    const isDragging = useRef(false);
     const recognitionRef = useRef<any>(null);
 
     useEffect(() => {
         setMounted(true);
         if (typeof window === 'undefined') return;
 
-        posRef.current = { x: 50, y: window.innerHeight - 380 };
-        targetRef.current = { x: 50, y: window.innerHeight - 380 };
+        posRef.current = { x: 50, y: window.innerHeight - 500 };
+        targetRef.current = { x: 50, y: window.innerHeight - 500 };
 
-        // --- Autonomous Roaming Logic ---
+        // --- Autonomous Roaming ---
         let animationFrameId: number;
         let lastMoveTime = 0;
 
         const updatePos = (time: number) => {
-            if (status === 'idle' && !isDragging.current) {
+            if (status === 'idle') {
                 const dx = targetRef.current.x - posRef.current.x;
                 const dy = targetRef.current.y - posRef.current.y;
-                
-                // Randomize target if reached or after 5 seconds
-                if (Math.sqrt(dx*dx + dy*dy) < 50 || time - lastMoveTime > 5000) {
+                if (Math.sqrt(dx*dx + dy*dy) < 50 || time - lastMoveTime > 6000) {
                     targetRef.current = { 
-                        x: Math.random() * (window.innerWidth - 300) + 50, 
-                        y: Math.random() * (window.innerHeight - 380) + 50 
+                        x: Math.random() * (window.innerWidth - 350) + 50, 
+                        y: Math.random() * (window.innerHeight - 500) + 50 
                     };
                     lastMoveTime = time;
                 }
-                
                 posRef.current.x += dx * 0.008;
                 posRef.current.y += dy * 0.008;
-                
-                if (containerRef.current) {
-                    containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
-                }
-            } else if (status !== 'idle' && containerRef.current) {
-                // Dock to the bottom-left while interacting
-                containerRef.current.style.transform = `translate(50px, ${window.innerHeight - 380}px)`;
+                if (containerRef.current) containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
             }
             animationFrameId = requestAnimationFrame(updatePos);
         };
         animationFrameId = requestAnimationFrame(updatePos);
 
-        // --- Speech Recognition ---
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+        // --- Speech AI ---
+        if ('webkitSpeechRecognition' in window) {
+            const SpeechRecognition = (window as any).webkitSpeechRecognition;
             recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.continuous = false;
             recognitionRef.current.onresult = async (event: any) => {
                 const transcript = event.results[0][0].transcript;
                 setStatus('thinking');
@@ -139,26 +125,15 @@ export default function AstraAvatar() {
                         body: JSON.stringify({ message: transcript, history: [] })
                     });
                     const data = await res.json();
-                    setResponseText(data.reply || "I am here to help!");
+                    setResponseText(data.reply);
                     setStatus('speaking');
-                    speak(data.reply || "I am here to help!", () => setStatus('idle'));
+                    speak(data.reply, () => setStatus('idle'));
                 } catch (e) { setStatus('idle'); }
             };
         }
 
         return () => cancelAnimationFrame(animationFrameId);
     }, [status]);
-
-    const handleInteraction = () => {
-        if (status === 'idle') {
-            setStatus('listening');
-            recognitionRef.current?.start();
-        } else {
-            window.speechSynthesis.cancel();
-            setStatus('idle');
-            setResponseText('');
-        }
-    };
 
     if (!mounted) return null;
 
@@ -167,15 +142,15 @@ export default function AstraAvatar() {
             ref={containerRef} 
             style={{ 
                 position: 'fixed', zIndex: 10000000, left: 0, top: 0,
-                width: '300px', height: '400px',
-                pointerEvents: 'auto', userSelect: 'none',
-                transition: status !== 'idle' ? 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
+                width: '350px', height: '550px', // Much taller for full body
+                pointerEvents: 'auto', userSelect: 'none'
             }}
         >
-            <div onClick={handleInteraction} style={{ width: '100%', height: '100%', position: 'relative', cursor: 'pointer' }}>
+            <div onClick={() => { setStatus('listening'); recognitionRef.current?.start(); }} style={{ width: '100%', height: '100%', position: 'relative', cursor: 'pointer' }}>
                 <Suspense fallback={null}>
                     <Canvas style={{ background: 'transparent' }}>
-                        <PerspectiveCamera makeDefault position={[0, 0, 6]} fov={35} />
+                        {/* Camera moved back to position 9 for full body view */}
+                        <PerspectiveCamera makeDefault position={[0, 0, 9]} fov={35} />
                         <ambientLight intensity={1.5} />
                         <directionalLight position={[5, 5, 5]} intensity={1.5} />
                         <Environment preset="city" />
@@ -185,25 +160,21 @@ export default function AstraAvatar() {
                 </Suspense>
 
                 <div style={{ 
-                    position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', 
-                    background: status === 'listening' ? '#10b981' : status === 'thinking' ? '#8b5cf6' : '#dc2626',
-                    color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', 
-                    boxShadow: '0 4px 15px rgba(0,0,0,0.2)', transition: 'all 0.3s'
+                    position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)', 
+                    background: '#dc2626', color: 'white', padding: '6px 20px', borderRadius: '24px', 
+                    fontSize: '13px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' 
                 }}>
-                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 Thinking...' : status === 'speaking' ? '🗣️ Speaking...' : '👋 Click me'}
+                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 thinking...' : status === 'speaking' ? '🗣️ Speaking...' : '👋 Click to talk'}
                 </div>
             </div>
 
             {status === 'speaking' && responseText && (
                 <div style={{ 
-                    position: 'absolute', bottom: '320px', left: '10px', width: '280px', 
+                    position: 'absolute', bottom: '480px', left: '10px', width: '300px', 
                     background: 'white', padding: '20px', borderRadius: '24px', 
-                    boxShadow: '0 20px 50px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9',
-                    animation: 'slideUp 0.3s ease-out'
+                    boxShadow: '0 20px 50px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9'
                 }}>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#334155', lineHeight: '1.6', fontWeight: 500 }}>
-                        {responseText}
-                    </p>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#334155', fontWeight: 600 }}>{responseText}</p>
                 </div>
             )}
         </div>
