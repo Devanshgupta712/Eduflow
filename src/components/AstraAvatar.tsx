@@ -5,42 +5,48 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Skeletal Character (Gesture & Animation Fix) ---
-function PremiumAvatar({ status, autoRotate }: { status: string, autoRotate: boolean }) {
+// --- Premium Skeletal Character (Full Animation Suite) ---
+function PremiumAvatar({ status, autoRotate, isMoving }: { status: string, autoRotate: boolean, isMoving: boolean }) {
     const gltf = useGLTF('/astra_model.glb');
-    const { actions } = useAnimations(gltf.animations, gltf.scene);
+    const { actions, names } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
-    const rightArm = useRef<THREE.Object3D | null>(null);
-    const leftArm = useRef<THREE.Object3D | null>(null);
 
     useEffect(() => {
         gltf.scene.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
                 const mesh = child as THREE.Mesh;
-                const mat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.0 });
-                mesh.material = mat;
-                
+                mesh.material = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.0 });
                 const name = mesh.name.toLowerCase();
-                if (name.includes('head') || name.includes('skin')) mat.color.set('#ffe0bd');
-                else if (name.includes('helmet') || name.includes('cap') || name.includes('upper')) mat.color.set('#dc2626');
-                else if (name.includes('lower') || name.includes('pants')) mat.color.set('#0d9488');
-                else mat.color.set('#475569');
-            }
-            // Capture arm bones for manual gestures if T-posing
-            if (child.name.toLowerCase().includes('arm') || child.name.toLowerCase().includes('shoulder')) {
-                if (child.name.toLowerCase().includes('right')) rightArm.current = child;
-                if (child.name.toLowerCase().includes('left')) leftArm.current = child;
+                if (name.includes('head') || name.includes('skin')) mesh.material.color.set('#ffe0bd');
+                else if (name.includes('helmet') || name.includes('cap') || name.includes('upper')) mesh.material.color.set('#dc2626');
+                else if (name.includes('lower') || name.includes('pants')) mesh.material.color.set('#0d9488');
+                else mesh.material.color.set('#475569');
             }
         });
-
-        // Ensure Idle animation is playing to prevent T-Pose
-        if (actions) {
-            const idle = actions['Idle'] || actions[Object.keys(actions)[0]];
-            if (idle) idle.reset().fadeIn(0.5).play();
-        }
-        
         gltf.scene.rotation.y = Math.PI;
-    }, [gltf.scene, actions]);
+    }, [gltf.scene]);
+
+    // --- Animation Controller ---
+    useEffect(() => {
+        if (!actions) return;
+        
+        // Stop all first
+        Object.values(actions).forEach(action => action?.fadeOut(0.3));
+
+        if (status === 'listening' || status === 'waving') {
+            // Wave animation if exists, or just Idle
+            const wave = actions['Wave'] || actions['Idle'];
+            if (wave) wave.reset().fadeIn(0.3).play();
+        } else if (isMoving) {
+            // Walking animation
+            const walk = actions['Walk'] || actions['Run'];
+            if (walk) walk.reset().fadeIn(0.3).play();
+        } else {
+            // Idle animation
+            const idle = actions['Idle'];
+            if (idle) idle.reset().fadeIn(0.3).play();
+        }
+    }, [actions, isMoving, status]);
 
     useFrame((state) => {
         const t = state.clock.elapsedTime;
@@ -48,15 +54,9 @@ function PremiumAvatar({ status, autoRotate }: { status: string, autoRotate: boo
             group.current.position.y = Math.sin(t * 1.5) * 0.08;
             if (autoRotate) group.current.rotation.y += 0.01;
             
-            // Speaking Gestures (Natural Arm Movement)
+            // Extra Speaking Logic (Head movement)
             if (status === 'speaking') {
-                if (rightArm.current) rightArm.current.rotation.z = -Math.PI/4 + Math.sin(t * 10) * 0.2;
-                if (leftArm.current) leftArm.current.rotation.z = Math.PI/4 + Math.cos(t * 10) * 0.2;
                 group.current.rotation.y += Math.sin(t * 12) * 0.03;
-            } else {
-                // Return arms to idle
-                if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0, 0.1);
-                if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, 0, 0.1);
             }
         }
     });
@@ -70,7 +70,8 @@ function PremiumAvatar({ status, autoRotate }: { status: string, autoRotate: boo
 
 export default function AstraAvatar() {
     const [mounted, setMounted] = useState(false);
-    const [status, setStatus] = useState('idle'); 
+    const [status, setStatus] = useState('waving'); 
+    const [isMoving, setIsMoving] = useState(false);
     const [responseText, setResponseText] = useState('');
     const [autoRotate, setAutoRotate] = useState(false);
     const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -80,6 +81,7 @@ export default function AstraAvatar() {
     
     const containerRef = useRef<HTMLDivElement>(null);
     const posRef = useRef({ x: 50, y: 500 });
+    const targetRef = useRef({ x: 50, y: 500 });
     const isDragging = useRef(false);
     const dragOffset = useRef({ x: 0, y: 0 });
     const recognitionRef = useRef<any>(null);
@@ -88,44 +90,74 @@ export default function AstraAvatar() {
         setMounted(true);
         if (typeof window === 'undefined') return;
         posRef.current = { x: 50, y: window.innerHeight - 550 };
+        targetRef.current = { x: 50, y: window.innerHeight - 550 };
+
+        // Initial Greeting
+        const waveTimer = setTimeout(() => setStatus('idle'), 3000);
 
         const loadVoices = () => {
             const v = window.speechSynthesis.getVoices();
             setVoices(v);
             const stored = localStorage.getItem('astra_voice');
             if (stored) setSelectedVoice(stored);
-            else if (v.length > 0) setSelectedVoice(v[0].name);
         };
         loadVoices();
         window.speechSynthesis.onvoiceschanged = loadVoices;
 
-        const handleMove = (e: MouseEvent) => {
-            if (isDragging.current && containerRef.current) {
-                const newX = e.clientX - dragOffset.current.x;
-                const newY = e.clientY - dragOffset.current.y;
-                containerRef.current.style.transform = `translate(${newX}px, ${newY}px)`;
-                posRef.current = { x: newX, y: newY };
+        // --- Movement & Roaming ---
+        let animationFrameId: number;
+        let lastMoveTime = 0;
+        const updatePos = (time: number) => {
+            if (status === 'idle') {
+                const dx = targetRef.current.x - posRef.current.x;
+                const dy = targetRef.current.y - posRef.current.y;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                
+                if (distance < 50 || time - lastMoveTime > 8000) {
+                    targetRef.current = { 
+                        x: Math.random() * (window.innerWidth - 350) + 50, 
+                        y: Math.random() * (window.innerHeight - 550) + 50 
+                    };
+                    lastMoveTime = time;
+                }
+                
+                if (distance > 10) {
+                    setIsMoving(true);
+                    posRef.current.x += dx * 0.01;
+                    posRef.current.y += dy * 0.01;
+                    
+                    // Face the target direction
+                    const angle = Math.atan2(dx, dy);
+                    if (containerRef.current) {
+                        containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
+                    }
+                } else {
+                    setIsMoving(false);
+                }
+            } else {
+                setIsMoving(false);
             }
+            animationFrameId = requestAnimationFrame(updatePos);
         };
-        const handleUp = () => { isDragging.current = false; };
-        window.addEventListener('mousemove', handleMove);
-        window.addEventListener('mouseup', handleUp);
-        return () => { window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
-    }, []);
+        animationFrameId = requestAnimationFrame(updatePos);
 
-    // Speech AI Click Interaction
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+            clearTimeout(waveTimer);
+        };
+    }, [status]);
+
     const handleAstraClick = () => {
         if (status === 'speaking') {
             window.speechSynthesis.cancel();
             setStatus('idle');
             return;
         }
-        if (status === 'idle') {
-            setStatus('listening');
-            recognitionRef.current?.start();
-        }
+        setStatus('listening');
+        recognitionRef.current?.start();
     };
 
+    // Speech AI Init
     useEffect(() => {
         if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
             const SpeechRecognition = (window as any).webkitSpeechRecognition;
@@ -156,7 +188,7 @@ export default function AstraAvatar() {
     if (!mounted) return null;
 
     return (
-        <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '380px', height: '550px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)` }}>
+        <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '380px', height: '550px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
             <div 
                 onMouseDown={(e) => { isDragging.current = true; dragOffset.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y }; }}
                 style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}
@@ -166,14 +198,19 @@ export default function AstraAvatar() {
                     <ambientLight intensity={1.5} />
                     <Environment preset="city" />
                     <Suspense fallback={null}>
-                        <PremiumAvatar status={status} autoRotate={autoRotate} />
+                        <PremiumAvatar status={status} autoRotate={autoRotate} isMoving={isMoving} />
                     </Suspense>
                     <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
                 </Canvas>
                 
-                {/* Astra Name/Status Tag */}
-                <div onClick={handleAstraClick} style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', background: '#dc2626', color: 'white', padding: '6px 20px', borderRadius: '24px', fontSize: '12px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', cursor: 'pointer' }}>
-                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 thinking...' : status === 'speaking' ? '🗣️ Stop Talking' : 'Ask Astra'}
+                {/* Ask Astra Tag (Shifted to the side of the face) */}
+                <div onClick={handleAstraClick} style={{ 
+                    position: 'absolute', top: '100px', right: '20px', 
+                    background: '#dc2626', color: 'white', padding: '6px 16px', borderRadius: '20px', 
+                    fontSize: '13px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', 
+                    cursor: 'pointer', whiteSpace: 'nowrap', zIndex: 10
+                }}>
+                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 thinking...' : status === 'speaking' ? '🗣️ Stop Talking' : status === 'waving' ? '👋 Hello!' : 'Ask Astra'}
                 </div>
 
                 {/* Settings Gear */}
@@ -183,25 +220,21 @@ export default function AstraAvatar() {
             {showSettings && (
                 <div style={{ position: 'absolute', top: '90px', right: '40px', width: '280px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 100 }}>
                     <h4 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>Settings</h4>
-                    
-                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Choose Voice / Language</label>
+                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Voice Language</label>
                     <select value={selectedVoice} onChange={(e) => { setSelectedVoice(e.target.value); localStorage.setItem('astra_voice', e.target.value); }} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', marginBottom: '15px' }}>
                         {voices.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
                     </select>
-
                     <label style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '15px' }}>
-                        <input type="checkbox" checked={autoRotate} onChange={() => setAutoRotate(!autoRotate)} /> Enable Auto-Rotate
+                        <input type="checkbox" checked={autoRotate} onChange={() => setAutoRotate(!autoRotate)} /> Auto-Rotate
                     </label>
-
-                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Voice Level</label>
+                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Volume</label>
                     <input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#dc2626' }} />
-                    
                     <button onClick={() => setShowSettings(false)} style={{ width: '100%', marginTop: '20px', background: '#f1f5f9', color: '#475569', border: 'none', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Close</button>
                 </div>
             )}
 
             {status === 'speaking' && responseText && (
-                <div style={{ position: 'absolute', top: '100px', left: '50%', transform: 'translateX(-50%)', width: '300px', background: 'white', padding: '20px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9' }}>
+                <div style={{ position: 'absolute', top: '150px', left: '50%', transform: 'translateX(-50%)', width: '300px', background: 'white', padding: '20px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9' }}>
                     <p style={{ margin: 0, fontSize: '14px', color: '#334155', fontWeight: 500 }}>{responseText}</p>
                 </div>
             )}
