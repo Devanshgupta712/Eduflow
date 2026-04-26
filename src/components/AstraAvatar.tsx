@@ -36,8 +36,8 @@ function SkeletalAvatar({ status }: { status: string }) {
             }
         });
         
-        // Turn around to face front
-        gltf.scene.rotation.y = Math.PI;
+        // Correct Rotation: Facing Forward (0 instead of PI)
+        gltf.scene.rotation.y = 0;
         
         const box = new THREE.Box3().setFromObject(gltf.scene);
         const center = box.getCenter(new THREE.Vector3());
@@ -55,15 +55,13 @@ function SkeletalAvatar({ status }: { status: string }) {
     useFrame((state) => {
         if (group.current) {
             group.current.position.y = Math.sin(state.clock.elapsedTime * 1.2) * 0.05;
-            
-            // Speaking Animation (Head Sway)
             if (status === 'speaking') {
-                group.current.rotation.y = Math.PI + Math.sin(state.clock.elapsedTime * 15) * 0.08;
+                group.current.rotation.y = Math.sin(state.clock.elapsedTime * 15) * 0.08;
                 group.current.rotation.x = Math.sin(state.clock.elapsedTime * 10) * 0.05;
             } else if (status === 'listening') {
-                group.current.rotation.y = Math.PI + Math.sin(state.clock.elapsedTime * 2) * 0.2;
+                group.current.rotation.y = Math.sin(state.clock.elapsedTime * 2) * 0.2;
             } else {
-                group.current.rotation.y = Math.PI + Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
+                group.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
                 group.current.rotation.x = 0;
             }
         }
@@ -79,28 +77,61 @@ function SkeletalAvatar({ status }: { status: string }) {
 export default function AstraAvatar() {
     const [mounted, setMounted] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
-    const [status, setStatus] = useState('idle'); // idle, listening, thinking, speaking
+    const [status, setStatus] = useState('idle'); 
     const [responseText, setResponseText] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState({ x: 50, y: 500 });
+    const posRef = useRef({ x: 50, y: 500 });
+    const targetRef = useRef({ x: 50, y: 500 });
     const isDragging = useRef(false);
     const recognitionRef = useRef<any>(null);
 
     useEffect(() => {
         setMounted(true);
-        setPos({ x: 50, y: window.innerHeight - 380 });
+        if (typeof window === 'undefined') return;
 
-        // Initialize Speech Recognition
-        if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        posRef.current = { x: 50, y: window.innerHeight - 380 };
+        targetRef.current = { x: 50, y: window.innerHeight - 380 };
+
+        // --- Autonomous Roaming Logic ---
+        let animationFrameId: number;
+        let lastMoveTime = 0;
+
+        const updatePos = (time: number) => {
+            if (status === 'idle' && !isDragging.current) {
+                const dx = targetRef.current.x - posRef.current.x;
+                const dy = targetRef.current.y - posRef.current.y;
+                
+                // Randomize target if reached or after 5 seconds
+                if (Math.sqrt(dx*dx + dy*dy) < 50 || time - lastMoveTime > 5000) {
+                    targetRef.current = { 
+                        x: Math.random() * (window.innerWidth - 300) + 50, 
+                        y: Math.random() * (window.innerHeight - 380) + 50 
+                    };
+                    lastMoveTime = time;
+                }
+                
+                posRef.current.x += dx * 0.008;
+                posRef.current.y += dy * 0.008;
+                
+                if (containerRef.current) {
+                    containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
+                }
+            } else if (status !== 'idle' && containerRef.current) {
+                // Dock to the bottom-left while interacting
+                containerRef.current.style.transform = `translate(50px, ${window.innerHeight - 380}px)`;
+            }
+            animationFrameId = requestAnimationFrame(updatePos);
+        };
+        animationFrameId = requestAnimationFrame(updatePos);
+
+        // --- Speech Recognition ---
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
             recognitionRef.current = new SpeechRecognition();
             recognitionRef.current.continuous = false;
-            recognitionRef.current.interimResults = false;
-
             recognitionRef.current.onresult = async (event: any) => {
                 const transcript = event.results[0][0].transcript;
                 setStatus('thinking');
-                
                 try {
                     const res = await fetch('https://lms-api-bkuw.onrender.com/api/training/chatbot', {
                         method: 'POST',
@@ -108,32 +139,24 @@ export default function AstraAvatar() {
                         body: JSON.stringify({ message: transcript, history: [] })
                     });
                     const data = await res.json();
-                    const reply = data.reply || "I'm here to help!";
-                    setResponseText(reply);
+                    setResponseText(data.reply || "I am here to help!");
                     setStatus('speaking');
-                    speak(reply, () => setStatus('idle'));
-                } catch (e) {
-                    setStatus('idle');
-                }
-            };
-
-            recognitionRef.current.onend = () => {
-                if (status === 'listening') setStatus('idle');
+                    speak(data.reply || "I am here to help!", () => setStatus('idle'));
+                } catch (e) { setStatus('idle'); }
             };
         }
+
+        return () => cancelAnimationFrame(animationFrameId);
     }, [status]);
 
     const handleInteraction = () => {
-        if (isDragging.current) return;
-        
         if (status === 'idle') {
-            setIsOpen(true);
             setStatus('listening');
             recognitionRef.current?.start();
         } else {
             window.speechSynthesis.cancel();
             setStatus('idle');
-            setIsOpen(false);
+            setResponseText('');
         }
     };
 
@@ -145,8 +168,8 @@ export default function AstraAvatar() {
             style={{ 
                 position: 'fixed', zIndex: 10000000, left: 0, top: 0,
                 width: '300px', height: '400px',
-                transform: `translate(${pos.x}px, ${pos.y}px)`,
-                pointerEvents: 'auto', userSelect: 'none'
+                pointerEvents: 'auto', userSelect: 'none',
+                transition: status !== 'idle' ? 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
             }}
         >
             <div onClick={handleInteraction} style={{ width: '100%', height: '100%', position: 'relative', cursor: 'pointer' }}>
@@ -161,18 +184,17 @@ export default function AstraAvatar() {
                     </Canvas>
                 </Suspense>
 
-                {/* Status Indicator Badge */}
                 <div style={{ 
                     position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', 
                     background: status === 'listening' ? '#10b981' : status === 'thinking' ? '#8b5cf6' : '#dc2626',
                     color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', 
                     boxShadow: '0 4px 15px rgba(0,0,0,0.2)', transition: 'all 0.3s'
                 }}>
-                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 Thinking...' : status === 'speaking' ? '🗣️ Speaking...' : '👋 Click to Talk'}
+                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 Thinking...' : status === 'speaking' ? '🗣️ Speaking...' : '👋 Click me'}
                 </div>
             </div>
 
-            {isOpen && responseText && (
+            {status === 'speaking' && responseText && (
                 <div style={{ 
                     position: 'absolute', bottom: '320px', left: '10px', width: '280px', 
                     background: 'white', padding: '20px', borderRadius: '24px', 
