@@ -5,11 +5,13 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Skeletal Character (Full Animation Suite) ---
-function PremiumAvatar({ status, autoRotate, isMoving }: { status: string, autoRotate: boolean, isMoving: boolean }) {
+// --- Premium Skeletal Character (Priority Animation Engine) ---
+function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
     const gltf = useGLTF('/astra_model.glb');
-    const { actions, names } = useAnimations(gltf.animations, gltf.scene);
+    const { actions } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
+    const rightArm = useRef<THREE.Object3D | null>(null);
+    const leftArm = useRef<THREE.Object3D | null>(null);
 
     useEffect(() => {
         gltf.scene.traverse((child) => {
@@ -23,31 +25,35 @@ function PremiumAvatar({ status, autoRotate, isMoving }: { status: string, autoR
                 else if (name.includes('lower') || name.includes('pants')) mat.color.set('#0d9488');
                 else mat.color.set('#475569');
             }
+            if (child.name.toLowerCase().includes('arm') || child.name.toLowerCase().includes('shoulder')) {
+                if (child.name.toLowerCase().includes('right')) rightArm.current = child;
+                if (child.name.toLowerCase().includes('left')) leftArm.current = child;
+            }
         });
         gltf.scene.rotation.y = Math.PI;
     }, [gltf.scene]);
 
-    // --- Animation Controller ---
+    // --- Animation State Machine (No Lag) ---
     useEffect(() => {
         if (!actions) return;
         
-        // Stop all first
-        Object.values(actions).forEach(action => action?.fadeOut(0.3));
-
+        // Priority: Status > Movement > Idle
+        let activeAction = actions['Idle'];
+        
         if (status === 'listening' || status === 'waving') {
-            // Wave animation if exists, or just Idle
-            const wave = actions['Wave'] || actions['Idle'];
-            if (wave) wave.reset().fadeIn(0.3).play();
-        } else if (isMoving) {
-            // Walking animation
-            const walk = actions['Walk'] || actions['Run'];
-            if (walk) walk.reset().fadeIn(0.3).play();
+            activeAction = actions['Wave'] || actions['Idle'];
+        } else if (enableRoaming && isMoving && status === 'idle') {
+            activeAction = actions['Walk'] || actions['Run'];
         } else {
-            // Idle animation
-            const idle = actions['Idle'];
-            if (idle) idle.reset().fadeIn(0.3).play();
+            activeAction = actions['Idle'];
         }
-    }, [actions, isMoving, status]);
+
+        // Smooth transition
+        Object.values(actions).forEach(a => {
+            if (a !== activeAction) a?.fadeOut(0.3);
+        });
+        activeAction?.reset().fadeIn(0.3).play();
+    }, [actions, isMoving, status, enableRoaming]);
 
     useFrame((state) => {
         const t = state.clock.elapsedTime;
@@ -55,9 +61,18 @@ function PremiumAvatar({ status, autoRotate, isMoving }: { status: string, autoR
             group.current.position.y = Math.sin(t * 1.5) * 0.08;
             if (autoRotate) group.current.rotation.y += 0.01;
             
-            // Extra Speaking Logic (Head movement)
+            // Speaking Gestures (only when still)
             if (status === 'speaking') {
+                if (rightArm.current) rightArm.current.rotation.z = -Math.PI/4 + Math.sin(t * 10) * 0.2;
+                if (leftArm.current) leftArm.current.rotation.z = Math.PI/4 + Math.cos(t * 10) * 0.2;
                 group.current.rotation.y += Math.sin(t * 12) * 0.03;
+            } else if (status === 'thinking') {
+                // Thinking Sway
+                group.current.rotation.z = Math.sin(t * 2) * 0.05;
+            } else {
+                if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0, 0.1);
+                if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, 0, 0.1);
+                group.current.rotation.z = THREE.MathUtils.lerp(group.current.rotation.z, 0, 0.1);
             }
         }
     });
@@ -73,6 +88,7 @@ export default function AstraAvatar() {
     const [mounted, setMounted] = useState(false);
     const [status, setStatus] = useState('waving'); 
     const [isMoving, setIsMoving] = useState(false);
+    const [enableRoaming, setEnableRoaming] = useState(false); // Default OFF per user request
     const [responseText, setResponseText] = useState('');
     const [autoRotate, setAutoRotate] = useState(false);
     const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -93,7 +109,6 @@ export default function AstraAvatar() {
         posRef.current = { x: 50, y: window.innerHeight - 550 };
         targetRef.current = { x: 50, y: window.innerHeight - 550 };
 
-        // Initial Greeting
         const waveTimer = setTimeout(() => setStatus('idle'), 3000);
 
         const loadVoices = () => {
@@ -105,11 +120,11 @@ export default function AstraAvatar() {
         loadVoices();
         window.speechSynthesis.onvoiceschanged = loadVoices;
 
-        // --- Movement & Roaming ---
+        // --- Roaming Controller ---
         let animationFrameId: number;
         let lastMoveTime = 0;
         const updatePos = (time: number) => {
-            if (status === 'idle') {
+            if (enableRoaming && status === 'idle') {
                 const dx = targetRef.current.x - posRef.current.x;
                 const dy = targetRef.current.y - posRef.current.y;
                 const distance = Math.sqrt(dx*dx + dy*dy);
@@ -124,14 +139,9 @@ export default function AstraAvatar() {
                 
                 if (distance > 10) {
                     setIsMoving(true);
-                    posRef.current.x += dx * 0.01;
-                    posRef.current.y += dy * 0.01;
-                    
-                    // Face the target direction
-                    const angle = Math.atan2(dx, dy);
-                    if (containerRef.current) {
-                        containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
-                    }
+                    posRef.current.x += dx * 0.012; // Smoother faster walk
+                    posRef.current.y += dy * 0.012;
+                    if (containerRef.current) containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
                 } else {
                     setIsMoving(false);
                 }
@@ -142,11 +152,8 @@ export default function AstraAvatar() {
         };
         animationFrameId = requestAnimationFrame(updatePos);
 
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-            clearTimeout(waveTimer);
-        };
-    }, [status]);
+        return () => { cancelAnimationFrame(animationFrameId); clearTimeout(waveTimer); };
+    }, [enableRoaming, status]);
 
     const handleAstraClick = () => {
         if (status === 'speaking') {
@@ -154,6 +161,7 @@ export default function AstraAvatar() {
             setStatus('idle');
             return;
         }
+        setIsMoving(false); // Force stop walking on click
         setStatus('listening');
         recognitionRef.current?.start();
     };
@@ -199,38 +207,39 @@ export default function AstraAvatar() {
                     <ambientLight intensity={1.5} />
                     <Environment preset="city" />
                     <Suspense fallback={null}>
-                        <PremiumAvatar status={status} autoRotate={autoRotate} isMoving={isMoving} />
+                        <PremiumAvatar status={status} autoRotate={autoRotate} isMoving={isMoving} enableRoaming={enableRoaming} />
                     </Suspense>
                     <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
                 </Canvas>
                 
-                {/* Ask Astra Tag (Shifted to the side of the face) */}
-                <div onClick={handleAstraClick} style={{ 
-                    position: 'absolute', top: '100px', right: '20px', 
-                    background: '#dc2626', color: 'white', padding: '6px 16px', borderRadius: '20px', 
-                    fontSize: '13px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', 
-                    cursor: 'pointer', whiteSpace: 'nowrap', zIndex: 10
-                }}>
-                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 thinking...' : status === 'speaking' ? '🗣️ Stop Talking' : status === 'waving' ? '👋 Hello!' : 'Ask Astra'}
+                <div onClick={handleAstraClick} style={{ position: 'absolute', top: '100px', right: '20px', background: '#dc2626', color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', cursor: 'pointer', whiteSpace: 'nowrap', zIndex: 10 }}>
+                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 Thinking...' : status === 'speaking' ? '🗣️ Stop Talking' : status === 'waving' ? '👋 Hello!' : 'Ask Astra'}
                 </div>
 
-                {/* Settings Gear */}
                 <button onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} style={{ position: 'absolute', right: '40px', top: '40px', background: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', cursor: 'pointer', fontSize: '20px' }}>⚙️</button>
             </div>
 
             {showSettings && (
                 <div style={{ position: 'absolute', top: '90px', right: '40px', width: '280px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 100 }}>
                     <h4 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>Settings</h4>
-                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Voice Language</label>
+                    
+                    <label style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '15px' }}>
+                        <input type="checkbox" checked={enableRoaming} onChange={() => setEnableRoaming(!enableRoaming)} /> Enable Walking / Roaming
+                    </label>
+
+                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Choose Voice / Language</label>
                     <select value={selectedVoice} onChange={(e) => { setSelectedVoice(e.target.value); localStorage.setItem('astra_voice', e.target.value); }} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', marginBottom: '15px' }}>
                         {voices.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
                     </select>
+
                     <label style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '15px' }}>
-                        <input type="checkbox" checked={autoRotate} onChange={() => setAutoRotate(!autoRotate)} /> Auto-Rotate
+                        <input type="checkbox" checked={autoRotate} onChange={() => setAutoRotate(!autoRotate)} /> Auto-Rotate 360
                     </label>
+
                     <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Volume</label>
                     <input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#dc2626' }} />
-                    <button onClick={() => setShowSettings(false)} style={{ width: '100%', marginTop: '20px', background: '#f1f5f9', color: '#475569', border: 'none', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Close</button>
+                    
+                    <button onClick={() => setShowSettings(false)} style={{ width: '100%', marginTop: '20px', background: '#f1f5f9', color: '#475569', border: 'none', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Close Settings</button>
                 </div>
             )}
 
