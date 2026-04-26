@@ -268,7 +268,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <>
                 {children}
                 <ChatbotFAQ />
-                <AstraAvatar />
             </>
         );
     }
@@ -539,85 +538,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
 
             {/* Saturday Feedback Block Overlay */}
-            {saturdayStatus.should_block && pathname !== '/student/feedback' && user?.role === 'STUDENT' && !user?.is_blocked && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(15, 23, 42, 0.98)',
-                    backdropFilter: 'blur(12px)',
-                    zIndex: 9999,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '20px'
-                }}>
-                    <div className="glass-premium" style={{ 
-                        maxWidth: '500px', width: '100%', padding: '48px 32px', 
-                        textAlign: 'center', borderRadius: '32px',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
-                    }}>
-                        <div style={{ fontSize: '72px', marginBottom: '24px' }}>📝</div>
-                        <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#111827', marginBottom: '16px', letterSpacing: '-0.02em' }}>
-                            Weekly Feedback Required
-                        </h2>
-                        <p style={{ color: '#4b5563', fontSize: '16px', lineHeight: 1.6, marginBottom: '32px' }}>
-                            Today is Saturday! You have pending feedbacks for your batches. {saturdayStatus.submitted_count}/{saturdayStatus.total_required} completed.
-                        </p>
-                        <button 
-                            onClick={() => router.push('/student/feedback')}
-                            className="btn-primary"
-                            style={{ 
-                                width: '100%', padding: '16px', borderRadius: '14px', 
-                                fontSize: '16px', fontWeight: 700,
-                                background: 'linear-gradient(135deg, var(--primary), var(--accent))',
-                                border: 'none', color: '#fff'
-                            }}
-                        >
-                            Give Feedback Now →
-                        </button>
-                        <p style={{ marginTop: '20px', fontSize: '12px', color: '#9ca3af' }}>
-                            Missing all feedbacks will result in an automated policy violation.
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            {/* Account Blocked Overlay */}
-            {(user?.is_blocked || saturdayStatus.is_blocked) && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: '#0f172a', zIndex: 10000,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '20px'
-                }}>
-                    <div className="glass-premium" style={{ 
-                        maxWidth: '500px', width: '100%', padding: '60px 40px', 
-                        textAlign: 'center', borderRadius: '32px', background: '#fff'
-                    }}>
-                        <div style={{ fontSize: '80px', marginBottom: '32px' }}>🔒</div>
-                        <h2 style={{ fontSize: '32px', fontWeight: 900, color: '#ef4444', marginBottom: '20px' }}>
-                            Access Denied
-                        </h2>
-                        <p style={{ color: '#4b5563', fontSize: '18px', lineHeight: 1.6, marginBottom: '40px' }}>
-                            Your portal has been **PERMANENTLY BLOCKED** due to repeated policy violations (3+ missed feedbacks).
-                        </p>
-                        <div style={{ 
-                            padding: '24px', background: '#fef2f2', borderRadius: '20px',
-                            border: '1px solid #fee2e2', marginBottom: '40px'
-                        }}>
-                            <p style={{ color: '#991b1b', fontSize: '14px', fontWeight: 600, margin: 0 }}>
-                                Only a Super Admin can unblock your account.
-                            </p>
-                        </div>
-                        <button 
-                            onClick={() => { clearToken(); window.location.href = '/login'; }}
-                            className="btn-secondary"
-                            style={{ width: '100%', padding: '16px', borderRadius: '14px', fontWeight: 700 }}
-                        >
-                            Sign Out
-                        </button>
-                    </div>
-                </div>
-            )}
-            <AstraAvatar />
         </div>
     );
 }

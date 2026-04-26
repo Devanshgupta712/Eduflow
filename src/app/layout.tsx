@@ -4,6 +4,7 @@ import "./globals.css";
 import AuthProvider from "@/components/AuthProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import BackToTop from "@/components/BackToTop";
+import AstraAvatar from "@/components/AstraAvatar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -42,6 +43,7 @@ export default function RootLayout({
           <AuthProvider>
             {children}
             <BackToTop />
+            <AstraAvatar />
           </AuthProvider>
         </ThemeProvider>
       </body>
