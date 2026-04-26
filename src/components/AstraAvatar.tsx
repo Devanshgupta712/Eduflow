@@ -17,12 +17,14 @@ function PremiumAvatar({ status, autoRotate }: { status: string, autoRotate: boo
         gltf.scene.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
                 const mesh = child as THREE.Mesh;
-                mesh.material = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.0 });
+                const mat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.0 });
+                mesh.material = mat;
+                
                 const name = mesh.name.toLowerCase();
-                if (name.includes('head') || name.includes('skin')) mesh.material.color.set('#ffe0bd');
-                else if (name.includes('helmet') || name.includes('cap') || name.includes('upper')) mesh.material.color.set('#dc2626');
-                else if (name.includes('lower') || name.includes('pants')) mesh.material.color.set('#0d9488');
-                else mesh.material.color.set('#475569');
+                if (name.includes('head') || name.includes('skin')) mat.color.set('#ffe0bd');
+                else if (name.includes('helmet') || name.includes('cap') || name.includes('upper')) mat.color.set('#dc2626');
+                else if (name.includes('lower') || name.includes('pants')) mat.color.set('#0d9488');
+                else mat.color.set('#475569');
             }
             // Capture arm bones for manual gestures if T-posing
             if (child.name.toLowerCase().includes('arm') || child.name.toLowerCase().includes('shoulder')) {
