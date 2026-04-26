@@ -173,7 +173,7 @@ export default function AstraAvatar() {
                 
                 {/* Astra Name/Status Tag */}
                 <div onClick={handleAstraClick} style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', background: '#dc2626', color: 'white', padding: '6px 20px', borderRadius: '24px', fontSize: '12px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', cursor: 'pointer' }}>
-                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 thinking...' : status === 'speaking' ? '🗣️ Stop Talking' : 'Astra (Click to Talk)'}
+                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 thinking...' : status === 'speaking' ? '🗣️ Stop Talking' : 'Ask Astra'}
                 </div>
 
                 {/* Settings Gear */}
