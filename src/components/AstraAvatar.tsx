@@ -5,13 +5,15 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Skeletal Character (Advanced Interaction Engine) ---
+// --- Premium Skeletal Character (Human-Gesture Engine) ---
 function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
     const gltf = useGLTF('/astra_model.glb');
     const { actions } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
     const rightArm = useRef<THREE.Object3D | null>(null);
     const leftArm = useRef<THREE.Object3D | null>(null);
+    const rightForearm = useRef<THREE.Object3D | null>(null);
+    const leftForearm = useRef<THREE.Object3D | null>(null);
     const head = useRef<THREE.Object3D | null>(null);
 
     useEffect(() => {
@@ -26,34 +28,29 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
                 else if (name.includes('lower') || name.includes('pants')) mat.color.set('#0d9488');
                 else mat.color.set('#475569');
             }
-            if (child.name.toLowerCase().includes('arm') || child.name.toLowerCase().includes('shoulder')) {
-                if (child.name.toLowerCase().includes('right')) rightArm.current = child;
-                if (child.name.toLowerCase().includes('left')) leftArm.current = child;
+            // Capture more bones for detailed human movement
+            const nodeName = child.name.toLowerCase();
+            if (nodeName.includes('shoulder') || nodeName.includes('arm')) {
+                if (nodeName.includes('right')) {
+                    if (nodeName.includes('forearm')) rightForearm.current = child;
+                    else rightArm.current = child;
+                } else if (nodeName.includes('left')) {
+                    if (nodeName.includes('forearm')) leftForearm.current = child;
+                    else leftArm.current = child;
+                }
             }
-            if (child.name.toLowerCase().includes('head') || child.name.toLowerCase().includes('neck')) {
-                head.current = child;
-            }
+            if (nodeName.includes('head') || nodeName.includes('neck')) head.current = child;
         });
         gltf.scene.rotation.y = Math.PI;
     }, [gltf.scene]);
 
-    // --- Animation State Machine ---
+    // --- State Machine ---
     useEffect(() => {
         if (!actions) return;
-        
         let activeAction = actions['Idle'];
-        
-        // Priority Chain
-        if (status === 'thinking') {
-            // No specific thinking anim? Use subtle Idle + manual head logic in useFrame
-            activeAction = actions['Idle'];
-        } else if (status === 'speaking' || status === 'waving') {
-            activeAction = actions['Wave'] || actions['Idle'];
-        } else if (enableRoaming && isMoving && status === 'idle') {
-            activeAction = actions['Walk'] || actions['Run'];
-        } else {
-            activeAction = actions['Idle'];
-        }
+        if (status === 'speaking' || status === 'waving') activeAction = actions['Wave'] || actions['Idle'];
+        else if (enableRoaming && isMoving && status === 'idle') activeAction = actions['Walk'] || actions['Run'];
+        else activeAction = actions['Idle'];
 
         Object.values(actions).forEach(a => { if (a !== activeAction) a?.fadeOut(0.3); });
         activeAction?.reset().fadeIn(0.3).play();
@@ -65,28 +62,44 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
             group.current.position.y = Math.sin(t * 1.5) * 0.08;
             if (autoRotate) group.current.rotation.y += 0.01;
             
-            // --- ADVANCED THINKING ANIMATION ---
+            // --- NATURAL HUMAN GESTURES ---
             if (status === 'thinking') {
                 if (head.current) {
-                    head.current.rotation.y = Math.sin(t * 4) * 0.3; // Looking around
-                    head.current.rotation.x = Math.sin(t * 2) * 0.1; // Nodding
+                    head.current.rotation.y = Math.sin(t * 4) * 0.3;
+                    head.current.rotation.x = Math.sin(t * 2) * 0.1;
                 }
-                group.current.rotation.z = Math.sin(t * 2) * 0.05;
+                // Relaxed Thinking Pose (Arms down and slightly in)
+                if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.2, 0.1);
+                if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.2, 0.1);
+                if (rightForearm.current) rightForearm.current.rotation.y = THREE.MathUtils.lerp(rightForearm.current.rotation.y, 0.5, 0.1);
+                if (leftForearm.current) leftForearm.current.rotation.y = THREE.MathUtils.lerp(leftForearm.current.rotation.y, -0.5, 0.1);
             } 
-            // --- SPEAKING GESTURES ---
             else if (status === 'speaking') {
-                if (rightArm.current) rightArm.current.rotation.z = -Math.PI/4 + Math.sin(t * 10) * 0.2;
-                if (leftArm.current) leftArm.current.rotation.z = Math.PI/4 + Math.cos(t * 10) * 0.2;
+                // Human Explaining Gestures (Hands in front)
+                if (rightArm.current) {
+                    rightArm.current.rotation.z = -0.5 + Math.sin(t * 5) * 0.1; 
+                    rightArm.current.rotation.x = 0.8 + Math.sin(t * 8) * 0.2; // Move forward
+                }
+                if (leftArm.current) {
+                    leftArm.current.rotation.z = 0.5 + Math.cos(t * 5) * 0.1;
+                    leftArm.current.rotation.x = 0.8 + Math.cos(t * 8) * 0.2; // Move forward
+                }
                 if (head.current) head.current.rotation.y = Math.sin(t * 2) * 0.1;
             } 
-            // --- RESET BONES ---
             else {
+                // Reset to Natural Idle (No T-Pose)
                 if (head.current) {
                     head.current.rotation.y = THREE.MathUtils.lerp(head.current.rotation.y, 0, 0.1);
                     head.current.rotation.x = THREE.MathUtils.lerp(head.current.rotation.x, 0, 0.1);
                 }
-                if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0, 0.1);
-                if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, 0, 0.1);
+                if (rightArm.current) {
+                    rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.1, 0.1);
+                    rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, 0.2, 0.1);
+                }
+                if (leftArm.current) {
+                    leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.1, 0.1);
+                    leftArm.current.rotation.x = THREE.MathUtils.lerp(leftArm.current.rotation.x, 0.2, 0.1);
+                }
                 group.current.rotation.z = THREE.MathUtils.lerp(group.current.rotation.z, 0, 0.1);
             }
         }
@@ -158,7 +171,6 @@ export default function AstraAvatar() {
             animationFrameId = requestAnimationFrame(updatePos);
         };
         animationFrameId = requestAnimationFrame(updatePos);
-
         return () => cancelAnimationFrame(animationFrameId);
     }, [enableRoaming, status]);
 
@@ -188,11 +200,8 @@ export default function AstraAvatar() {
                         body: JSON.stringify({ message: transcript, history: [] })
                     });
                     const data = await res.json();
-                    
-                    // --- REPLY SEQUENCE ---
                     setResponseText(data.reply);
-                    setStatus('waving'); // Start wave greeting
-                    
+                    setStatus('waving');
                     setTimeout(() => {
                         setStatus('speaking');
                         const utterance = new SpeechSynthesisUtterance(data.reply);
@@ -201,8 +210,7 @@ export default function AstraAvatar() {
                         utterance.volume = volume;
                         utterance.onend = () => setStatus('idle');
                         window.speechSynthesis.speak(utterance);
-                    }, 1000); // Wave for 1 second then talk
-                    
+                    }, 1000);
                 } catch (e) { setStatus('idle'); }
             };
         }
