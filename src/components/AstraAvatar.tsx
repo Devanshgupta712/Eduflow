@@ -5,15 +5,11 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Skeletal Character (Human-Gesture Engine) ---
+// --- Premium Skeletal Character (Restored Pro-Animations) ---
 function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
     const gltf = useGLTF('/astra_model.glb');
     const { actions } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
-    const rightArm = useRef<THREE.Object3D | null>(null);
-    const leftArm = useRef<THREE.Object3D | null>(null);
-    const rightForearm = useRef<THREE.Object3D | null>(null);
-    const leftForearm = useRef<THREE.Object3D | null>(null);
     const head = useRef<THREE.Object3D | null>(null);
 
     useEffect(() => {
@@ -28,32 +24,29 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
                 else if (name.includes('lower') || name.includes('pants')) mat.color.set('#0d9488');
                 else mat.color.set('#475569');
             }
-            // Capture more bones for detailed human movement
-            const nodeName = child.name.toLowerCase();
-            if (nodeName.includes('shoulder') || nodeName.includes('arm')) {
-                if (nodeName.includes('right')) {
-                    if (nodeName.includes('forearm')) rightForearm.current = child;
-                    else rightArm.current = child;
-                } else if (nodeName.includes('left')) {
-                    if (nodeName.includes('forearm')) leftForearm.current = child;
-                    else leftArm.current = child;
-                }
+            if (child.name.toLowerCase().includes('head') || child.name.toLowerCase().includes('neck')) {
+                head.current = child;
             }
-            if (nodeName.includes('head') || nodeName.includes('neck')) head.current = child;
         });
         gltf.scene.rotation.y = Math.PI;
     }, [gltf.scene]);
 
-    // --- State Machine ---
+    // --- State Machine (Pure Skeletal) ---
     useEffect(() => {
         if (!actions) return;
-        let activeAction = actions['Idle'];
-        if (status === 'speaking' || status === 'waving') activeAction = actions['Wave'] || actions['Idle'];
-        else if (enableRoaming && isMoving && status === 'idle') activeAction = actions['Walk'] || actions['Run'];
-        else activeAction = actions['Idle'];
+        
+        let activeAction = actions['Idle'] || actions[Object.keys(actions)[0]];
+        
+        if (status === 'listening' || status === 'waving') {
+            activeAction = actions['Wave'] || actions['Idle'];
+        } else if (enableRoaming && isMoving && status === 'idle') {
+            activeAction = actions['Walk'] || actions['Run'] || actions['Idle'];
+        } else {
+            activeAction = actions['Idle'] || actions[Object.keys(actions)[0]];
+        }
 
-        Object.values(actions).forEach(a => { if (a !== activeAction) a?.fadeOut(0.3); });
-        activeAction?.reset().fadeIn(0.3).play();
+        Object.values(actions).forEach(a => { if (a !== activeAction) a?.fadeOut(0.4); });
+        activeAction?.reset().fadeIn(0.4).play();
     }, [actions, isMoving, status, enableRoaming]);
 
     useFrame((state) => {
@@ -62,45 +55,17 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
             group.current.position.y = Math.sin(t * 1.5) * 0.08;
             if (autoRotate) group.current.rotation.y += 0.01;
             
-            // --- NATURAL HUMAN GESTURES ---
+            // Subtle Head Only overrides
             if (status === 'thinking') {
                 if (head.current) {
-                    head.current.rotation.y = Math.sin(t * 4) * 0.3;
+                    head.current.rotation.y = Math.sin(t * 4) * 0.2;
                     head.current.rotation.x = Math.sin(t * 2) * 0.1;
                 }
-                // Relaxed Thinking Pose (Arms down and slightly in)
-                if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.2, 0.1);
-                if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.2, 0.1);
-                if (rightForearm.current) rightForearm.current.rotation.y = THREE.MathUtils.lerp(rightForearm.current.rotation.y, 0.5, 0.1);
-                if (leftForearm.current) leftForearm.current.rotation.y = THREE.MathUtils.lerp(leftForearm.current.rotation.y, -0.5, 0.1);
-            } 
-            else if (status === 'speaking') {
-                // Human Explaining Gestures (Hands in front)
-                if (rightArm.current) {
-                    rightArm.current.rotation.z = -0.5 + Math.sin(t * 5) * 0.1; 
-                    rightArm.current.rotation.x = 0.8 + Math.sin(t * 8) * 0.2; // Move forward
-                }
-                if (leftArm.current) {
-                    leftArm.current.rotation.z = 0.5 + Math.cos(t * 5) * 0.1;
-                    leftArm.current.rotation.x = 0.8 + Math.cos(t * 8) * 0.2; // Move forward
-                }
-                if (head.current) head.current.rotation.y = Math.sin(t * 2) * 0.1;
-            } 
-            else {
-                // Reset to Natural Idle (No T-Pose)
+            } else {
                 if (head.current) {
                     head.current.rotation.y = THREE.MathUtils.lerp(head.current.rotation.y, 0, 0.1);
                     head.current.rotation.x = THREE.MathUtils.lerp(head.current.rotation.x, 0, 0.1);
                 }
-                if (rightArm.current) {
-                    rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.1, 0.1);
-                    rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, 0.2, 0.1);
-                }
-                if (leftArm.current) {
-                    leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.1, 0.1);
-                    leftArm.current.rotation.x = THREE.MathUtils.lerp(leftArm.current.rotation.x, 0.2, 0.1);
-                }
-                group.current.rotation.z = THREE.MathUtils.lerp(group.current.rotation.z, 0, 0.1);
             }
         }
     });
@@ -146,7 +111,6 @@ export default function AstraAvatar() {
         loadVoices();
         window.speechSynthesis.onvoiceschanged = loadVoices;
 
-        // --- Roaming Controller ---
         let animationFrameId: number;
         let lastMoveTime = 0;
         const updatePos = (time: number) => {
@@ -185,7 +149,7 @@ export default function AstraAvatar() {
         recognitionRef.current?.start();
     };
 
-    // Speech AI Init
+    // Speech AI Init (Shortened Response Instruction)
     useEffect(() => {
         if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
             const SpeechRecognition = (window as any).webkitSpeechRecognition;
@@ -197,9 +161,13 @@ export default function AstraAvatar() {
                     const res = await fetch('https://lms-api-bkuw.onrender.com/api/training/chatbot', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: transcript, history: [] })
+                        body: JSON.stringify({ 
+                            message: "PLEASE RESPOND VERY SHORTLY (MAX 2 SENTENCES): " + transcript, 
+                            history: [] 
+                        })
                     });
                     const data = await res.json();
+                    
                     setResponseText(data.reply);
                     setStatus('waving');
                     setTimeout(() => {
@@ -210,7 +178,7 @@ export default function AstraAvatar() {
                         utterance.volume = volume;
                         utterance.onend = () => setStatus('idle');
                         window.speechSynthesis.speak(utterance);
-                    }, 1000);
+                    }, 800);
                 } catch (e) { setStatus('idle'); }
             };
         }
@@ -235,7 +203,7 @@ export default function AstraAvatar() {
                 </Canvas>
                 
                 <div onClick={handleAstraClick} style={{ position: 'absolute', top: '100px', right: '20px', background: '#dc2626', color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', cursor: 'pointer', whiteSpace: 'nowrap', zIndex: 10 }}>
-                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 Thinking...' : status === 'speaking' ? '🗣️ Stop Talking' : status === 'waving' ? '👋 Hello!' : 'Ask Astra'}
+                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 thinking...' : status === 'speaking' ? '🗣️ Stop Talking' : status === 'waving' ? '👋 Hello!' : 'Ask Astra'}
                 </div>
 
                 <button onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} style={{ position: 'absolute', right: '40px', top: '40px', background: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', cursor: 'pointer', fontSize: '20px' }}>⚙️</button>
