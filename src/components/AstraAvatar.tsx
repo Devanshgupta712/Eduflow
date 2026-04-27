@@ -5,7 +5,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Skeletal Character (Advanced Motion Engine) ---
+// --- Premium Skeletal Character (Digital Mouth Engine) ---
 function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
     const gltf = useGLTF('/astra_model.glb');
     const { actions } = useAnimations(gltf.animations, gltf.scene);
@@ -36,13 +36,11 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
         gltf.scene.rotation.y = Math.PI;
     }, [gltf.scene]);
 
-    // --- State Machine ---
     useEffect(() => {
         if (!actions) return;
         let activeAction = actions['Idle'] || Object.values(actions)[0];
         if (status === 'listening' || status === 'waving') activeAction = actions['Wave'] || actions['Idle'];
         else if (enableRoaming && isMoving && status === 'idle') activeAction = actions['Walk'] || actions['Run'] || actions['Idle'];
-        
         Object.values(actions).forEach(a => { if (a !== activeAction) a?.fadeOut(0.4); });
         activeAction?.reset().fadeIn(0.4).play();
     }, [actions, isMoving, status, enableRoaming]);
@@ -53,9 +51,7 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
             group.current.position.y = Math.sin(t * 1.5) * 0.08;
             if (autoRotate) group.current.rotation.y += 0.01;
             
-            // --- ANTI-T-POSE & NATURAL GESTURES ---
             if (status === 'speaking') {
-                // Natural gesturing (moving in front)
                 if (rightArm.current) {
                     rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.4, 0.1);
                     rightArm.current.rotation.x = 0.5 + Math.sin(t * 10) * 0.2;
@@ -64,13 +60,7 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
                     leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.4, 0.1);
                     leftArm.current.rotation.x = 0.5 + Math.cos(t * 10) * 0.2;
                 }
-            } else if (status === 'thinking') {
-                if (head.current) {
-                    head.current.rotation.y = Math.sin(t * 4) * 0.2;
-                    head.current.rotation.x = Math.sin(t * 2) * 0.1;
-                }
             } else {
-                // Force Arms Down (Relaxed)
                 if (rightArm.current) {
                     rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.2, 0.1);
                     rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, 0.1, 0.1);
@@ -86,13 +76,19 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
     return (
         <group ref={group} scale={[1.8, 1.8, 1.8]} position={[0, -1.2, 0]}>
             <primitive object={gltf.scene} />
-            {/* --- VISUAL MOUTH (AI PULSE) --- */}
+            {/* --- DIGITAL MOUTH PULSE (Integrated on face) --- */}
             {status === 'speaking' && (
-                <mesh position={[0, 2.5, 0.3]}>
-                    <sphereGeometry args={[0.04, 16, 16]} />
-                    <meshBasicMaterial color="#fff" transparent opacity={0.8} />
-                    <pointLight intensity={2} distance={1} color="#dc2626" />
-                </mesh>
+                <group position={[0, 2.5, 0.2]}>
+                    <mesh rotation={[0, 0, 0]}>
+                        <boxGeometry args={[0.15, 0.02, 0.02]} />
+                        <meshBasicMaterial color="#fff" />
+                        <pointLight intensity={3} distance={1} color="#dc2626" />
+                    </mesh>
+                    <mesh position={[0, Math.sin(Date.now() * 0.02) * 0.02, 0]}>
+                        <boxGeometry args={[0.12, 0.03, 0.01]} />
+                        <meshBasicMaterial color="#dc2626" />
+                    </mesh>
+                </group>
             )}
         </group>
     );
@@ -140,7 +136,7 @@ export default function AstraAvatar() {
                 const dy = targetRef.current.y - posRef.current.y;
                 const distance = Math.sqrt(dx*dx + dy*dy);
                 if (distance < 50 || time - lastMoveTime > 8000) {
-                    targetRef.current = { x: Math.random() * (window.innerWidth - 350) + 50, y: Math.random() * (window.innerHeight - 550) + 50 };
+                    targetRef.current = { x: Math.random() * (window.innerWidth - 350) + 50, y: Math.random() * (window.innerHeight - 650) + 50 };
                     lastMoveTime = time;
                 }
                 if (distance > 10) {
@@ -167,7 +163,7 @@ export default function AstraAvatar() {
         recognitionRef.current?.start();
     };
 
-    // Speech AI Init
+    // Speech AI
     useEffect(() => {
         if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
             const SpeechRecognition = (window as any).webkitSpeechRecognition;
@@ -202,6 +198,16 @@ export default function AstraAvatar() {
 
     return (
         <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '380px', height: '650px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
+            
+            {/* Top Chat Bubble */}
+            {(status === 'speaking' || status === 'waving') && responseText && (
+                <div style={{ position: 'absolute', top: '-140px', left: '50%', transform: 'translateX(-50%)', width: '320px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
+                    <p style={{ margin: 0, fontSize: '15px', color: '#1e293b', fontWeight: 600, lineHeight: 1.5 }}>{responseText}</p>
+                    {/* Bubble Tail */}
+                    <div style={{ position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', width: '20px', height: '20px', background: 'white', clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)' }}></div>
+                </div>
+            )}
+
             <div onMouseDown={(e) => { isDragging.current = true; dragOffset.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y }; }} style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}>
                 <Canvas style={{ background: 'transparent' }}>
                     <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={35} />
@@ -212,8 +218,9 @@ export default function AstraAvatar() {
                     </Suspense>
                     <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
                 </Canvas>
+                
                 <div onClick={handleAstraClick} style={{ position: 'absolute', top: '100px', right: '20px', background: '#dc2626', color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', cursor: 'pointer', whiteSpace: 'nowrap', zIndex: 10 }}>
-                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 Thinking...' : status === 'speaking' ? '🗣️ Stop Talking' : status === 'waving' ? '👋 Hello!' : 'Ask Astra'}
+                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 Thinking...' : status === 'speaking' ? '🗣️ Stop' : status === 'waving' ? '👋 Hello!' : 'Ask Astra'}
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} style={{ position: 'absolute', right: '40px', top: '40px', background: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', cursor: 'pointer', fontSize: '20px' }}>⚙️</button>
             </div>
@@ -233,11 +240,6 @@ export default function AstraAvatar() {
                     <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Volume</label>
                     <input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#dc2626' }} />
                     <button onClick={() => setShowSettings(false)} style={{ width: '100%', marginTop: '20px', background: '#f1f5f9', color: '#475569', border: 'none', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Close</button>
-                </div>
-            )}
-            {(status === 'speaking' || status === 'waving') && responseText && (
-                <div style={{ position: 'absolute', top: '150px', left: '50%', transform: 'translateX(-50%)', width: '300px', background: 'white', padding: '20px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9' }}>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#334155', fontWeight: 500 }}>{responseText}</p>
                 </div>
             )}
         </div>
