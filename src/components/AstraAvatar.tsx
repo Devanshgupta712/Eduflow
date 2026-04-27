@@ -5,11 +5,12 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Skeletal Character (Interactive Face Engine) ---
+// --- Premium Student Character (Human Face Engine) ---
 function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
     const gltf = useGLTF('/astra_model.glb');
     const { actions } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
+    const headNode = useRef<THREE.Object3D | null>(null);
     const rightArm = useRef<THREE.Object3D | null>(null);
     const leftArm = useRef<THREE.Object3D | null>(null);
 
@@ -17,19 +18,25 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
         gltf.scene.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
                 const mesh = child as THREE.Mesh;
-                const mat = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 });
+                const mat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.0 });
                 mesh.material = mat;
                 const name = mesh.name.toLowerCase();
-                // Make head area slightly lighter
-                if (name.includes('head') || name.includes('skin')) mat.color.set('#ffd1a9');
-                else if (name.includes('helmet') || name.includes('cap') || name.includes('upper')) mat.color.set('#ef4444');
-                else if (name.includes('lower') || name.includes('pants')) mat.color.set('#14b8a6');
-                else mat.color.set('#64748b');
+                
+                // --- STUDENT CLOTHING RE-SKIN ---
+                if (name.includes('head') || name.includes('skin')) {
+                    mat.color.set('#ffe0bd'); // Skin Tone
+                    headNode.current = child;
+                } else if (name.includes('upper') || name.includes('chest') || name.includes('arm')) {
+                    mat.color.set('#dc2626'); // Red Hoodie
+                } else if (name.includes('lower') || name.includes('pants') || name.includes('leg')) {
+                    mat.color.set('#0d9488'); // Teal/Blue Jeans
+                } else {
+                    mat.color.set('#334155'); // Dark Shoes/Details
+                }
             }
-            const nodeName = child.name.toLowerCase();
-            if (nodeName.includes('arm') || nodeName.includes('shoulder')) {
-                if (nodeName.includes('right')) rightArm.current = child;
-                if (nodeName.includes('left')) leftArm.current = child;
+            if (child.name.toLowerCase().includes('shoulder') || child.name.toLowerCase().includes('arm')) {
+                if (child.name.toLowerCase().includes('right')) rightArm.current = child;
+                if (child.name.toLowerCase().includes('left')) leftArm.current = child;
             }
         });
         gltf.scene.rotation.y = Math.PI;
@@ -50,6 +57,7 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
             group.current.position.y = Math.sin(t * 1.5) * 0.08;
             if (autoRotate) group.current.rotation.y += 0.01;
             
+            // --- NATURAL STUDENT GESTURES ---
             if (status === 'speaking') {
                 if (rightArm.current) {
                     rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.4, 0.1);
@@ -70,25 +78,33 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
         <group ref={group} scale={[1.8, 1.8, 1.8]} position={[0, -1.2, 0]}>
             <primitive object={gltf.scene} />
             
-            {/* --- GLOWING NEON VISOR FACE --- */}
-            <group position={[0, 2.5, 0.4]}>
-                {/* Neon Cyan Eyes */}
-                <mesh position={[-0.07, 0.05, 0]}>
-                    <sphereGeometry args={[0.03, 16, 16]} />
-                    <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={5} />
+            {/* --- CUSTOM STUDENT FACE (Eyes, Eyebrows, Mouth) --- */}
+            <group position={[0, 2.55, 0.45]}>
+                {/* Expressive Eyes */}
+                <mesh position={[-0.08, 0.08, 0]}>
+                    <sphereGeometry args={[0.035, 16, 16]} />
+                    <meshBasicMaterial color="#111" />
                 </mesh>
-                <mesh position={[0.07, 0.05, 0]}>
-                    <sphereGeometry args={[0.03, 16, 16]} />
-                    <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={5} />
+                <mesh position={[0.08, 0.08, 0]}>
+                    <sphereGeometry args={[0.035, 16, 16]} />
+                    <meshBasicMaterial color="#111" />
                 </mesh>
                 
-                {/* Glowing Mouth Line */}
-                {status === 'speaking' && (
-                    <mesh position={[0, -0.05, 0]}>
-                        <boxGeometry args={[0.14, Math.sin(Date.now() * 0.02) * 0.04 + 0.01, 0.01]} />
-                        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={5} />
-                    </mesh>
-                )}
+                {/* Eyebrows */}
+                <mesh position={[-0.08, 0.14, 0]}>
+                    <boxGeometry args={[0.06, 0.01, 0.01]} />
+                    <meshBasicMaterial color="#442200" />
+                </mesh>
+                <mesh position={[0.08, 0.14, 0]}>
+                    <boxGeometry args={[0.06, 0.01, 0.01]} />
+                    <meshBasicMaterial color="#442200" />
+                </mesh>
+
+                {/* Human Mouth */}
+                <mesh position={[0, -0.05, 0]}>
+                    <boxGeometry args={[0.1, status === 'speaking' ? Math.sin(Date.now() * 0.02) * 0.04 + 0.02 : 0.015, 0.01]} />
+                    <meshBasicMaterial color="#882222" />
+                </mesh>
             </group>
         </group>
     );
@@ -113,16 +129,13 @@ export default function AstraAvatar() {
     const dragOffset = useRef({ x: 0, y: 0 });
     const recognitionRef = useRef<any>(null);
 
-    // --- Global Drag Logic ---
     useEffect(() => {
         const handleGlobalMouseMove = (e: MouseEvent) => {
             if (isDragging.current) {
                 posRef.current.x = e.clientX - dragOffset.current.x;
                 posRef.current.y = e.clientY - dragOffset.current.y;
-                targetRef.current = { ...posRef.current }; // Sync target
-                if (containerRef.current) {
-                    containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
-                }
+                targetRef.current = { ...posRef.current };
+                if (containerRef.current) containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
             }
         };
         const handleGlobalMouseUp = () => { isDragging.current = false; };
@@ -235,13 +248,7 @@ export default function AstraAvatar() {
                 </div>
             )}
 
-            <div 
-                onMouseDown={(e) => { 
-                    isDragging.current = true; 
-                    dragOffset.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y }; 
-                }} 
-                style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}
-            >
+            <div onMouseDown={(e) => { isDragging.current = true; dragOffset.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y }; }} style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}>
                 <Canvas style={{ background: 'transparent' }}>
                     <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={35} />
                     <ambientLight intensity={1.5} />
