@@ -5,7 +5,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Skeletal Character (Digital Mouth Engine) ---
+// --- Premium Skeletal Character (Ultimate Interaction Engine) ---
 function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
     const gltf = useGLTF('/astra_model.glb');
     const { actions } = useAnimations(gltf.animations, gltf.scene);
@@ -54,24 +54,20 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
             if (status === 'speaking') {
                 if (rightArm.current) {
                     rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.4, 0.1);
-                    rightArm.current.rotation.x = 0.5 + Math.sin(t * 10) * 0.2;
+                    rightArm.current.rotation.x = -0.5 + Math.sin(t * 8) * 0.2; // Move FORWARD
                 }
                 if (leftArm.current) {
                     leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.4, 0.1);
-                    leftArm.current.rotation.x = 0.5 + Math.cos(t * 10) * 0.2;
+                    leftArm.current.rotation.x = -0.5 + Math.cos(t * 8) * 0.2; // Move FORWARD
                 }
             } else if (status === 'thinking') {
                 if (head.current) {
                     head.current.rotation.y = Math.sin(t * 4) * 0.2;
                     head.current.rotation.x = Math.sin(t * 2) * 0.1;
                 }
-                // Force Down during thinking
                 if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 1.3, 0.1);
                 if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -1.3, 0.1);
-            } else if (isMoving && enableRoaming) {
-                // Let the Walk animation handle the arms! No override.
-            } else {
-                // Force Arms Down (Relaxed Idle)
+            } else if (!(isMoving && enableRoaming)) {
                 if (rightArm.current) {
                     rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 1.3, 0.1);
                     rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, 0.1, 0.1);
@@ -87,16 +83,16 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
     return (
         <group ref={group} scale={[1.8, 1.8, 1.8]} position={[0, -1.2, 0]}>
             <primitive object={gltf.scene} />
-            {/* --- DIGITAL MOUTH PULSE (Integrated on face) --- */}
+            {/* --- BRIGHTER DIGITAL VISOR (Mouth) --- */}
             {status === 'speaking' && (
-                <group position={[0, 2.5, 0.2]}>
-                    <mesh rotation={[0, 0, 0]}>
-                        <boxGeometry args={[0.15, 0.02, 0.02]} />
+                <group position={[0, 2.65, 0.35]}>
+                    <mesh>
+                        <boxGeometry args={[0.2, 0.05, 0.01]} />
                         <meshBasicMaterial color="#fff" />
-                        <pointLight intensity={3} distance={1} color="#dc2626" />
+                        <pointLight intensity={5} distance={1.5} color="#dc2626" />
                     </mesh>
-                    <mesh position={[0, Math.sin(Date.now() * 0.02) * 0.02, 0]}>
-                        <boxGeometry args={[0.12, 0.03, 0.01]} />
+                    <mesh position={[0, Math.sin(Date.now() * 0.02) * 0.03, 0.01]}>
+                        <boxGeometry args={[0.15, 0.03, 0.01]} />
                         <meshBasicMaterial color="#dc2626" />
                     </mesh>
                 </group>
@@ -207,15 +203,25 @@ export default function AstraAvatar() {
 
     if (!mounted) return null;
 
+    // --- Dynamic Bubble Position Logic ---
+    const isLeftHalf = typeof window !== 'undefined' && posRef.current.x < window.innerWidth / 2;
+    const bubbleStyle = isLeftHalf 
+        ? { top: '50px', left: '380px' } // Show on Right if Astra is on Left
+        : { top: '50px', left: '-340px' }; // Show on Left if Astra is on Right
+
     return (
         <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '380px', height: '650px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
             
-            {/* Side Chat Bubble */}
+            {/* Smart Dynamic Chat Bubble */}
             {(status === 'speaking' || status === 'waving') && responseText && (
-                <div style={{ position: 'absolute', top: '50px', left: '-340px', width: '320px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
+                <div style={{ position: 'absolute', ...bubbleStyle, width: '320px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
                     <p style={{ margin: 0, fontSize: '15px', color: '#1e293b', fontWeight: 600, lineHeight: 1.5 }}>{responseText}</p>
-                    {/* Bubble Tail pointing to Astra */}
-                    <div style={{ position: 'absolute', top: '30px', right: '-10px', width: '20px', height: '20px', background: 'white', clipPath: 'polygon(0% 0%, 0% 100%, 100% 50%)' }}></div>
+                    {/* Dynamic Bubble Tail */}
+                    <div style={{ 
+                        position: 'absolute', top: '30px', 
+                        ...(isLeftHalf ? { left: '-10px', clipPath: 'polygon(100% 0%, 100% 100%, 0% 50%)' } : { right: '-10px', clipPath: 'polygon(0% 0%, 0% 100%, 100% 50%)' }),
+                        width: '20px', height: '20px', background: 'white'
+                    }}></div>
                 </div>
             )}
 
