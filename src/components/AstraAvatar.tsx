@@ -5,12 +5,11 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Skeletal Character (Ultimate Interaction Engine) ---
+// --- Premium Skeletal Character (Digital Personality Engine) ---
 function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
     const gltf = useGLTF('/astra_model.glb');
     const { actions } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
-    const head = useRef<THREE.Object3D | null>(null);
     const rightArm = useRef<THREE.Object3D | null>(null);
     const leftArm = useRef<THREE.Object3D | null>(null);
 
@@ -27,7 +26,6 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
                 else mat.color.set('#475569');
             }
             const nodeName = child.name.toLowerCase();
-            if (nodeName.includes('head') || nodeName.includes('neck')) head.current = child;
             if (nodeName.includes('arm') || nodeName.includes('shoulder')) {
                 if (nodeName.includes('right')) rightArm.current = child;
                 if (nodeName.includes('left')) leftArm.current = child;
@@ -54,19 +52,12 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
             if (status === 'speaking') {
                 if (rightArm.current) {
                     rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.4, 0.1);
-                    rightArm.current.rotation.x = -0.5 + Math.sin(t * 8) * 0.2; // Move FORWARD
+                    rightArm.current.rotation.x = -0.5 + Math.sin(t * 8) * 0.2;
                 }
                 if (leftArm.current) {
                     leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.4, 0.1);
-                    leftArm.current.rotation.x = -0.5 + Math.cos(t * 8) * 0.2; // Move FORWARD
+                    leftArm.current.rotation.x = -0.5 + Math.cos(t * 8) * 0.2;
                 }
-            } else if (status === 'thinking') {
-                if (head.current) {
-                    head.current.rotation.y = Math.sin(t * 4) * 0.2;
-                    head.current.rotation.x = Math.sin(t * 2) * 0.1;
-                }
-                if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 1.3, 0.1);
-                if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -1.3, 0.1);
             } else if (!(isMoving && enableRoaming)) {
                 if (rightArm.current) {
                     rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 1.3, 0.1);
@@ -83,20 +74,30 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
     return (
         <group ref={group} scale={[1.8, 1.8, 1.8]} position={[0, -1.2, 0]}>
             <primitive object={gltf.scene} />
-            {/* --- BRIGHTER DIGITAL VISOR (Mouth) --- */}
-            {status === 'speaking' && (
-                <group position={[0, 2.65, 0.35]}>
-                    <mesh>
-                        <boxGeometry args={[0.2, 0.05, 0.01]} />
+            
+            {/* --- DIGITAL VISOR FACE (Eyes & Mouth) --- */}
+            <group position={[0, 2.6, 0.35]}>
+                {/* Eyes */}
+                <mesh position={[-0.06, 0.05, 0]}>
+                    <sphereGeometry args={[0.02, 8, 8]} />
+                    <meshBasicMaterial color="#00ffff" />
+                    <pointLight intensity={1} color="#00ffff" />
+                </mesh>
+                <mesh position={[0.06, 0.05, 0]}>
+                    <sphereGeometry args={[0.02, 8, 8]} />
+                    <meshBasicMaterial color="#00ffff" />
+                    <pointLight intensity={1} color="#00ffff" />
+                </mesh>
+                
+                {/* Animated Mouth */}
+                {status === 'speaking' && (
+                    <mesh position={[0, -0.05, 0]}>
+                        <boxGeometry args={[0.12, Math.sin(Date.now() * 0.02) * 0.03 + 0.01, 0.01]} />
                         <meshBasicMaterial color="#fff" />
-                        <pointLight intensity={5} distance={1.5} color="#dc2626" />
+                        <pointLight intensity={2} color="#fff" />
                     </mesh>
-                    <mesh position={[0, Math.sin(Date.now() * 0.02) * 0.03, 0.01]}>
-                        <boxGeometry args={[0.15, 0.03, 0.01]} />
-                        <meshBasicMaterial color="#dc2626" />
-                    </mesh>
-                </group>
-            )}
+                )}
+            </group>
         </group>
     );
 }
@@ -203,25 +204,18 @@ export default function AstraAvatar() {
 
     if (!mounted) return null;
 
-    // --- Dynamic Bubble Position Logic ---
     const isLeftHalf = typeof window !== 'undefined' && posRef.current.x < window.innerWidth / 2;
     const bubbleStyle = isLeftHalf 
-        ? { top: '50px', left: '380px' } // Show on Right if Astra is on Left
-        : { top: '50px', left: '-340px' }; // Show on Left if Astra is on Right
+        ? { top: '50px', left: '260px' } // Tighter Gap
+        : { top: '50px', left: '-220px' }; // Tighter Gap
 
     return (
         <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '380px', height: '650px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
             
-            {/* Smart Dynamic Chat Bubble */}
             {(status === 'speaking' || status === 'waving') && responseText && (
-                <div style={{ position: 'absolute', ...bubbleStyle, width: '320px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
-                    <p style={{ margin: 0, fontSize: '15px', color: '#1e293b', fontWeight: 600, lineHeight: 1.5 }}>{responseText}</p>
-                    {/* Dynamic Bubble Tail */}
-                    <div style={{ 
-                        position: 'absolute', top: '30px', 
-                        ...(isLeftHalf ? { left: '-10px', clipPath: 'polygon(100% 0%, 100% 100%, 0% 50%)' } : { right: '-10px', clipPath: 'polygon(0% 0%, 0% 100%, 100% 50%)' }),
-                        width: '20px', height: '20px', background: 'white'
-                    }}></div>
+                <div style={{ position: 'absolute', ...bubbleStyle, width: '280px', background: 'white', padding: '20px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#1e293b', fontWeight: 600, lineHeight: 1.5 }}>{responseText}</p>
+                    <div style={{ position: 'absolute', top: '30px', ...(isLeftHalf ? { left: '-10px', clipPath: 'polygon(100% 0%, 100% 100%, 0% 50%)' } : { right: '-10px', clipPath: 'polygon(0% 0%, 0% 100%, 100% 50%)' }), width: '20px', height: '20px', background: 'white' }}></div>
                 </div>
             )}
 
@@ -236,13 +230,19 @@ export default function AstraAvatar() {
                     <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
                 </Canvas>
                 
-                <div onClick={handleAstraClick} style={{ position: 'absolute', top: '100px', right: '20px', background: '#dc2626', color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', cursor: 'pointer', whiteSpace: 'nowrap', zIndex: 10 }}>
-                    {status === 'listening' ? '👂 Listening...' : status === 'thinking' ? '🧠 Thinking...' : status === 'speaking' ? '🗣️ Stop' : status === 'waving' ? '👋 Hello!' : 'Ask Astra'}
+                {/* Clean Actions Overlay */}
+                <div style={{ position: 'absolute', top: '50px', right: '40px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <button onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} style={{ background: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', cursor: 'pointer', fontSize: '20px' }}>⚙️</button>
+                    {status === 'speaking' && (
+                        <button onClick={handleAstraClick} style={{ background: '#dc2626', color: 'white', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Stop Talking</button>
+                    )}
+                    {status === 'idle' && (
+                        <div onClick={handleAstraClick} style={{ background: '#dc2626', color: 'white', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Ask Astra</div>
+                    )}
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} style={{ position: 'absolute', right: '40px', top: '40px', background: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', cursor: 'pointer', fontSize: '20px' }}>⚙️</button>
             </div>
             {showSettings && (
-                <div style={{ position: 'absolute', top: '90px', right: '40px', width: '280px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 100 }}>
+                <div style={{ position: 'absolute', top: '150px', right: '40px', width: '260px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 100 }}>
                     <h4 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>Settings</h4>
                     <label style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '15px' }}>
                         <input type="checkbox" checked={enableRoaming} onChange={() => setEnableRoaming(!enableRoaming)} /> Enable Roaming
