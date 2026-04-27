@@ -120,8 +120,8 @@ export default function AstraAvatar() {
     useEffect(() => {
         setMounted(true);
         if (typeof window === 'undefined') return;
-        posRef.current = { x: 50, y: window.innerHeight - 550 };
-        targetRef.current = { x: 50, y: window.innerHeight - 550 };
+        posRef.current = { x: 50, y: window.innerHeight - 650 };
+        targetRef.current = { x: 50, y: window.innerHeight - 650 };
 
         const loadVoices = () => {
             const v = window.speechSynthesis.getVoices();
@@ -201,7 +201,7 @@ export default function AstraAvatar() {
     if (!mounted) return null;
 
     return (
-        <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '380px', height: '550px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
+        <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '380px', height: '650px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
             <div onMouseDown={(e) => { isDragging.current = true; dragOffset.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y }; }} style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}>
                 <Canvas style={{ background: 'transparent' }}>
                     <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={35} />
