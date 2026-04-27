@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
+import { useRouter } from 'next/navigation';
 
 // --- ROBOT EXPRESSIVE (Full Animation + Morph Target Engine) ---
 function ExpressiveBot({ status, isMoving, enableRoaming }: { status: string, isMoving: boolean, enableRoaming: boolean }) {
@@ -116,6 +117,7 @@ function ExpressiveBot({ status, isMoving, enableRoaming }: { status: string, is
 }
 
 export default function AstraAvatar() {
+    const router = useRouter();
     const [mounted, setMounted] = useState(false);
     const [status, setStatus] = useState('idle'); 
     const [isMoving, setIsMoving] = useState(false);
@@ -246,7 +248,7 @@ export default function AstraAvatar() {
             rolePersonality = `You are talking to a visitor. Be welcoming and help them understand the platform, courses, and enrollment process.`;
         }
 
-        return `You are Astra, a friendly AI assistant for the EduSuite.ai Learning Management System. ${rolePersonality} The user is currently on the page: "${pageName}". Respond concisely in 3-4 sentences. Address them as ${firstName}. User says: ${userMessage}`;
+        return `You are Astra, a friendly AI assistant for the EduSuite.ai Learning Management System. ${rolePersonality} The user is currently on the page: "${pageName}". Respond concisely in 3-4 sentences. Address them as ${firstName}. If the user asks you to take them to a specific page or navigate anywhere, append exactly "[NAVIGATE: /path]" to the very end of your response (e.g. "[NAVIGATE: /dashboard]" or "[NAVIGATE: /training/attendance]"). User says: ${userMessage}`;
     };
 
     // Speech AI (Personalized)
@@ -265,11 +267,21 @@ export default function AstraAvatar() {
                         body: JSON.stringify({ message: personalizedMessage, history: [] })
                     });
                     const data = await res.json();
-                    setResponseText(data.reply);
+                    let finalReply = data.reply;
+                    
+                    // Parse Navigation Command
+                    const navMatch = finalReply.match(/\[NAVIGATE:\s*([^\]]+)\]/i);
+                    if (navMatch) {
+                        const navPath = navMatch[1].trim();
+                        finalReply = finalReply.replace(/\[NAVIGATE:\s*([^\]]+)\]/gi, '').trim();
+                        router.push(navPath);
+                    }
+
+                    setResponseText(finalReply);
                     setStatus('waving');
                     setTimeout(() => {
                         setStatus('speaking');
-                        const utterance = new SpeechSynthesisUtterance(data.reply);
+                        const utterance = new SpeechSynthesisUtterance(finalReply);
                         const voice = voices.find(v => v.name === selectedVoice);
                         if (voice) utterance.voice = voice;
                         utterance.volume = volume;
