@@ -207,7 +207,49 @@ export default function AstraAvatar() {
         recognitionRef.current?.start();
     };
 
-    // Speech AI
+    // --- PERSONALIZATION ENGINE ---
+    const getUserContext = () => {
+        if (typeof window === 'undefined') return { name: 'Guest', role: 'GUEST', email: '', page: '/' };
+        try {
+            const raw = localStorage.getItem('auth_user');
+            const user = raw ? JSON.parse(raw) : null;
+            const page = window.location.pathname;
+            const pageTitle = document.title;
+            return {
+                name: user?.name || 'Guest',
+                role: user?.role || 'GUEST',
+                email: user?.email || '',
+                batch: user?.batch_name || user?.batch || '',
+                page,
+                pageTitle
+            };
+        } catch { return { name: 'Guest', role: 'GUEST', email: '', page: '/', pageTitle: '' }; }
+    };
+
+    const buildPersonalizedPrompt = (userMessage: string) => {
+        const ctx = getUserContext();
+        const firstName = ctx.name.split(' ')[0];
+        const pageName = ctx.page.replace(/\//g, ' > ').replace(/>/g, '›').trim() || 'Home';
+
+        let rolePersonality = '';
+        if (ctx.role === 'STUDENT') {
+            rolePersonality = `You are talking to a student/trainee named ${firstName}. Be a friendly, encouraging tutor. Help them with assignments, courses, and career guidance. If they're on an assessment page, wish them luck. If they're on attendance, help them track it.`;
+        } else if (ctx.role === 'TRAINER') {
+            rolePersonality = `You are talking to a trainer named ${firstName}. Be professional and supportive. Help them manage batches, track trainee progress, and handle attendance.`;
+        } else if (ctx.role === 'ADMIN') {
+            rolePersonality = `You are talking to an admin named ${firstName}. Be professional and efficient. Help them with reports, managing users, batches, and system operations.`;
+        } else if (ctx.role === 'SUPER_ADMIN') {
+            rolePersonality = `You are talking to a Super Admin named ${firstName}. Be an executive advisor. Help with system-wide decisions, analytics, and platform management.`;
+        } else if (ctx.role === 'MARKETER') {
+            rolePersonality = `You are talking to a marketer named ${firstName}. Help them with leads, campaigns, and enrollment metrics.`;
+        } else {
+            rolePersonality = `You are talking to a visitor. Be welcoming and help them understand the platform, courses, and enrollment process.`;
+        }
+
+        return `You are Astra, a friendly AI assistant for the EduSuite.ai Learning Management System. ${rolePersonality} The user is currently on the page: "${pageName}". Respond concisely in 3-4 sentences. Address them as ${firstName}. User says: ${userMessage}`;
+    };
+
+    // Speech AI (Personalized)
     useEffect(() => {
         if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
             const SpeechRecognition = (window as any).webkitSpeechRecognition;
@@ -216,10 +258,11 @@ export default function AstraAvatar() {
                 const transcript = event.results[0][0].transcript;
                 setStatus('thinking');
                 try {
+                    const personalizedMessage = buildPersonalizedPrompt(transcript);
                     const res = await fetch('https://lms-api-bkuw.onrender.com/api/training/chatbot', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: "Respond in a helpful yet concise manner (around 3-4 sentences): " + transcript, history: [] })
+                        body: JSON.stringify({ message: personalizedMessage, history: [] })
                     });
                     const data = await res.json();
                     setResponseText(data.reply);
