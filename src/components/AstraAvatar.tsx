@@ -2,135 +2,82 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { PerspectiveCamera, Environment, ContactShadows, Float, useGLTF } from '@react-three/drei';
+import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- PREMIUM STYLIZED HUMAN STUDENT (Built with High-End Primitives) ---
-function PremiumHuman({ status, isMoving }: { status: string, isMoving: boolean }) {
+// --- PREMIUM HUMAN STUDENT CHARACTER ---
+function PremiumHumanAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
+    const gltf = useGLTF('/student_avatar.glb');
+    const { actions, names } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
-    const head = useRef<THREE.Group>(null);
-    const leftArm = useRef<THREE.Group>(null);
-    const rightArm = useRef<THREE.Group>(null);
-    const leftLeg = useRef<THREE.Group>(null);
-    const rightLeg = useRef<THREE.Group>(null);
+
+    // Log available animations on first load so we can debug
+    useEffect(() => {
+        console.log('Available animations:', names);
+        console.log('Actions:', Object.keys(actions));
+        
+        // Set nice materials on the human model
+        gltf.scene.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                if (Array.isArray(mesh.material)) {
+                    mesh.material.forEach((mat) => {
+                        if (mat instanceof THREE.MeshStandardMaterial) {
+                            mat.roughness = 0.6;
+                            mat.metalness = 0.1;
+                        }
+                    });
+                } else if (mesh.material instanceof THREE.MeshStandardMaterial) {
+                    mesh.material.roughness = 0.6;
+                    mesh.material.metalness = 0.1;
+                }
+            }
+        });
+    }, [gltf.scene, names, actions]);
+
+    // --- Animation State Machine ---
+    useEffect(() => {
+        if (!actions || names.length === 0) return;
+
+        // Find the best matching animation for each state
+        const findAnim = (...keywords: string[]) => {
+            for (const kw of keywords) {
+                const found = names.find(n => n.toLowerCase().includes(kw.toLowerCase()));
+                if (found && actions[found]) return actions[found];
+            }
+            return null;
+        };
+
+        let targetAction: THREE.AnimationAction | null = null;
+
+        if (status === 'waving' || status === 'listening') {
+            targetAction = findAnim('wave', 'greet', 'hello') || findAnim('idle', 'stand') || (actions[names[0]] ?? null);
+        } else if (status === 'speaking') {
+            targetAction = findAnim('talk', 'gesture', 'idle') || (actions[names[0]] ?? null);
+        } else if (enableRoaming && isMoving) {
+            targetAction = findAnim('walk', 'run', 'locomotion') || (actions[names[0]] ?? null);
+        } else {
+            targetAction = findAnim('idle', 'stand', 'breathe') || (actions[names[0]] ?? null);
+        }
+
+        if (targetAction) {
+            Object.values(actions).forEach(a => { if (a && a !== targetAction) a.fadeOut(0.4); });
+            targetAction.reset().fadeIn(0.4).play();
+        }
+    }, [actions, names, isMoving, status, enableRoaming]);
 
     useFrame((state) => {
         const t = state.clock.elapsedTime;
-        if (!group.current) return;
-
-        // --- IDLE BREATHING ---
-        group.current.position.y = Math.sin(t * 1.5) * 0.08;
-
-        if (status === 'speaking') {
-            if (rightArm.current) {
-                rightArm.current.rotation.x = -0.5 + Math.sin(t * 10) * 0.3;
-                rightArm.current.rotation.z = -0.3;
-            }
-            if (leftArm.current) {
-                leftArm.current.rotation.x = -0.5 + Math.cos(t * 10) * 0.3;
-                leftArm.current.rotation.z = 0.3;
-            }
-            if (head.current) head.current.rotation.y = Math.sin(t * 2) * 0.15;
-        } else if (isMoving) {
-            const walkSpeed = 8;
-            if (leftLeg.current) leftLeg.current.rotation.x = Math.sin(t * walkSpeed) * 0.6;
-            if (rightLeg.current) rightLeg.current.rotation.x = Math.cos(t * walkSpeed) * 0.6;
-            if (leftArm.current) leftArm.current.rotation.x = Math.cos(t * walkSpeed) * 0.5;
-            if (rightArm.current) rightArm.current.rotation.x = Math.sin(t * walkSpeed) * 0.5;
-        } else if (status === 'waving') {
-            if (rightArm.current) {
-                rightArm.current.rotation.z = -1.8 + Math.sin(t * 12) * 0.6;
-                rightArm.current.rotation.x = -0.3;
-            }
-        } else {
-            // Smooth Idle
-            if (rightArm.current) {
-                rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, -0.15, 0.1);
-                rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, 0.1, 0.1);
-            }
-            if (leftArm.current) {
-                leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, 0.15, 0.1);
-                leftArm.current.rotation.x = THREE.MathUtils.lerp(leftArm.current.rotation.x, 0.1, 0.1);
-            }
-            if (head.current) {
-                head.current.rotation.y = THREE.MathUtils.lerp(head.current.rotation.y, 0, 0.1);
-                head.current.rotation.x = Math.sin(t * 0.8) * 0.05;
-            }
+        if (group.current) {
+            // Gentle hover
+            group.current.position.y = Math.sin(t * 1.5) * 0.06;
+            if (autoRotate) group.current.rotation.y += 0.008;
         }
     });
 
     return (
-        <group ref={group} scale={[1.1, 1.1, 1.1]} position={[0, -0.5, 0]}>
-            {/* --- TORSO (Hoodie) --- */}
-            <mesh castShadow>
-                <capsuleGeometry args={[0.32, 0.7, 16, 16]} />
-                <meshStandardMaterial color="#dc2626" roughness={0.4} />
-            </mesh>
-
-            {/* --- HEAD (Human Teenager) --- */}
-            <group ref={head} position={[0, 1.3, 0]}>
-                <mesh castShadow>
-                    <sphereGeometry args={[0.28, 32, 32]} />
-                    <meshStandardMaterial color="#ffe0bd" roughness={0.5} />
-                </mesh>
-                {/* Hair */}
-                <mesh position={[0, 0.15, 0]}>
-                    <sphereGeometry args={[0.3, 32, 32]} />
-                    <meshStandardMaterial color="#332211" />
-                </mesh>
-                {/* Expressive Eyes */}
-                <mesh position={[-0.1, 0.05, 0.22]}>
-                    <sphereGeometry args={[0.04, 16, 16]} />
-                    <meshBasicMaterial color="#111" />
-                </mesh>
-                <mesh position={[0.1, 0.05, 0.22]}>
-                    <sphereGeometry args={[0.04, 16, 16]} />
-                    <meshBasicMaterial color="#111" />
-                </mesh>
-                {/* Human Mouth */}
-                <mesh position={[0, -0.12, 0.22]}>
-                    <boxGeometry args={[0.1, status === 'speaking' ? 0.06 : 0.02, 0.01]} />
-                    <meshBasicMaterial color="#882222" />
-                </mesh>
-            </group>
-
-            {/* --- ARMS --- */}
-            <group ref={leftArm} position={[-0.4, 0.8, 0]}>
-                <mesh castShadow>
-                    <capsuleGeometry args={[0.1, 0.5, 16, 16]} />
-                    <meshStandardMaterial color="#dc2626" />
-                </mesh>
-            </group>
-            <group ref={rightArm} position={[0.4, 0.8, 0]}>
-                <mesh castShadow>
-                    <capsuleGeometry args={[0.1, 0.5, 16, 16]} />
-                    <meshStandardMaterial color="#dc2626" />
-                </mesh>
-            </group>
-
-            {/* --- LEGS (Jeans) --- */}
-            <group ref={leftLeg} position={[-0.18, -0.2, 0]}>
-                <mesh castShadow>
-                    <capsuleGeometry args={[0.12, 0.7, 16, 16]} />
-                    <meshStandardMaterial color="#1e40af" />
-                </mesh>
-                {/* Sneaker */}
-                <mesh position={[0, -0.45, 0.1]}>
-                    <boxGeometry args={[0.18, 0.15, 0.35]} />
-                    <meshStandardMaterial color="#fff" />
-                </mesh>
-            </group>
-            <group ref={rightLeg} position={[0.18, -0.2, 0]}>
-                <mesh castShadow>
-                    <capsuleGeometry args={[0.12, 0.7, 16, 16]} />
-                    <meshStandardMaterial color="#1e40af" />
-                </mesh>
-                {/* Sneaker */}
-                <mesh position={[0, -0.45, 0.1]}>
-                    <boxGeometry args={[0.18, 0.15, 0.35]} />
-                    <meshStandardMaterial color="#fff" />
-                </mesh>
-            </group>
+        <group ref={group} scale={[2, 2, 2]} position={[0, -2.5, 0]}>
+            <primitive object={gltf.scene} />
         </group>
     );
 }
@@ -282,12 +229,12 @@ export default function AstraAvatar() {
                 style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}
             >
                 <Canvas shadows>
-                    <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={30} />
-                    <ambientLight intensity={1.2} />
-                    <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={2} castShadow />
+                    <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={35} />
+                    <ambientLight intensity={1.5} />
+                    <spotLight position={[5, 5, 5]} angle={0.3} penumbra={1} intensity={2} castShadow />
                     <Environment preset="city" />
                     <Suspense fallback={null}>
-                        <PremiumHuman status={status} isMoving={isMoving} />
+                        <PremiumHumanAvatar status={status} autoRotate={autoRotate} isMoving={isMoving} enableRoaming={enableRoaming} />
                     </Suspense>
                     <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
                 </Canvas>
@@ -323,3 +270,5 @@ export default function AstraAvatar() {
         </div>
     );
 }
+
+useGLTF.preload('/student_avatar.glb');
