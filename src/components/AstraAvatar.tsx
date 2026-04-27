@@ -5,7 +5,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Skeletal Character (Digital Personality Engine) ---
+// --- Premium Skeletal Character (Interactive Face Engine) ---
 function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
     const gltf = useGLTF('/astra_model.glb');
     const { actions } = useAnimations(gltf.animations, gltf.scene);
@@ -17,13 +17,14 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
         gltf.scene.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
                 const mesh = child as THREE.Mesh;
-                const mat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.0 });
+                const mat = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 });
                 mesh.material = mat;
                 const name = mesh.name.toLowerCase();
-                if (name.includes('head') || name.includes('skin')) mat.color.set('#ffe0bd');
-                else if (name.includes('helmet') || name.includes('cap') || name.includes('upper')) mat.color.set('#dc2626');
-                else if (name.includes('lower') || name.includes('pants')) mat.color.set('#0d9488');
-                else mat.color.set('#475569');
+                // Make head area slightly lighter
+                if (name.includes('head') || name.includes('skin')) mat.color.set('#ffd1a9');
+                else if (name.includes('helmet') || name.includes('cap') || name.includes('upper')) mat.color.set('#ef4444');
+                else if (name.includes('lower') || name.includes('pants')) mat.color.set('#14b8a6');
+                else mat.color.set('#64748b');
             }
             const nodeName = child.name.toLowerCase();
             if (nodeName.includes('arm') || nodeName.includes('shoulder')) {
@@ -59,14 +60,8 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
                     leftArm.current.rotation.x = -0.5 + Math.cos(t * 8) * 0.2;
                 }
             } else if (!(isMoving && enableRoaming)) {
-                if (rightArm.current) {
-                    rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 1.3, 0.1);
-                    rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, 0.1, 0.1);
-                }
-                if (leftArm.current) {
-                    leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -1.3, 0.1);
-                    leftArm.current.rotation.x = THREE.MathUtils.lerp(leftArm.current.rotation.x, 0.1, 0.1);
-                }
+                if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 1.3, 0.1);
+                if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -1.3, 0.1);
             }
         }
     });
@@ -75,26 +70,23 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
         <group ref={group} scale={[1.8, 1.8, 1.8]} position={[0, -1.2, 0]}>
             <primitive object={gltf.scene} />
             
-            {/* --- DIGITAL VISOR FACE (Eyes & Mouth) --- */}
-            <group position={[0, 2.6, 0.35]}>
-                {/* Eyes */}
-                <mesh position={[-0.06, 0.05, 0]}>
-                    <sphereGeometry args={[0.02, 8, 8]} />
-                    <meshBasicMaterial color="#00ffff" />
-                    <pointLight intensity={1} color="#00ffff" />
+            {/* --- GLOWING NEON VISOR FACE --- */}
+            <group position={[0, 2.5, 0.4]}>
+                {/* Neon Cyan Eyes */}
+                <mesh position={[-0.07, 0.05, 0]}>
+                    <sphereGeometry args={[0.03, 16, 16]} />
+                    <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={5} />
                 </mesh>
-                <mesh position={[0.06, 0.05, 0]}>
-                    <sphereGeometry args={[0.02, 8, 8]} />
-                    <meshBasicMaterial color="#00ffff" />
-                    <pointLight intensity={1} color="#00ffff" />
+                <mesh position={[0.07, 0.05, 0]}>
+                    <sphereGeometry args={[0.03, 16, 16]} />
+                    <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={5} />
                 </mesh>
                 
-                {/* Animated Mouth */}
+                {/* Glowing Mouth Line */}
                 {status === 'speaking' && (
                     <mesh position={[0, -0.05, 0]}>
-                        <boxGeometry args={[0.12, Math.sin(Date.now() * 0.02) * 0.03 + 0.01, 0.01]} />
-                        <meshBasicMaterial color="#fff" />
-                        <pointLight intensity={2} color="#fff" />
+                        <boxGeometry args={[0.14, Math.sin(Date.now() * 0.02) * 0.04 + 0.01, 0.01]} />
+                        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={5} />
                     </mesh>
                 )}
             </group>
@@ -121,6 +113,27 @@ export default function AstraAvatar() {
     const dragOffset = useRef({ x: 0, y: 0 });
     const recognitionRef = useRef<any>(null);
 
+    // --- Global Drag Logic ---
+    useEffect(() => {
+        const handleGlobalMouseMove = (e: MouseEvent) => {
+            if (isDragging.current) {
+                posRef.current.x = e.clientX - dragOffset.current.x;
+                posRef.current.y = e.clientY - dragOffset.current.y;
+                targetRef.current = { ...posRef.current }; // Sync target
+                if (containerRef.current) {
+                    containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
+                }
+            }
+        };
+        const handleGlobalMouseUp = () => { isDragging.current = false; };
+        window.addEventListener('mousemove', handleGlobalMouseMove);
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleGlobalMouseMove);
+            window.removeEventListener('mouseup', handleGlobalMouseUp);
+        };
+    }, []);
+
     useEffect(() => {
         setMounted(true);
         if (typeof window === 'undefined') return;
@@ -139,7 +152,7 @@ export default function AstraAvatar() {
         let animationFrameId: number;
         let lastMoveTime = 0;
         const updatePos = (time: number) => {
-            if (enableRoaming && status === 'idle') {
+            if (enableRoaming && status === 'idle' && !isDragging.current) {
                 const dx = targetRef.current.x - posRef.current.x;
                 const dy = targetRef.current.y - posRef.current.y;
                 const distance = Math.sqrt(dx*dx + dy*dy);
@@ -153,14 +166,17 @@ export default function AstraAvatar() {
                     posRef.current.y += dy * 0.012;
                     if (containerRef.current) containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
                 } else { setIsMoving(false); }
-            } else { setIsMoving(false); }
+            } else if (!isDragging.current) {
+                setIsMoving(false);
+            }
             animationFrameId = requestAnimationFrame(updatePos);
         };
         animationFrameId = requestAnimationFrame(updatePos);
         return () => cancelAnimationFrame(animationFrameId);
     }, [enableRoaming, status]);
 
-    const handleAstraClick = () => {
+    const handleAstraClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
         if (status === 'speaking' || status === 'thinking') {
             window.speechSynthesis.cancel();
             setStatus('idle');
@@ -206,8 +222,8 @@ export default function AstraAvatar() {
 
     const isLeftHalf = typeof window !== 'undefined' && posRef.current.x < window.innerWidth / 2;
     const bubbleStyle = isLeftHalf 
-        ? { top: '50px', left: '260px' } // Tighter Gap
-        : { top: '50px', left: '-220px' }; // Tighter Gap
+        ? { top: '50px', left: '260px' } 
+        : { top: '50px', left: '-220px' }; 
 
     return (
         <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '380px', height: '650px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
@@ -219,7 +235,13 @@ export default function AstraAvatar() {
                 </div>
             )}
 
-            <div onMouseDown={(e) => { isDragging.current = true; dragOffset.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y }; }} style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}>
+            <div 
+                onMouseDown={(e) => { 
+                    isDragging.current = true; 
+                    dragOffset.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y }; 
+                }} 
+                style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}
+            >
                 <Canvas style={{ background: 'transparent' }}>
                     <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={35} />
                     <ambientLight intensity={1.5} />
@@ -230,7 +252,6 @@ export default function AstraAvatar() {
                     <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
                 </Canvas>
                 
-                {/* Clean Actions Overlay */}
                 <div style={{ position: 'absolute', top: '50px', right: '40px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <button onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} style={{ background: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', cursor: 'pointer', fontSize: '20px' }}>⚙️</button>
                     {status === 'speaking' && (
