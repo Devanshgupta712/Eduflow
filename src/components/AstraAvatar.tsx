@@ -162,7 +162,7 @@ export default function AstraAvatar() {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
-                            message: "PLEASE RESPOND VERY SHORTLY (MAX 2 SENTENCES): " + transcript, 
+                            message: "Respond in a helpful yet concise manner (around 3-4 sentences): " + transcript, 
                             history: [] 
                         })
                     });
