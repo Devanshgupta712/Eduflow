@@ -237,6 +237,8 @@ export default function AstraAvatar() {
         const pageName = ctx.page.replace(/\//g, ' > ').replace(/>/g, '›').trim() || 'Home';
 
         let rolePersonality = '';
+        let navInstruction = `If the user asks you to take them to a specific page or navigate anywhere, append exactly "[NAVIGATE: /path]" to the very end of your response (e.g. "[NAVIGATE: /dashboard]" or "[NAVIGATE: /training/attendance]").`;
+
         if (ctx.role === 'STUDENT') {
             rolePersonality = `You are talking to a student/trainee named ${firstName}. Be a friendly, encouraging tutor. Help them with assignments, courses, and career guidance. If they're on an assessment page, wish them luck. If they're on attendance, help them track it.`;
         } else if (ctx.role === 'TRAINER') {
@@ -249,9 +251,10 @@ export default function AstraAvatar() {
             rolePersonality = `You are talking to a marketer named ${firstName}. Help them with leads, campaigns, and enrollment metrics.`;
         } else {
             rolePersonality = `You are talking to a visitor. Be welcoming and help them understand the platform, courses, and enrollment process.`;
+            navInstruction = `DO NOT use the [NAVIGATE: /path] command. If they ask to go to a dashboard or specific page, politely tell them they need to log in first to access those areas.`;
         }
 
-        return `You are Astra, a friendly AI assistant for the EduSuite.ai Learning Management System. ${rolePersonality} The user is currently on the page: "${pageName}". IMPORTANT: Always respond in the exact same language that the user is speaking to you in. Respond concisely in 3-4 sentences. Address them as ${firstName}. If the user asks you to take them to a specific page or navigate anywhere, append exactly "[NAVIGATE: /path]" to the very end of your response (e.g. "[NAVIGATE: /dashboard]" or "[NAVIGATE: /training/attendance]"). User says: ${userMessage}`;
+        return `You are Astra, a friendly AI assistant for the EduSuite.ai Learning Management System. ${rolePersonality} The user is currently on the page: "${pageName}". IMPORTANT: Always respond in the exact same language that the user is speaking to you in. Respond concisely in 3-4 sentences. Address them as ${firstName}. ${navInstruction} User says: ${userMessage}`;
     };
 
     // Speech AI (Personalized)
@@ -272,6 +275,10 @@ export default function AstraAvatar() {
                     });
                     const data = await res.json();
                     let finalReply = data.reply;
+                    
+                    if (!finalReply) {
+                        finalReply = "I'm sorry, I couldn't process that right now. Please try asking again.";
+                    }
                     
                     // Parse Navigation Command
                     const navMatch = finalReply.match(/\[NAVIGATE:\s*([^\]]+)\]/i);
