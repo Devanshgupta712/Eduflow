@@ -5,41 +5,31 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- PREMIUM HUMAN STUDENT CHARACTER ---
-function PremiumHumanAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
+// --- ROBOT EXPRESSIVE (Full Animation + Morph Target Engine) ---
+function ExpressiveBot({ status, isMoving, enableRoaming }: { status: string, isMoving: boolean, enableRoaming: boolean }) {
     const gltf = useGLTF('/student_avatar.glb');
-    const { actions, names } = useAnimations(gltf.animations, gltf.scene);
+    const { actions, names, mixer } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
+    const headMesh = useRef<THREE.Mesh | null>(null);
 
-    // Log available animations on first load so we can debug
+    // Find the head mesh with morph targets
     useEffect(() => {
-        console.log('Available animations:', names);
-        console.log('Actions:', Object.keys(actions));
-        
-        // Set nice materials on the human model
+        console.log('RobotExpressive animations:', names);
         gltf.scene.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
                 const mesh = child as THREE.Mesh;
-                if (Array.isArray(mesh.material)) {
-                    mesh.material.forEach((mat) => {
-                        if (mat instanceof THREE.MeshStandardMaterial) {
-                            mat.roughness = 0.6;
-                            mat.metalness = 0.1;
-                        }
-                    });
-                } else if (mesh.material instanceof THREE.MeshStandardMaterial) {
-                    mesh.material.roughness = 0.6;
-                    mesh.material.metalness = 0.1;
+                if (mesh.morphTargetDictionary && Object.keys(mesh.morphTargetDictionary).length > 0) {
+                    headMesh.current = mesh;
+                    console.log('Morph targets found:', mesh.morphTargetDictionary);
                 }
             }
         });
-    }, [gltf.scene, names, actions]);
+    }, [gltf.scene, names]);
 
-    // --- Animation State Machine ---
+    // --- Full Animation State Machine ---
     useEffect(() => {
         if (!actions || names.length === 0) return;
 
-        // Find the best matching animation for each state
         const findAnim = (...keywords: string[]) => {
             for (const kw of keywords) {
                 const found = names.find(n => n.toLowerCase().includes(kw.toLowerCase()));
@@ -48,37 +38,78 @@ function PremiumHumanAvatar({ status, autoRotate, isMoving, enableRoaming }: { s
             return null;
         };
 
+        // Stop all first
+        Object.values(actions).forEach(a => a?.fadeOut(0.3));
+
         let targetAction: THREE.AnimationAction | null = null;
 
         if (status === 'waving' || status === 'listening') {
-            targetAction = findAnim('wave', 'greet', 'hello');
+            targetAction = findAnim('wave', 'thumbsup', 'yes');
         } else if (status === 'speaking') {
-            targetAction = findAnim('talk', 'gesture');
+            targetAction = findAnim('talk', 'idle', 'yes');
+        } else if (status === 'thinking') {
+            targetAction = findAnim('idle', 'stand');
         } else if (enableRoaming && isMoving) {
-            targetAction = findAnim('walk', 'run', 'locomotion');
+            targetAction = findAnim('walk', 'walking', 'run', 'running');
+        } else {
+            // Idle: just stand still
+            targetAction = findAnim('idle', 'stand');
         }
-        // For 'idle' and 'thinking': NO animation — just stand still
 
-        // Stop all animations first
-        Object.values(actions).forEach(a => a?.fadeOut(0.3));
-
-        // Only play if we found a specific animation for the current state
         if (targetAction) {
             targetAction.reset().fadeIn(0.3).play();
         }
     }, [actions, names, isMoving, status, enableRoaming]);
 
+    // --- Morph Target Mouth Animation ---
     useFrame((state) => {
         const t = state.clock.elapsedTime;
         if (group.current) {
-            // Gentle hover
-            group.current.position.y = Math.sin(t * 1.5) * 0.06;
-            if (autoRotate) group.current.rotation.y += 0.008;
+            group.current.position.y = Math.sin(t * 1.5) * 0.04;
+        }
+
+        // Animate mouth morph targets while speaking
+        if (headMesh.current && headMesh.current.morphTargetDictionary && headMesh.current.morphTargetInfluences) {
+            const dict = headMesh.current.morphTargetDictionary;
+            const influences = headMesh.current.morphTargetInfluences;
+
+            if (status === 'speaking') {
+                // Open/close mouth in sync with "speech"
+                const mouthIdx = dict['Surprised'] ?? dict['surprised'] ?? dict['mouthOpen'] ?? dict['jawOpen'];
+                if (mouthIdx !== undefined) {
+                    influences[mouthIdx] = Math.abs(Math.sin(t * 12)) * 0.6;
+                }
+                // Happy expression while talking
+                const happyIdx = dict['Happy'] ?? dict['happy'] ?? dict['smile'];
+                if (happyIdx !== undefined) {
+                    influences[happyIdx] = 0.4;
+                }
+            } else if (status === 'thinking') {
+                // Sad/thinking expression
+                const sadIdx = dict['Sad'] ?? dict['sad'];
+                if (sadIdx !== undefined) {
+                    influences[sadIdx] = 0.5;
+                }
+                // Reset others
+                const happyIdx = dict['Happy'] ?? dict['happy'];
+                if (happyIdx !== undefined) influences[happyIdx] = 0;
+                const surprisedIdx = dict['Surprised'] ?? dict['surprised'];
+                if (surprisedIdx !== undefined) influences[surprisedIdx] = 0;
+            } else if (status === 'waving' || status === 'listening') {
+                // Happy greeting
+                const happyIdx = dict['Happy'] ?? dict['happy'];
+                if (happyIdx !== undefined) influences[happyIdx] = 0.8;
+            } else {
+                // Reset all morph targets for idle
+                for (let i = 0; i < influences.length; i++) {
+                    influences[i] = THREE.MathUtils.lerp(influences[i], 0, 0.1);
+                }
+            }
         }
     });
 
     return (
-        <group ref={group} scale={[0.9, 0.9, 0.9]} position={[0, -1.2, 0]}>
+        <group ref={group} scale={[0.7, 0.7, 0.7]} position={[0, -1.2, 0]}>
             <primitive object={gltf.scene} />
         </group>
     );
@@ -210,16 +241,16 @@ export default function AstraAvatar() {
 
     const isLeftHalf = typeof window !== 'undefined' && posRef.current.x < window.innerWidth / 2;
     const bubbleStyle = isLeftHalf 
-        ? { top: '50px', left: '260px' } 
-        : { top: '50px', left: '-220px' }; 
+        ? { top: '30px', left: '220px' } 
+        : { top: '30px', left: '-220px' }; 
 
     return (
         <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '300px', height: '450px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
             
             {(status === 'speaking' || status === 'waving') && responseText && (
-                <div style={{ position: 'absolute', ...bubbleStyle, width: '280px', background: 'white', padding: '20px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#1e293b', fontWeight: 600, lineHeight: 1.5 }}>{responseText}</p>
-                    <div style={{ position: 'absolute', top: '30px', ...(isLeftHalf ? { left: '-10px', clipPath: 'polygon(100% 0%, 100% 100%, 0% 50%)' } : { right: '-10px', clipPath: 'polygon(0% 0%, 0% 100%, 100% 50%)' }), width: '20px', height: '20px', background: 'white' }}></div>
+                <div style={{ position: 'absolute', ...bubbleStyle, width: '260px', background: 'white', padding: '18px', borderRadius: '20px', boxShadow: '0 15px 40px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#1e293b', fontWeight: 600, lineHeight: 1.5 }}>{responseText}</p>
+                    <div style={{ position: 'absolute', top: '25px', ...(isLeftHalf ? { left: '-10px', clipPath: 'polygon(100% 0%, 100% 100%, 0% 50%)' } : { right: '-10px', clipPath: 'polygon(0% 0%, 0% 100%, 100% 50%)' }), width: '16px', height: '16px', background: 'white' }}></div>
                 </div>
             )}
 
@@ -231,42 +262,36 @@ export default function AstraAvatar() {
                 style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}
             >
                 <Canvas shadows>
-                    <PerspectiveCamera makeDefault position={[0, 0, 6]} fov={30} />
+                    <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={30} />
                     <ambientLight intensity={1.5} />
                     <spotLight position={[5, 5, 5]} angle={0.3} penumbra={1} intensity={2} castShadow />
                     <Environment preset="city" />
                     <Suspense fallback={null}>
-                        <PremiumHumanAvatar status={status} autoRotate={autoRotate} isMoving={isMoving} enableRoaming={enableRoaming} />
+                        <ExpressiveBot status={status} isMoving={isMoving} enableRoaming={enableRoaming} />
                     </Suspense>
                     <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
                 </Canvas>
                 
-                <div style={{ position: 'absolute', top: '50px', right: '40px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <button onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} style={{ background: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', cursor: 'pointer', fontSize: '20px' }}>⚙️</button>
-                    {status === 'speaking' && (
-                        <button onClick={handleAstraClick} style={{ background: '#dc2626', color: 'white', border: 'none', borderRadius: '20px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Stop Talking</button>
-                    )}
-                    {status === 'idle' && (
-                        <div onClick={handleAstraClick} style={{ background: '#dc2626', color: 'white', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Ask Astra</div>
-                    )}
+                <div style={{ position: 'absolute', top: '30px', right: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} style={{ background: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', cursor: 'pointer', fontSize: '16px' }}>⚙️</button>
+                    <div onClick={handleAstraClick} style={{ background: status === 'speaking' ? '#dc2626' : status === 'listening' ? '#f59e0b' : status === 'thinking' ? '#8b5cf6' : '#10b981', color: 'white', padding: '6px 10px', borderRadius: '16px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                        {status === 'listening' ? '👂 Listening' : status === 'thinking' ? '🧠 Thinking' : status === 'speaking' ? '🛑 Stop' : status === 'waving' ? '👋 Hello!' : '💬 Ask Astra'}
+                    </div>
                 </div>
             </div>
             {showSettings && (
-                <div style={{ position: 'absolute', top: '150px', right: '40px', width: '260px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 100 }}>
-                    <h4 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>Settings</h4>
-                    <label style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '15px' }}>
+                <div style={{ position: 'absolute', top: '120px', right: '20px', width: '240px', background: 'white', padding: '20px', borderRadius: '20px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 100 }}>
+                    <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 'bold' }}>Settings</h4>
+                    <label style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '12px' }}>
                         <input type="checkbox" checked={enableRoaming} onChange={() => setEnableRoaming(!enableRoaming)} /> Enable Roaming
                     </label>
-                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Voice Language</label>
-                    <select value={selectedVoice} onChange={(e) => { setSelectedVoice(e.target.value); localStorage.setItem('astra_voice', e.target.value); }} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', marginBottom: '15px' }}>
+                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Voice</label>
+                    <select value={selectedVoice} onChange={(e) => { setSelectedVoice(e.target.value); localStorage.setItem('astra_voice', e.target.value); }} style={{ width: '100%', padding: '6px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '11px', marginBottom: '12px' }}>
                         {voices.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
                     </select>
-                    <label style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '15px' }}>
-                        <input type="checkbox" checked={autoRotate} onChange={() => setAutoRotate(!autoRotate)} /> Auto-Rotate
-                    </label>
                     <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Volume</label>
-                    <input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#dc2626' }} />
-                    <button onClick={() => setShowSettings(false)} style={{ width: '100%', marginTop: '20px', background: '#f1f5f9', color: '#475569', border: 'none', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Close</button>
+                    <input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#10b981' }} />
+                    <button onClick={() => setShowSettings(false)} style={{ width: '100%', marginTop: '15px', background: '#f1f5f9', color: '#475569', border: 'none', padding: '8px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>Close</button>
                 </div>
             )}
         </div>

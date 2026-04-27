@@ -1452,6 +1452,21 @@ async def list_violations(
     for v in violations:
         student = await db.get(User, v.student_id) if v.student_id else None
         resolver = await db.get(User, v.resolved_by_id) if v.resolved_by_id else None
+        
+        reference_title = None
+        if v.reference_type == "TASK" and v.reference_id:
+            task = await db.get(Task, v.reference_id)
+            if task:
+                reference_title = task.title
+        elif v.reference_type == "ASSIGNMENT" and v.reference_id:
+            assignment = await db.get(Assignment, v.reference_id)
+            if assignment:
+                reference_title = assignment.title
+        elif v.reference_type == "PROJECT" and v.reference_id:
+            project = await db.get(Project, v.reference_id)
+            if project:
+                reference_title = project.title
+
         out.append({
             "id": v.id,
             "student_id": v.student_id,
@@ -1463,6 +1478,7 @@ async def list_violations(
             "description": v.description,
             "reference_type": v.reference_type,
             "reference_id": v.reference_id,
+            "reference_title": reference_title,
             "penalty_points": v.penalty_points,
             "resolved_by": resolver.name if resolver else None,
             "resolution_note": v.resolution_note,

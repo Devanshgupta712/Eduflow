@@ -6,6 +6,7 @@ import { apiGet, getStoredUser } from '@/lib/api';
 interface ViolationItem {
     id: string; type: string; severity: string; status: string;
     title: string; description: string | null;
+    reference_type?: string | null; reference_id?: string | null; reference_title?: string | null;
     penalty_points: number;
     resolution_note: string | null; created_at: string;
     resolved_at: string | null; resolved_by: string | null;
@@ -130,8 +131,13 @@ export default function StudentViolationsPage() {
                                     </p>
                                 )}
 
-                                <div style={{ display: 'flex', gap: '20px', fontSize: '13px', color: 'var(--text-secondary)', borderTop: '1px solid #334155', paddingTop: '12px' }}>
+                                <div style={{ display: 'flex', gap: '20px', fontSize: '13px', color: 'var(--text-secondary)', borderTop: '1px solid #334155', paddingTop: '12px', flexWrap: 'wrap' }}>
                                     <span>📅 Issued: {new Date(v.created_at).toLocaleDateString()}</span>
+                                    {v.reference_title && (
+                                        <span style={{ color: '#3b82f6', fontWeight: 500 }}>
+                                            🔗 {v.reference_type}: {v.reference_title}
+                                        </span>
+                                    )}
                                     {v.penalty_points > 0 && (
                                         <span style={{ color: '#ef4444', fontWeight: 500 }}>
                                             ⚠️ Penalty: -{v.penalty_points} pts

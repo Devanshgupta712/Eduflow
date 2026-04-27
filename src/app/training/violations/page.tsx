@@ -7,7 +7,7 @@ interface ViolationItem {
     id: string; student_id: string; student_name: string;
     type: string; severity: string; status: string;
     title: string; description: string | null;
-    reference_type: string | null; reference_id: string | null;
+    reference_type: string | null; reference_id: string | null; reference_title?: string | null;
     penalty_points: number;
     resolved_by: string | null; resolution_note: string | null;
     resolved_at: string | null; created_at: string;
@@ -231,6 +231,11 @@ export default function ViolationsPage() {
                                         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--text-secondary)' }}>
                                             <span>👤 {v.student_name}</span>
                                             <span style={{ background: `${tCfg.color}18`, color: tCfg.color, padding: '2px 8px', borderRadius: '8px' }}>{tCfg.label}</span>
+                                            {v.reference_title && (
+                                                <span style={{ background: '#3b82f618', color: '#3b82f6', padding: '2px 8px', borderRadius: '8px' }}>
+                                                    🔗 {v.reference_type}: {v.reference_title}
+                                                </span>
+                                            )}
                                             {v.penalty_points > 0 && <span style={{ color: '#ef4444' }}>-{v.penalty_points} pts</span>}
                                             <span>📅 {new Date(v.created_at).toLocaleDateString()}</span>
                                             {v.resolved_by && <span>✅ Resolved by {v.resolved_by}</span>}
