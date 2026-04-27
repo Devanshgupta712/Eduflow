@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { apiGet, getStoredUser } from '@/lib/api';
+import { apiGet, apiFetch, getStoredUser } from '@/lib/api';
 
 interface ViolationItem {
     id: string; type: string; severity: string; status: string;
@@ -55,6 +55,15 @@ export default function StudentViolationsPage() {
             setLoading(false);
         }
     }, []);
+
+    const handleAcknowledge = async (id: string) => {
+        try {
+            await apiFetch(`/api/training/violations/${id}/acknowledge`, { method: 'PATCH' });
+            setViolations(prev => prev.map(v => v.id === id ? { ...v, status: 'ACKNOWLEDGED' } : v));
+        } catch (e) {
+            console.error('Failed to acknowledge violation', e);
+        }
+    };
 
     const totalPoints = violations.reduce((acc, v) => acc + v.penalty_points, 0);
     const activeViolations = violations.filter(v => v.status === 'OPEN').length;
@@ -129,6 +138,18 @@ export default function StudentViolationsPage() {
                                     <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px', lineHeight: 1.6 }}>
                                         {v.description}
                                     </p>
+                                )}
+                                
+                                {v.status === 'OPEN' && (
+                                    <div style={{ marginBottom: '16px' }}>
+                                        <button 
+                                            className="btn btn-sm btn-primary" 
+                                            onClick={() => handleAcknowledge(v.id)}
+                                            style={{ fontSize: '12px', padding: '6px 12px' }}
+                                        >
+                                            ✅ Acknowledge Violation
+                                        </button>
+                                    </div>
                                 )}
 
                                 <div style={{ display: 'flex', gap: '20px', fontSize: '13px', color: 'var(--text-secondary)', borderTop: '1px solid #334155', paddingTop: '12px', flexWrap: 'wrap' }}>

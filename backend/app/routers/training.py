@@ -816,6 +816,17 @@ async def list_tasks(
             
         # Hide tasks that are scheduled for the future
         query = query.where(or_(Task.scheduled_at == None, Task.scheduled_at <= datetime.utcnow()))
+    elif user.role == Role.TRAINER:
+        from sqlalchemy import or_
+        batch_ids_result = await db.execute(select(Batch.id).where(Batch.trainer_id == user.id))
+        owned_batch_ids = [r[0] for r in batch_ids_result.all()]
+        if owned_batch_ids:
+            query = query.where(or_(Task.batch_id.in_(owned_batch_ids), Task.assigned_by == user.id))
+        else:
+            query = query.where(Task.assigned_by == user.id)
+            
+        # Hide tasks that are scheduled for the future
+        query = query.where(or_(Task.scheduled_at == None, Task.scheduled_at <= datetime.utcnow()))
 
             
     result = await db.execute(query.order_by(Task.created_at.desc()))
@@ -827,7 +838,6 @@ async def list_tasks(
         if t.due_date and t.status != TaskStatus.COMPLETED and t.due_date < datetime.utcnow():
             is_overdue = True
         
-        # For students, look up their assessment session(s) for this task
         task_session = None
         attempt_count = 0
         if user.role == Role.STUDENT:
@@ -843,9 +853,12 @@ async def list_tasks(
             if sessions:
                 task_session = sessions[0]  # latest session
         
+        batch = await db.get(Batch, t.batch_id) if t.batch_id else None
+
         task_data = {
             "id": t.id, "title": t.title, "description": t.description,
-            "batch_id": t.batch_id, "student_id": t.student_id, "priority": t.priority.value,
+            "batch_id": t.batch_id, "batch_name": batch.name if batch else None,
+            "student_id": t.student_id, "priority": t.priority.value,
             "status": t.status.value, "is_overdue": is_overdue,
             "assigned_by": trainer.name if trainer else None,
             "due_date": t.due_date.isoformat() if t.due_date else None,
@@ -1038,6 +1051,17 @@ async def list_assignments(
             
         # Hide assignments scheduled for future
         query = query.where(or_(Assignment.scheduled_at == None, Assignment.scheduled_at <= datetime.utcnow()))
+    elif user.role == Role.TRAINER:
+        from sqlalchemy import or_
+        batch_ids_result = await db.execute(select(Batch.id).where(Batch.trainer_id == user.id))
+        owned_batch_ids = [r[0] for r in batch_ids_result.all()]
+        if owned_batch_ids:
+            query = query.where(or_(Assignment.batch_id.in_(owned_batch_ids), Assignment.assigned_by == user.id))
+        else:
+            query = query.where(Assignment.assigned_by == user.id)
+            
+        # Hide assignments scheduled for future
+        query = query.where(or_(Assignment.scheduled_at == None, Assignment.scheduled_at <= datetime.utcnow()))
 
     
     result = await db.execute(query.order_by(Assignment.created_at.desc()))
@@ -1083,9 +1107,12 @@ async def list_assignments(
                 }
                 current_status = "COMPLETED"
 
+        batch = await db.get(Batch, a.batch_id) if a.batch_id else None
+
         out.append({
             "id": a.id, "title": a.title, "description": a.description,
             "type": a.type.value, "batch_id": a.batch_id,
+            "batch_name": batch.name if batch else None,
             "total_marks": a.total_marks,
             "assigned_by": trainer.name if trainer else None,
             "due_date": a.due_date.isoformat() if a.due_date else None,
@@ -1535,6 +1562,30 @@ async def update_violation(
 
     await db.flush()
     return {"status": "updated"}
+
+
+@router.patch("/violations/{violation_id}/acknowledge")
+async def acknowledge_violation(
+    violation_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != Role.STUDENT:
+        raise HTTPException(403, "Only students can acknowledge violations")
+
+    violation = await db.get(Violation, violation_id)
+    if not violation:
+        raise HTTPException(404, "Violation not found")
+
+    if violation.student_id != user.id:
+        raise HTTPException(403, "You can only acknowledge your own violations")
+
+    if violation.status == "OPEN":
+        violation.status = "ACKNOWLEDGED"
+        await db.flush()
+        return {"status": "acknowledged"}
+    
+    return {"status": "no_action_needed"}
 
 
 @router.delete("/violations/{violation_id}")

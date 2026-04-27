@@ -6,7 +6,7 @@ import { apiGet, apiFetch, API_BASE } from '@/lib/api';
 
 interface AssignmentItem {
     id: string; title: string; description: string | null;
-    type: string; batch_id: string | null; total_marks: number;
+    type: string; batch_id: string | null; batch_name?: string | null; total_marks: number;
     assigned_by: string | null; due_date: string | null;
     submission_count: number; created_at: string;
 }
@@ -26,6 +26,7 @@ export default function AssignmentsPage() {
     const today = new Date().toISOString().split('T')[0];
     const [selectedDate, setSelectedDate] = useState(today);
     const [showAllDates, setShowAllDates] = useState(false);
+    const [filterBatchId, setFilterBatchId] = useState('ALL');
 
     // Overdue detail modal
     const [showOverdueModal, setShowOverdueModal] = useState(false);
@@ -257,11 +258,13 @@ export default function AssignmentsPage() {
 
     // Filter assignments by selected date
     const filteredAssignments = showAllDates
-        ? assignments
+        ? assignments.filter(a => filterBatchId === 'ALL' || a.batch_id === filterBatchId)
         : assignments.filter(a => {
             const created = a.created_at ? a.created_at.split('T')[0] : '';
             const due = a.due_date ? a.due_date.split('T')[0] : '';
-            return created === selectedDate || due === selectedDate;
+            const matchesDate = created === selectedDate || due === selectedDate;
+            const matchesBatch = filterBatchId === 'ALL' || a.batch_id === filterBatchId;
+            return matchesDate && matchesBatch;
         });
 
     // Build overdue student details
@@ -361,6 +364,19 @@ export default function AssignmentsPage() {
                         style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
                     />
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '8px 14px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🏫 Batch:</span>
+                    <select
+                        value={filterBatchId}
+                        onChange={e => setFilterBatchId(e.target.value)}
+                        style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                    >
+                        <option value="ALL">All Batches</option>
+                        {batches.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                    </select>
+                </div>
                 <button
                     className={`btn btn-sm ${showAllDates ? 'btn-primary' : 'btn-ghost'}`}
                     onClick={() => setShowAllDates(!showAllDates)}
@@ -386,6 +402,7 @@ export default function AssignmentsPage() {
                                     <td>
                                         <div style={{ fontWeight: 600 }}>{a.title}</div>
                                         {a.description && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{a.description.slice(0, 60)}...</div>}
+                                        {a.batch_name && <div style={{ fontSize: '11px', color: 'var(--primary)', marginTop: '4px', fontWeight: 600 }}>🏫 {a.batch_name}</div>}
                                     </td>
                                     <td><span className="badge" style={{ background: `${typeColors[a.type]}20`, color: typeColors[a.type] }}>{typeIcons[a.type]} {a.type}</span></td>
                                     <td style={{ fontWeight: 600 }}>{a.total_marks}</td>
