@@ -51,18 +51,20 @@ function PremiumHumanAvatar({ status, autoRotate, isMoving, enableRoaming }: { s
         let targetAction: THREE.AnimationAction | null = null;
 
         if (status === 'waving' || status === 'listening') {
-            targetAction = findAnim('wave', 'greet', 'hello') || findAnim('idle', 'stand') || (actions[names[0]] ?? null);
+            targetAction = findAnim('wave', 'greet', 'hello');
         } else if (status === 'speaking') {
-            targetAction = findAnim('talk', 'gesture', 'idle') || (actions[names[0]] ?? null);
+            targetAction = findAnim('talk', 'gesture');
         } else if (enableRoaming && isMoving) {
-            targetAction = findAnim('walk', 'run', 'locomotion') || (actions[names[0]] ?? null);
-        } else {
-            targetAction = findAnim('idle', 'stand', 'breathe') || (actions[names[0]] ?? null);
+            targetAction = findAnim('walk', 'run', 'locomotion');
         }
+        // For 'idle' and 'thinking': NO animation — just stand still
 
+        // Stop all animations first
+        Object.values(actions).forEach(a => a?.fadeOut(0.3));
+
+        // Only play if we found a specific animation for the current state
         if (targetAction) {
-            Object.values(actions).forEach(a => { if (a && a !== targetAction) a.fadeOut(0.4); });
-            targetAction.reset().fadeIn(0.4).play();
+            targetAction.reset().fadeIn(0.3).play();
         }
     }, [actions, names, isMoving, status, enableRoaming]);
 
