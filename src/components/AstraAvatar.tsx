@@ -2,130 +2,94 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { PerspectiveCamera, Environment, ContactShadows, Float, useHelper } from '@react-three/drei';
+import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera, Html } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- NEW PREMIUM STUDENT GAMING CHARACTER (Built from Scratch) ---
-function StudentBot({ status, isMoving }: { status: string, isMoving: boolean }) {
+// --- Premium Student character (Hybrid Engine) ---
+function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
+    const gltf = useGLTF('/astra_model.glb');
+    const { actions } = useAnimations(gltf.animations, gltf.scene);
     const group = useRef<THREE.Group>(null);
-    const head = useRef<THREE.Group>(null);
-    const leftArm = useRef<THREE.Mesh>(null);
-    const rightArm = useRef<THREE.Mesh>(null);
-    const leftLeg = useRef<THREE.Mesh>(null);
-    const rightLeg = useRef<THREE.Mesh>(null);
+    const rightArm = useRef<THREE.Object3D | null>(null);
+    const leftArm = useRef<THREE.Object3D | null>(null);
+
+    useEffect(() => {
+        gltf.scene.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                const mat = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 });
+                mesh.material = mat;
+                const name = mesh.name.toLowerCase();
+                
+                // --- STUDENT COLORS ON PREMIUM MODEL ---
+                if (name.includes('head') || name.includes('skin')) mat.color.set('#ffd1a9');
+                else if (name.includes('upper') || name.includes('chest') || name.includes('arm')) mat.color.set('#dc2626'); // Red Hoodie
+                else if (name.includes('lower') || name.includes('pants')) mat.color.set('#14b8a6'); // Teal Jeans
+                else mat.color.set('#475569');
+            }
+            const nodeName = child.name.toLowerCase();
+            if (nodeName.includes('arm') || nodeName.includes('shoulder')) {
+                if (nodeName.includes('right')) rightArm.current = child;
+                if (nodeName.includes('left')) leftArm.current = child;
+            }
+        });
+        gltf.scene.rotation.y = Math.PI;
+    }, [gltf.scene]);
+
+    useEffect(() => {
+        if (!actions) return;
+        let activeAction = actions['Idle'] || Object.values(actions)[0];
+        if (status === 'listening' || status === 'waving') activeAction = actions['Wave'] || actions['Idle'];
+        else if (enableRoaming && isMoving && status === 'idle') activeAction = actions['Walk'] || actions['Run'] || actions['Idle'];
+        Object.values(actions).forEach(a => { if (a !== activeAction) a?.fadeOut(0.4); });
+        activeAction?.reset().fadeIn(0.4).play();
+    }, [actions, isMoving, status, enableRoaming]);
 
     useFrame((state) => {
         const t = state.clock.elapsedTime;
-        if (!group.current) return;
-
-        // --- IDLE / FLOATING MOTION ---
-        group.current.position.y = Math.sin(t * 1.5) * 0.1;
-
-        // --- ANIMATION LOGIC ---
-        if (status === 'speaking') {
-            // Natural talking gestures
-            if (leftArm.current) {
-                leftArm.current.rotation.x = -0.5 + Math.sin(t * 10) * 0.2;
-                leftArm.current.rotation.z = 0.2;
-            }
-            if (rightArm.current) {
-                rightArm.current.rotation.x = -0.5 + Math.cos(t * 10) * 0.2;
-                rightArm.current.rotation.z = -0.2;
-            }
-            if (head.current) head.current.rotation.y = Math.sin(t * 2) * 0.1;
-        } 
-        else if (isMoving) {
-            // Walking logic
-            const walkSpeed = 10;
-            if (leftLeg.current) leftLeg.current.rotation.x = Math.sin(t * walkSpeed) * 0.5;
-            if (rightLeg.current) rightLeg.current.rotation.x = Math.cos(t * walkSpeed) * 0.5;
-            if (leftArm.current) leftArm.current.rotation.x = Math.cos(t * walkSpeed) * 0.4;
-            if (rightArm.current) rightArm.current.rotation.x = Math.sin(t * walkSpeed) * 0.4;
-        }
-        else if (status === 'waving') {
-            if (rightArm.current) {
-                rightArm.current.rotation.z = -1.5 + Math.sin(t * 10) * 0.5;
-                rightArm.current.rotation.x = -0.5;
-            }
-        }
-        else {
-            // Natural Idle Pose
-            if (leftArm.current) leftArm.current.rotation.x = THREE.MathUtils.lerp(leftArm.current.rotation.x, 0.2, 0.1);
-            if (rightArm.current) rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, 0.2, 0.1);
-            if (leftLeg.current) leftLeg.current.rotation.x = THREE.MathUtils.lerp(leftLeg.current.rotation.x, 0, 0.1);
-            if (rightLeg.current) rightLeg.current.rotation.x = THREE.MathUtils.lerp(rightLeg.current.rotation.x, 0, 0.1);
-            if (head.current) {
-                head.current.rotation.y = THREE.MathUtils.lerp(head.current.rotation.y, 0, 0.1);
-                head.current.rotation.x = Math.sin(t * 0.5) * 0.05;
+        if (group.current) {
+            group.current.position.y = Math.sin(t * 1.5) * 0.08;
+            if (autoRotate) group.current.rotation.y += 0.01;
+            
+            if (status === 'speaking') {
+                if (rightArm.current) {
+                    rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.4, 0.1);
+                    rightArm.current.rotation.x = -0.5 + Math.sin(t * 8) * 0.2;
+                }
+                if (leftArm.current) {
+                    leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.4, 0.1);
+                    leftArm.current.rotation.x = -0.5 + Math.cos(t * 8) * 0.2;
+                }
+            } else if (!(isMoving && enableRoaming)) {
+                if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 1.3, 0.1);
+                if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -1.3, 0.1);
             }
         }
     });
 
     return (
-        <group ref={group} scale={[1.2, 1.2, 1.2]} position={[0, -0.5, 0]}>
-            {/* --- BODY (Hoodie) --- */}
-            <mesh position={[0, 0.8, 0]} castShadow>
-                <boxGeometry args={[0.6, 0.8, 0.4]} />
-                <meshStandardMaterial color="#dc2626" roughness={0.3} metalness={0.1} />
-            </mesh>
-
-            {/* --- HEAD (Human Teenager) --- */}
-            <group ref={head} position={[0, 1.5, 0]}>
-                {/* Face */}
-                <mesh castShadow>
-                    <boxGeometry args={[0.45, 0.45, 0.4]} />
-                    <meshStandardMaterial color="#ffe0bd" />
-                </mesh>
-                {/* Gamer Hair */}
-                <mesh position={[0, 0.2, 0]}>
-                    <boxGeometry args={[0.5, 0.2, 0.45]} />
-                    <meshStandardMaterial color="#332211" />
-                </mesh>
-                {/* Eyes */}
-                <mesh position={[-0.1, 0.05, 0.21]}>
-                    <sphereGeometry args={[0.04, 16, 16]} />
-                    <meshBasicMaterial color="#000" />
-                </mesh>
-                <mesh position={[0.1, 0.05, 0.21]}>
-                    <sphereGeometry args={[0.04, 16, 16]} />
-                    <meshBasicMaterial color="#000" />
-                </mesh>
-                {/* Mouth */}
-                <mesh position={[0, -0.1, 0.21]}>
-                    <boxGeometry args={[0.12, status === 'speaking' ? 0.05 : 0.015, 0.01]} />
-                    <meshBasicMaterial color="#882222" />
-                </mesh>
-            </group>
-
-            {/* --- ARMS --- */}
-            <mesh ref={leftArm} position={[-0.45, 1, 0]} castShadow>
-                <boxGeometry args={[0.18, 0.7, 0.18]} />
-                <meshStandardMaterial color="#dc2626" />
-            </mesh>
-            <mesh ref={rightArm} position={[0.45, 1, 0]} castShadow>
-                <boxGeometry args={[0.18, 0.7, 0.18]} />
-                <meshStandardMaterial color="#dc2626" />
-            </mesh>
-
-            {/* --- LEGS (Jeans) --- */}
-            <mesh ref={leftLeg} position={[-0.2, 0.2, 0]} castShadow>
-                <boxGeometry args={[0.22, 0.8, 0.22]} />
-                <meshStandardMaterial color="#0d9488" />
-            </mesh>
-            <mesh ref={rightLeg} position={[0.2, 0.2, 0]} castShadow>
-                <boxGeometry args={[0.22, 0.8, 0.22]} />
-                <meshStandardMaterial color="#0d9488" />
-            </mesh>
-
-            {/* --- SNEAKERS --- */}
-            <mesh position={[-0.2, -0.25, 0.05]}>
-                <boxGeometry args={[0.25, 0.15, 0.4]} />
-                <meshStandardMaterial color="#fff" />
-            </mesh>
-            <mesh position={[0.2, -0.25, 0.05]}>
-                <boxGeometry args={[0.25, 0.15, 0.4]} />
-                <meshStandardMaterial color="#fff" />
-            </mesh>
+        <group ref={group} scale={[1.8, 1.8, 1.8]} position={[0, -1.2, 0]}>
+            <primitive object={gltf.scene} />
+            
+            {/* --- HIGH-DEFINITION STUDENT FACE OVERLAY --- */}
+            <Html position={[0, 2.5, 0.4]} center distanceFactor={1.5}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', pointerEvents: 'none' }}>
+                    <div style={{ display: 'flex', gap: '15px' }}>
+                        {/* Eyes */}
+                        <div style={{ width: '12px', height: '12px', background: '#00ffff', borderRadius: '50%', boxShadow: '0 0 10px #00ffff' }}></div>
+                        <div style={{ width: '12px', height: '12px', background: '#00ffff', borderRadius: '50%', boxShadow: '0 0 10px #00ffff' }}></div>
+                    </div>
+                    {/* Animated Mouth */}
+                    <div style={{ 
+                        width: '30px', 
+                        height: status === 'speaking' ? '8px' : '2px', 
+                        background: 'white', 
+                        borderRadius: '10px',
+                        boxShadow: '0 0 10px white',
+                        transition: 'height 0.1s ease-in-out'
+                    }}></div>
+                </div>
+            </Html>
         </group>
     );
 }
@@ -277,12 +241,11 @@ export default function AstraAvatar() {
                 style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}
             >
                 <Canvas shadows>
-                    <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={30} />
-                    <ambientLight intensity={1} />
-                    <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={2} castShadow />
+                    <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={35} />
+                    <ambientLight intensity={1.5} />
                     <Environment preset="city" />
                     <Suspense fallback={null}>
-                        <StudentBot status={status} isMoving={isMoving} />
+                        <PremiumAvatar status={status} autoRotate={autoRotate} isMoving={isMoving} enableRoaming={enableRoaming} />
                     </Suspense>
                     <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
                 </Canvas>
@@ -318,3 +281,5 @@ export default function AstraAvatar() {
         </div>
     );
 }
+
+useGLTF.preload('/astra_model.glb');
