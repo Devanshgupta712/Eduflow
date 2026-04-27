@@ -2,94 +2,135 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera, Html } from '@react-three/drei';
+import { PerspectiveCamera, Environment, ContactShadows, Float, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Student character (Hybrid Engine) ---
-function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
-    const gltf = useGLTF('/astra_model.glb');
-    const { actions } = useAnimations(gltf.animations, gltf.scene);
+// --- PREMIUM STYLIZED HUMAN STUDENT (Built with High-End Primitives) ---
+function PremiumHuman({ status, isMoving }: { status: string, isMoving: boolean }) {
     const group = useRef<THREE.Group>(null);
-    const rightArm = useRef<THREE.Object3D | null>(null);
-    const leftArm = useRef<THREE.Object3D | null>(null);
-
-    useEffect(() => {
-        gltf.scene.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-                const mesh = child as THREE.Mesh;
-                const mat = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 });
-                mesh.material = mat;
-                const name = mesh.name.toLowerCase();
-                
-                // --- STUDENT COLORS ON PREMIUM MODEL ---
-                if (name.includes('head') || name.includes('skin')) mat.color.set('#ffd1a9');
-                else if (name.includes('upper') || name.includes('chest') || name.includes('arm')) mat.color.set('#dc2626'); // Red Hoodie
-                else if (name.includes('lower') || name.includes('pants')) mat.color.set('#14b8a6'); // Teal Jeans
-                else mat.color.set('#475569');
-            }
-            const nodeName = child.name.toLowerCase();
-            if (nodeName.includes('arm') || nodeName.includes('shoulder')) {
-                if (nodeName.includes('right')) rightArm.current = child;
-                if (nodeName.includes('left')) leftArm.current = child;
-            }
-        });
-        gltf.scene.rotation.y = Math.PI;
-    }, [gltf.scene]);
-
-    useEffect(() => {
-        if (!actions) return;
-        let activeAction = actions['Idle'] || Object.values(actions)[0];
-        if (status === 'listening' || status === 'waving') activeAction = actions['Wave'] || actions['Idle'];
-        else if (enableRoaming && isMoving && status === 'idle') activeAction = actions['Walk'] || actions['Run'] || actions['Idle'];
-        Object.values(actions).forEach(a => { if (a !== activeAction) a?.fadeOut(0.4); });
-        activeAction?.reset().fadeIn(0.4).play();
-    }, [actions, isMoving, status, enableRoaming]);
+    const head = useRef<THREE.Group>(null);
+    const leftArm = useRef<THREE.Group>(null);
+    const rightArm = useRef<THREE.Group>(null);
+    const leftLeg = useRef<THREE.Group>(null);
+    const rightLeg = useRef<THREE.Group>(null);
 
     useFrame((state) => {
         const t = state.clock.elapsedTime;
-        if (group.current) {
-            group.current.position.y = Math.sin(t * 1.5) * 0.08;
-            if (autoRotate) group.current.rotation.y += 0.01;
-            
-            if (status === 'speaking') {
-                if (rightArm.current) {
-                    rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.4, 0.1);
-                    rightArm.current.rotation.x = -0.5 + Math.sin(t * 8) * 0.2;
-                }
-                if (leftArm.current) {
-                    leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.4, 0.1);
-                    leftArm.current.rotation.x = -0.5 + Math.cos(t * 8) * 0.2;
-                }
-            } else if (!(isMoving && enableRoaming)) {
-                if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 1.3, 0.1);
-                if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -1.3, 0.1);
+        if (!group.current) return;
+
+        // --- IDLE BREATHING ---
+        group.current.position.y = Math.sin(t * 1.5) * 0.08;
+
+        if (status === 'speaking') {
+            if (rightArm.current) {
+                rightArm.current.rotation.x = -0.5 + Math.sin(t * 10) * 0.3;
+                rightArm.current.rotation.z = -0.3;
+            }
+            if (leftArm.current) {
+                leftArm.current.rotation.x = -0.5 + Math.cos(t * 10) * 0.3;
+                leftArm.current.rotation.z = 0.3;
+            }
+            if (head.current) head.current.rotation.y = Math.sin(t * 2) * 0.15;
+        } else if (isMoving) {
+            const walkSpeed = 8;
+            if (leftLeg.current) leftLeg.current.rotation.x = Math.sin(t * walkSpeed) * 0.6;
+            if (rightLeg.current) rightLeg.current.rotation.x = Math.cos(t * walkSpeed) * 0.6;
+            if (leftArm.current) leftArm.current.rotation.x = Math.cos(t * walkSpeed) * 0.5;
+            if (rightArm.current) rightArm.current.rotation.x = Math.sin(t * walkSpeed) * 0.5;
+        } else if (status === 'waving') {
+            if (rightArm.current) {
+                rightArm.current.rotation.z = -1.8 + Math.sin(t * 12) * 0.6;
+                rightArm.current.rotation.x = -0.3;
+            }
+        } else {
+            // Smooth Idle
+            if (rightArm.current) {
+                rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, -0.15, 0.1);
+                rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, 0.1, 0.1);
+            }
+            if (leftArm.current) {
+                leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, 0.15, 0.1);
+                leftArm.current.rotation.x = THREE.MathUtils.lerp(leftArm.current.rotation.x, 0.1, 0.1);
+            }
+            if (head.current) {
+                head.current.rotation.y = THREE.MathUtils.lerp(head.current.rotation.y, 0, 0.1);
+                head.current.rotation.x = Math.sin(t * 0.8) * 0.05;
             }
         }
     });
 
     return (
-        <group ref={group} scale={[1.8, 1.8, 1.8]} position={[0, -1.2, 0]}>
-            <primitive object={gltf.scene} />
-            
-            {/* --- HIGH-DEFINITION STUDENT FACE OVERLAY --- */}
-            <Html position={[0, 2.5, 0.4]} center distanceFactor={1.5}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', pointerEvents: 'none' }}>
-                    <div style={{ display: 'flex', gap: '15px' }}>
-                        {/* Eyes */}
-                        <div style={{ width: '12px', height: '12px', background: '#00ffff', borderRadius: '50%', boxShadow: '0 0 10px #00ffff' }}></div>
-                        <div style={{ width: '12px', height: '12px', background: '#00ffff', borderRadius: '50%', boxShadow: '0 0 10px #00ffff' }}></div>
-                    </div>
-                    {/* Animated Mouth */}
-                    <div style={{ 
-                        width: '30px', 
-                        height: status === 'speaking' ? '8px' : '2px', 
-                        background: 'white', 
-                        borderRadius: '10px',
-                        boxShadow: '0 0 10px white',
-                        transition: 'height 0.1s ease-in-out'
-                    }}></div>
-                </div>
-            </Html>
+        <group ref={group} scale={[1.1, 1.1, 1.1]} position={[0, -0.5, 0]}>
+            {/* --- TORSO (Hoodie) --- */}
+            <mesh castShadow>
+                <capsuleGeometry args={[0.32, 0.7, 16, 16]} />
+                <meshStandardMaterial color="#dc2626" roughness={0.4} />
+            </mesh>
+
+            {/* --- HEAD (Human Teenager) --- */}
+            <group ref={head} position={[0, 1.3, 0]}>
+                <mesh castShadow>
+                    <sphereGeometry args={[0.28, 32, 32]} />
+                    <meshStandardMaterial color="#ffe0bd" roughness={0.5} />
+                </mesh>
+                {/* Hair */}
+                <mesh position={[0, 0.15, 0]}>
+                    <sphereGeometry args={[0.3, 32, 32]} />
+                    <meshStandardMaterial color="#332211" />
+                </mesh>
+                {/* Expressive Eyes */}
+                <mesh position={[-0.1, 0.05, 0.22]}>
+                    <sphereGeometry args={[0.04, 16, 16]} />
+                    <meshBasicMaterial color="#111" />
+                </mesh>
+                <mesh position={[0.1, 0.05, 0.22]}>
+                    <sphereGeometry args={[0.04, 16, 16]} />
+                    <meshBasicMaterial color="#111" />
+                </mesh>
+                {/* Human Mouth */}
+                <mesh position={[0, -0.12, 0.22]}>
+                    <boxGeometry args={[0.1, status === 'speaking' ? 0.06 : 0.02, 0.01]} />
+                    <meshBasicMaterial color="#882222" />
+                </mesh>
+            </group>
+
+            {/* --- ARMS --- */}
+            <group ref={leftArm} position={[-0.4, 0.8, 0]}>
+                <mesh castShadow>
+                    <capsuleGeometry args={[0.1, 0.5, 16, 16]} />
+                    <meshStandardMaterial color="#dc2626" />
+                </mesh>
+            </group>
+            <group ref={rightArm} position={[0.4, 0.8, 0]}>
+                <mesh castShadow>
+                    <capsuleGeometry args={[0.1, 0.5, 16, 16]} />
+                    <meshStandardMaterial color="#dc2626" />
+                </mesh>
+            </group>
+
+            {/* --- LEGS (Jeans) --- */}
+            <group ref={leftLeg} position={[-0.18, -0.2, 0]}>
+                <mesh castShadow>
+                    <capsuleGeometry args={[0.12, 0.7, 16, 16]} />
+                    <meshStandardMaterial color="#1e40af" />
+                </mesh>
+                {/* Sneaker */}
+                <mesh position={[0, -0.45, 0.1]}>
+                    <boxGeometry args={[0.18, 0.15, 0.35]} />
+                    <meshStandardMaterial color="#fff" />
+                </mesh>
+            </group>
+            <group ref={rightLeg} position={[0.18, -0.2, 0]}>
+                <mesh castShadow>
+                    <capsuleGeometry args={[0.12, 0.7, 16, 16]} />
+                    <meshStandardMaterial color="#1e40af" />
+                </mesh>
+                {/* Sneaker */}
+                <mesh position={[0, -0.45, 0.1]}>
+                    <boxGeometry args={[0.18, 0.15, 0.35]} />
+                    <meshStandardMaterial color="#fff" />
+                </mesh>
+            </group>
         </group>
     );
 }
@@ -241,11 +282,12 @@ export default function AstraAvatar() {
                 style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}
             >
                 <Canvas shadows>
-                    <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={35} />
-                    <ambientLight intensity={1.5} />
+                    <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={30} />
+                    <ambientLight intensity={1.2} />
+                    <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={2} castShadow />
                     <Environment preset="city" />
                     <Suspense fallback={null}>
-                        <PremiumAvatar status={status} autoRotate={autoRotate} isMoving={isMoving} enableRoaming={enableRoaming} />
+                        <PremiumHuman status={status} isMoving={isMoving} />
                     </Suspense>
                     <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
                 </Canvas>
@@ -281,5 +323,3 @@ export default function AstraAvatar() {
         </div>
     );
 }
-
-useGLTF.preload('/astra_model.glb');
