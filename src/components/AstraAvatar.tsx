@@ -109,7 +109,7 @@ function ExpressiveBot({ status, isMoving, enableRoaming }: { status: string, is
     });
 
     return (
-        <group ref={group} scale={[0.7, 0.7, 0.7]} position={[0, -1.2, 0]}>
+        <group ref={group} scale={[0.45, 0.45, 0.45]} position={[0, -0.8, 0]}>
             <primitive object={gltf.scene} />
         </group>
     );
@@ -126,10 +126,11 @@ export default function AstraAvatar() {
     const [selectedVoice, setSelectedVoice] = useState<string>('');
     const [volume, setVolume] = useState<number>(1.0);
     const [showSettings, setShowSettings] = useState(false);
+    const [isHidden, setIsHidden] = useState(false);
     
     const containerRef = useRef<HTMLDivElement>(null);
-    const posRef = useRef({ x: 50, y: 500 });
-    const targetRef = useRef({ x: 50, y: 500 });
+    const posRef = useRef({ x: typeof window !== 'undefined' ? window.innerWidth - 320 : 800, y: typeof window !== 'undefined' ? window.innerHeight - 420 : 400 });
+    const targetRef = useRef({ x: typeof window !== 'undefined' ? window.innerWidth - 320 : 800, y: typeof window !== 'undefined' ? window.innerHeight - 420 : 400 });
     const isDragging = useRef(false);
     const dragOffset = useRef({ x: 0, y: 0 });
     const recognitionRef = useRef<any>(null);
@@ -156,8 +157,8 @@ export default function AstraAvatar() {
     useEffect(() => {
         setMounted(true);
         if (typeof window === 'undefined') return;
-        posRef.current = { x: 50, y: window.innerHeight - 500 };
-        targetRef.current = { x: 50, y: window.innerHeight - 500 };
+        posRef.current = { x: window.innerWidth - 320, y: window.innerHeight - 420 };
+        targetRef.current = { x: window.innerWidth - 320, y: window.innerHeight - 420 };
 
         const loadVoices = () => {
             const v = window.speechSynthesis.getVoices();
@@ -239,13 +240,24 @@ export default function AstraAvatar() {
 
     if (!mounted) return null;
 
+    // Show a small floating button when hidden
+    if (isHidden) {
+        return (
+            <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 10000000 }}>
+                <button onClick={() => setIsHidden(false)} style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '50px', padding: '10px 18px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 6px 20px rgba(16,185,129,0.4)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    🤖 Show Astra
+                </button>
+            </div>
+        );
+    }
+
     const isLeftHalf = typeof window !== 'undefined' && posRef.current.x < window.innerWidth / 2;
     const bubbleStyle = isLeftHalf 
-        ? { top: '30px', left: '220px' } 
-        : { top: '30px', left: '-220px' }; 
+        ? { top: '20px', left: '220px' } 
+        : { top: '20px', left: '-230px' }; 
 
     return (
-        <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '300px', height: '450px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
+        <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '280px', height: '380px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
             
             {(status === 'speaking' || status === 'waving') && responseText && (
                 <div style={{ position: 'absolute', ...bubbleStyle, width: '260px', background: 'white', padding: '18px', borderRadius: '20px', boxShadow: '0 15px 40px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
@@ -262,7 +274,7 @@ export default function AstraAvatar() {
                 style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}
             >
                 <Canvas shadows>
-                    <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={30} />
+                    <PerspectiveCamera makeDefault position={[0, 0, 4.5]} fov={28} />
                     <ambientLight intensity={1.5} />
                     <spotLight position={[5, 5, 5]} angle={0.3} penumbra={1} intensity={2} castShadow />
                     <Environment preset="city" />
@@ -272,10 +284,11 @@ export default function AstraAvatar() {
                     <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
                 </Canvas>
                 
-                <div style={{ position: 'absolute', top: '30px', right: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <button onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} style={{ background: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', boxShadow: '0 4px 15px rgba(0,0,0,0.15)', cursor: 'pointer', fontSize: '16px' }}>⚙️</button>
-                    <div onClick={handleAstraClick} style={{ background: status === 'speaking' ? '#dc2626' : status === 'listening' ? '#f59e0b' : status === 'thinking' ? '#8b5cf6' : '#10b981', color: 'white', padding: '6px 10px', borderRadius: '16px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
-                        {status === 'listening' ? '👂 Listening' : status === 'thinking' ? '🧠 Thinking' : status === 'speaking' ? '🛑 Stop' : status === 'waving' ? '👋 Hello!' : '💬 Ask Astra'}
+                <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <button onClick={(e) => { e.stopPropagation(); setIsHidden(true); }} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '28px', height: '28px', boxShadow: '0 4px 12px rgba(239,68,68,0.3)', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', lineHeight: '28px' }}>✕</button>
+                    <button onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} style={{ background: 'white', border: 'none', borderRadius: '50%', width: '28px', height: '28px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', cursor: 'pointer', fontSize: '13px' }}>⚙️</button>
+                    <div onClick={handleAstraClick} style={{ background: status === 'speaking' ? '#dc2626' : status === 'listening' ? '#f59e0b' : status === 'thinking' ? '#8b5cf6' : '#10b981', color: 'white', padding: '5px 8px', borderRadius: '14px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                        {status === 'listening' ? '👂 Listen' : status === 'thinking' ? '🧠 Think' : status === 'speaking' ? '🛑 Stop' : status === 'waving' ? '👋 Hi!' : '💬 Ask'}
                     </div>
                 </div>
             </div>
