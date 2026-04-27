@@ -199,12 +199,12 @@ export default function AstraAvatar() {
     return (
         <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '380px', height: '650px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
             
-            {/* Top Chat Bubble */}
+            {/* Side Chat Bubble */}
             {(status === 'speaking' || status === 'waving') && responseText && (
-                <div style={{ position: 'absolute', top: '-140px', left: '50%', transform: 'translateX(-50%)', width: '320px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
+                <div style={{ position: 'absolute', top: '50px', left: '-340px', width: '320px', background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
                     <p style={{ margin: 0, fontSize: '15px', color: '#1e293b', fontWeight: 600, lineHeight: 1.5 }}>{responseText}</p>
-                    {/* Bubble Tail */}
-                    <div style={{ position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', width: '20px', height: '20px', background: 'white', clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)' }}></div>
+                    {/* Bubble Tail pointing to Astra */}
+                    <div style={{ position: 'absolute', top: '30px', right: '-10px', width: '20px', height: '20px', background: 'white', clipPath: 'polygon(0% 0%, 0% 100%, 100% 50%)' }}></div>
                 </div>
             )}
 
