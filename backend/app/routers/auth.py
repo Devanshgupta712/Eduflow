@@ -272,31 +272,8 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     await db.flush()
     await db.refresh(user)
 
-    # Automatically register student in the selected course and its active batch
-    if body.course and body.role == "STUDENT":
-        from app.models.course import Course, Batch, BatchStudent
-        from app.models.registration import Registration
-        
-        course_result = await db.execute(select(Course).where(Course.name == body.course))
-        course = course_result.scalars().first()
-        if course:
-            reg = Registration(
-                student_id=user.id,
-                course_id=course.id,
-                fee_amount=course.fee,
-                fee_paid=0.0,
-                status="CONFIRMED"
-            )
-            db.add(reg)
-            
-            batch_result = await db.execute(select(Batch).where(Batch.course_id == course.id, Batch.is_active == True))
-            first_batch = batch_result.scalars().first()
-            if first_batch:
-                bs = BatchStudent(batch_id=first_batch.id, student_id=user.id)
-                db.add(bs)
-                reg.batch_id = first_batch.id
-            
-            await db.flush()
+    # Students are NOT auto-assigned to any batch or course during registration.
+    # Admin will manually assign batches/courses via the User Management panel.
 
     # Clean up OTP after successful registration
     if body.role == "STUDENT" and body.email in _otp_store:

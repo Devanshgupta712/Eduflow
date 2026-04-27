@@ -551,12 +551,12 @@ async def delete_user(
             raise HTTPException(status_code=403, detail="Cannot delete SUPER_ADMIN")
         
         # Manual cascade delete for related entities across all modules
-        from app.models.notification import Notification, Message, Feedback
+        from app.models.notification import Notification, Message, Feedback, PushSubscription, Suggestion
         from app.models.attendance import LeaveRequest, TimeTracking, Attendance
         from app.models.lead import Lead, LeadActivity
-        from app.models.project import Task, Assignment, AssignmentSubmission, Violation, Project
+        from app.models.project import Task, Assignment, AssignmentSubmission, Violation, Project, AssessmentSession
         from app.models.registration import Document, Registration
-        from app.models.placement import JobApplication, AssessmentSubmission, MockInterview, CommunicationPractice
+        from app.models.placement import JobApplication, AssessmentSubmission as PlacementAssessmentSubmission, MockInterview, CommunicationPractice
         from app.models.user import AdminPermission
         from app.models.course import Batch, BatchStudent
         from app.models.resume import Resume
@@ -565,6 +565,7 @@ async def delete_user(
         # 1. DELETE records where user is the primary subject
         entities = [
             (Notification, "Notification", "user_id"),
+            (PushSubscription, "PushSubscription", "user_id"),
             (LeaveRequest, "LeaveRequest", "user_id"),
             (TimeTracking, "TimeTracking", "user_id"),
             (Attendance, "Attendance", "student_id"),
@@ -572,12 +573,14 @@ async def delete_user(
             (Registration, "Registration", "student_id"),
             (Document, "Document", "student_id"),
             (Feedback, "Feedback", "student_id"),
+            (Suggestion, "Suggestion", "student_id"),
             (Violation, "Violation", "student_id"),
             (AssignmentSubmission, "AssignmentSubmission", "student_id"),
+            (AssessmentSession, "AssessmentSession", "student_id"),
             (LeadActivity, "LeadActivity", "user_id"),
             (AdminPermission, "AdminPermission", "user_id"),
             (JobApplication, "JobApplication", "student_id"),
-            (AssessmentSubmission, "AssessmentSubmission", "student_id"),
+            (PlacementAssessmentSubmission, "PlacementAssessmentSubmission", "student_id"),
             (MockInterview, "MockInterview", "student_id"),
             (CommunicationPractice, "CommunicationPractice", "student_id"),
             (Resume, "Resume", "user_id"),
@@ -627,15 +630,39 @@ async def delete_user(
 
         try:
             await db.execute(Task.__table__.update().where(Task.assigned_by == user_id).values(assigned_by=None))
-            report.append("Nullified Task")
+            report.append("Nullified Task.assigned_by")
         except Exception as e:
-            report.append(f"Failed Nullify Task: {str(e)}")
+            report.append(f"Failed Nullify Task.assigned_by: {str(e)}")
+
+        try:
+            await db.execute(Task.__table__.update().where(Task.student_id == user_id).values(student_id=None))
+            report.append("Nullified Task.student_id")
+        except Exception as e:
+            report.append(f"Failed Nullify Task.student_id: {str(e)}")
 
         try:
             await db.execute(Assignment.__table__.update().where(Assignment.assigned_by == user_id).values(assigned_by=None))
-            report.append("Nullified Assignment")
+            report.append("Nullified Assignment.assigned_by")
         except Exception as e:
-            report.append(f"Failed Nullify Assignment: {str(e)}")
+            report.append(f"Failed Nullify Assignment.assigned_by: {str(e)}")
+
+        try:
+            await db.execute(Assignment.__table__.update().where(Assignment.student_id == user_id).values(student_id=None))
+            report.append("Nullified Assignment.student_id")
+        except Exception as e:
+            report.append(f"Failed Nullify Assignment.student_id: {str(e)}")
+
+        try:
+            await db.execute(Violation.__table__.update().where(Violation.resolved_by_id == user_id).values(resolved_by_id=None))
+            report.append("Nullified Violation.resolved_by_id")
+        except Exception as e:
+            report.append(f"Failed Nullify Violation.resolved_by_id: {str(e)}")
+
+        try:
+            await db.execute(Feedback.__table__.update().where(Feedback.created_by_id == user_id).values(created_by_id=None))
+            report.append("Nullified Feedback.created_by_id")
+        except Exception as e:
+            report.append(f"Failed Nullify Feedback.created_by_id: {str(e)}")
 
         # Finally delete user
         await db.delete(target_user)
@@ -653,8 +680,6 @@ async def delete_user(
                 "report": report
             }
         )
-        
-    return {"status": "deleted"}
 
 
 # ─── Admin Permissions ────────────────────────────────

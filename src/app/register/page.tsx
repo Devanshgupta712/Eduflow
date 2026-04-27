@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export default function RegisterPage() {
     const router = useRouter();
-    const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirmPassword: '', course: '' });
+    const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -18,14 +18,7 @@ export default function RegisterPage() {
     const [phoneError, setPhoneError] = useState('');
     const [phoneSuccess, setPhoneSuccess] = useState('');
 
-    const courses = [
-        'Full Stack Java Development',
-        'Full Stack Python Development',
-        'MERN Stack Development',
-        'Software Testing & Automation',
-        'Data Analytics',
-        'Data Science',
-    ];
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -63,7 +56,6 @@ export default function RegisterPage() {
                     phone: form.phone || null,
                     password: form.password,
                     role: 'STUDENT',
-                    course: form.course || null,
                 }),
             });
             const text = await res.text();
@@ -335,21 +327,7 @@ export default function RegisterPage() {
                             />
                         </div>
 
-                        <div>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Curriculum</label>
-                            <select 
-                                value={form.course} 
-                                onChange={e => set('course', e.target.value)} 
-                                style={{
-                                    width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--border)',
-                                    background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '15px', outline: 'none',
-                                    transition: 'all 0.2s', appearance: 'none'
-                                }}
-                            >
-                                <option value="" disabled>Select course track</option>
-                                {courses.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                        </div>
+
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                             <div>
