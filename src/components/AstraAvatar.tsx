@@ -76,7 +76,7 @@ function PremiumHumanAvatar({ status, autoRotate, isMoving, enableRoaming }: { s
     });
 
     return (
-        <group ref={group} scale={[2, 2, 2]} position={[0, -2.5, 0]}>
+        <group ref={group} scale={[0.9, 0.9, 0.9]} position={[0, -1.2, 0]}>
             <primitive object={gltf.scene} />
         </group>
     );
@@ -123,8 +123,8 @@ export default function AstraAvatar() {
     useEffect(() => {
         setMounted(true);
         if (typeof window === 'undefined') return;
-        posRef.current = { x: 50, y: window.innerHeight - 650 };
-        targetRef.current = { x: 50, y: window.innerHeight - 650 };
+        posRef.current = { x: 50, y: window.innerHeight - 500 };
+        targetRef.current = { x: 50, y: window.innerHeight - 500 };
 
         const loadVoices = () => {
             const v = window.speechSynthesis.getVoices();
@@ -143,7 +143,7 @@ export default function AstraAvatar() {
                 const dy = targetRef.current.y - posRef.current.y;
                 const distance = Math.sqrt(dx*dx + dy*dy);
                 if (distance < 50 || time - lastMoveTime > 8000) {
-                    targetRef.current = { x: Math.random() * (window.innerWidth - 350) + 50, y: Math.random() * (window.innerHeight - 650) + 50 };
+                    targetRef.current = { x: Math.random() * (window.innerWidth - 350) + 50, y: Math.random() * (window.innerHeight - 500) + 50 };
                     lastMoveTime = time;
                 }
                 if (distance > 10) {
@@ -212,7 +212,7 @@ export default function AstraAvatar() {
         : { top: '50px', left: '-220px' }; 
 
     return (
-        <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '380px', height: '650px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
+        <div ref={containerRef} style={{ position: 'fixed', zIndex: 10000000, left: 0, top: 0, width: '300px', height: '450px', pointerEvents: 'auto', transform: `translate(${posRef.current.x}px, ${posRef.current.y}px)`, transition: 'transform 0.1s linear' }}>
             
             {(status === 'speaking' || status === 'waving') && responseText && (
                 <div style={{ position: 'absolute', ...bubbleStyle, width: '280px', background: 'white', padding: '20px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
@@ -229,7 +229,7 @@ export default function AstraAvatar() {
                 style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}
             >
                 <Canvas shadows>
-                    <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={35} />
+                    <PerspectiveCamera makeDefault position={[0, 0, 6]} fov={30} />
                     <ambientLight intensity={1.5} />
                     <spotLight position={[5, 5, 5]} angle={0.3} penumbra={1} intensity={2} castShadow />
                     <Environment preset="city" />
