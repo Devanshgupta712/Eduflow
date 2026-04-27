@@ -60,13 +60,24 @@ function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status
                     leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.4, 0.1);
                     leftArm.current.rotation.x = 0.5 + Math.cos(t * 10) * 0.2;
                 }
+            } else if (status === 'thinking') {
+                if (head.current) {
+                    head.current.rotation.y = Math.sin(t * 4) * 0.2;
+                    head.current.rotation.x = Math.sin(t * 2) * 0.1;
+                }
+                // Force Down during thinking
+                if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 1.3, 0.1);
+                if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -1.3, 0.1);
+            } else if (isMoving && enableRoaming) {
+                // Let the Walk animation handle the arms! No override.
             } else {
+                // Force Arms Down (Relaxed Idle)
                 if (rightArm.current) {
-                    rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.2, 0.1);
+                    rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 1.3, 0.1);
                     rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, 0.1, 0.1);
                 }
                 if (leftArm.current) {
-                    leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.2, 0.1);
+                    leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -1.3, 0.1);
                     leftArm.current.rotation.x = THREE.MathUtils.lerp(leftArm.current.rotation.x, 0.1, 0.1);
                 }
             }
