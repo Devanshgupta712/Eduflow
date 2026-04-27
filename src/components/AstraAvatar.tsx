@@ -129,6 +129,7 @@ export default function AstraAvatar() {
     const [volume, setVolume] = useState<number>(1.0);
     const [showSettings, setShowSettings] = useState(false);
     const [isHidden, setIsHidden] = useState(false);
+    const [inputLanguage, setInputLanguage] = useState('en-IN');
     
     const containerRef = useRef<HTMLDivElement>(null);
     const posRef = useRef({ x: typeof window !== 'undefined' ? window.innerWidth - 320 : 800, y: typeof window !== 'undefined' ? window.innerHeight - 420 : 400 });
@@ -165,8 +166,10 @@ export default function AstraAvatar() {
         const loadVoices = () => {
             const v = window.speechSynthesis.getVoices();
             setVoices(v);
-            const stored = localStorage.getItem('astra_voice');
-            if (stored) setSelectedVoice(stored);
+            const storedVoice = localStorage.getItem('astra_voice');
+            if (storedVoice) setSelectedVoice(storedVoice);
+            const storedLang = localStorage.getItem('astra_lang');
+            if (storedLang) setInputLanguage(storedLang);
         };
         loadVoices();
         window.speechSynthesis.onvoiceschanged = loadVoices;
@@ -248,7 +251,7 @@ export default function AstraAvatar() {
             rolePersonality = `You are talking to a visitor. Be welcoming and help them understand the platform, courses, and enrollment process.`;
         }
 
-        return `You are Astra, a friendly AI assistant for the EduSuite.ai Learning Management System. ${rolePersonality} The user is currently on the page: "${pageName}". Respond concisely in 3-4 sentences. Address them as ${firstName}. If the user asks you to take them to a specific page or navigate anywhere, append exactly "[NAVIGATE: /path]" to the very end of your response (e.g. "[NAVIGATE: /dashboard]" or "[NAVIGATE: /training/attendance]"). User says: ${userMessage}`;
+        return `You are Astra, a friendly AI assistant for the EduSuite.ai Learning Management System. ${rolePersonality} The user is currently on the page: "${pageName}". IMPORTANT: Always respond in the exact same language that the user is speaking to you in. Respond concisely in 3-4 sentences. Address them as ${firstName}. If the user asks you to take them to a specific page or navigate anywhere, append exactly "[NAVIGATE: /path]" to the very end of your response (e.g. "[NAVIGATE: /dashboard]" or "[NAVIGATE: /training/attendance]"). User says: ${userMessage}`;
     };
 
     // Speech AI (Personalized)
@@ -256,6 +259,7 @@ export default function AstraAvatar() {
         if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
             const SpeechRecognition = (window as any).webkitSpeechRecognition;
             recognitionRef.current = new SpeechRecognition();
+            recognitionRef.current.lang = inputLanguage;
             recognitionRef.current.onresult = async (event: any) => {
                 const transcript = event.results[0][0].transcript;
                 setStatus('thinking');
@@ -282,6 +286,7 @@ export default function AstraAvatar() {
                     setTimeout(() => {
                         setStatus('speaking');
                         const utterance = new SpeechSynthesisUtterance(finalReply);
+                        utterance.lang = inputLanguage; // Ensure TTS engine uses the right accent
                         const voice = voices.find(v => v.name === selectedVoice);
                         if (voice) utterance.voice = voice;
                         utterance.volume = volume;
@@ -291,7 +296,7 @@ export default function AstraAvatar() {
                 } catch (e) { setStatus('idle'); }
             };
         }
-    }, [voices, selectedVoice, volume]);
+    }, [voices, selectedVoice, volume, inputLanguage]);
 
     if (!mounted) return null;
 
@@ -353,7 +358,20 @@ export default function AstraAvatar() {
                     <label style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '12px' }}>
                         <input type="checkbox" checked={enableRoaming} onChange={() => setEnableRoaming(!enableRoaming)} /> Enable Roaming
                     </label>
-                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Voice</label>
+                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Spoken Language</label>
+                    <select value={inputLanguage} onChange={(e) => { setInputLanguage(e.target.value); localStorage.setItem('astra_lang', e.target.value); }} style={{ width: '100%', padding: '6px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '11px', marginBottom: '12px' }}>
+                        <option value="en-IN">English (India)</option>
+                        <option value="hi-IN">Hindi</option>
+                        <option value="ta-IN">Tamil</option>
+                        <option value="te-IN">Telugu</option>
+                        <option value="mr-IN">Marathi</option>
+                        <option value="bn-IN">Bengali</option>
+                        <option value="gu-IN">Gujarati</option>
+                        <option value="kn-IN">Kannada</option>
+                        <option value="ml-IN">Malayalam</option>
+                        <option value="pa-IN">Punjabi</option>
+                    </select>
+                    <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>TTS Voice</label>
                     <select value={selectedVoice} onChange={(e) => { setSelectedVoice(e.target.value); localStorage.setItem('astra_voice', e.target.value); }} style={{ width: '100%', padding: '6px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '11px', marginBottom: '12px' }}>
                         {voices.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
                     </select>
