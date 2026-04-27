@@ -2,110 +2,130 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, useAnimations, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
+import { PerspectiveCamera, Environment, ContactShadows, Float, useHelper } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Premium Student Character (Human Face Engine) ---
-function PremiumAvatar({ status, autoRotate, isMoving, enableRoaming }: { status: string, autoRotate: boolean, isMoving: boolean, enableRoaming: boolean }) {
-    const gltf = useGLTF('/astra_model.glb');
-    const { actions } = useAnimations(gltf.animations, gltf.scene);
+// --- NEW PREMIUM STUDENT GAMING CHARACTER (Built from Scratch) ---
+function StudentBot({ status, isMoving }: { status: string, isMoving: boolean }) {
     const group = useRef<THREE.Group>(null);
-    const headNode = useRef<THREE.Object3D | null>(null);
-    const rightArm = useRef<THREE.Object3D | null>(null);
-    const leftArm = useRef<THREE.Object3D | null>(null);
-
-    useEffect(() => {
-        gltf.scene.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-                const mesh = child as THREE.Mesh;
-                const mat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.0 });
-                mesh.material = mat;
-                const name = mesh.name.toLowerCase();
-                
-                // --- STUDENT CLOTHING RE-SKIN ---
-                if (name.includes('head') || name.includes('skin')) {
-                    mat.color.set('#ffe0bd'); // Skin Tone
-                    headNode.current = child;
-                } else if (name.includes('upper') || name.includes('chest') || name.includes('arm')) {
-                    mat.color.set('#dc2626'); // Red Hoodie
-                } else if (name.includes('lower') || name.includes('pants') || name.includes('leg')) {
-                    mat.color.set('#0d9488'); // Teal/Blue Jeans
-                } else {
-                    mat.color.set('#334155'); // Dark Shoes/Details
-                }
-            }
-            if (child.name.toLowerCase().includes('shoulder') || child.name.toLowerCase().includes('arm')) {
-                if (child.name.toLowerCase().includes('right')) rightArm.current = child;
-                if (child.name.toLowerCase().includes('left')) leftArm.current = child;
-            }
-        });
-        gltf.scene.rotation.y = Math.PI;
-    }, [gltf.scene]);
-
-    useEffect(() => {
-        if (!actions) return;
-        let activeAction = actions['Idle'] || Object.values(actions)[0];
-        if (status === 'listening' || status === 'waving') activeAction = actions['Wave'] || actions['Idle'];
-        else if (enableRoaming && isMoving && status === 'idle') activeAction = actions['Walk'] || actions['Run'] || actions['Idle'];
-        Object.values(actions).forEach(a => { if (a !== activeAction) a?.fadeOut(0.4); });
-        activeAction?.reset().fadeIn(0.4).play();
-    }, [actions, isMoving, status, enableRoaming]);
+    const head = useRef<THREE.Group>(null);
+    const leftArm = useRef<THREE.Mesh>(null);
+    const rightArm = useRef<THREE.Mesh>(null);
+    const leftLeg = useRef<THREE.Mesh>(null);
+    const rightLeg = useRef<THREE.Mesh>(null);
 
     useFrame((state) => {
         const t = state.clock.elapsedTime;
-        if (group.current) {
-            group.current.position.y = Math.sin(t * 1.5) * 0.08;
-            if (autoRotate) group.current.rotation.y += 0.01;
-            
-            // --- NATURAL STUDENT GESTURES ---
-            if (status === 'speaking') {
-                if (rightArm.current) {
-                    rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 0.4, 0.1);
-                    rightArm.current.rotation.x = -0.5 + Math.sin(t * 8) * 0.2;
-                }
-                if (leftArm.current) {
-                    leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -0.4, 0.1);
-                    leftArm.current.rotation.x = -0.5 + Math.cos(t * 8) * 0.2;
-                }
-            } else if (!(isMoving && enableRoaming)) {
-                if (rightArm.current) rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, 1.3, 0.1);
-                if (leftArm.current) leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -1.3, 0.1);
+        if (!group.current) return;
+
+        // --- IDLE / FLOATING MOTION ---
+        group.current.position.y = Math.sin(t * 1.5) * 0.1;
+
+        // --- ANIMATION LOGIC ---
+        if (status === 'speaking') {
+            // Natural talking gestures
+            if (leftArm.current) {
+                leftArm.current.rotation.x = -0.5 + Math.sin(t * 10) * 0.2;
+                leftArm.current.rotation.z = 0.2;
+            }
+            if (rightArm.current) {
+                rightArm.current.rotation.x = -0.5 + Math.cos(t * 10) * 0.2;
+                rightArm.current.rotation.z = -0.2;
+            }
+            if (head.current) head.current.rotation.y = Math.sin(t * 2) * 0.1;
+        } 
+        else if (isMoving) {
+            // Walking logic
+            const walkSpeed = 10;
+            if (leftLeg.current) leftLeg.current.rotation.x = Math.sin(t * walkSpeed) * 0.5;
+            if (rightLeg.current) rightLeg.current.rotation.x = Math.cos(t * walkSpeed) * 0.5;
+            if (leftArm.current) leftArm.current.rotation.x = Math.cos(t * walkSpeed) * 0.4;
+            if (rightArm.current) rightArm.current.rotation.x = Math.sin(t * walkSpeed) * 0.4;
+        }
+        else if (status === 'waving') {
+            if (rightArm.current) {
+                rightArm.current.rotation.z = -1.5 + Math.sin(t * 10) * 0.5;
+                rightArm.current.rotation.x = -0.5;
+            }
+        }
+        else {
+            // Natural Idle Pose
+            if (leftArm.current) leftArm.current.rotation.x = THREE.MathUtils.lerp(leftArm.current.rotation.x, 0.2, 0.1);
+            if (rightArm.current) rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, 0.2, 0.1);
+            if (leftLeg.current) leftLeg.current.rotation.x = THREE.MathUtils.lerp(leftLeg.current.rotation.x, 0, 0.1);
+            if (rightLeg.current) rightLeg.current.rotation.x = THREE.MathUtils.lerp(rightLeg.current.rotation.x, 0, 0.1);
+            if (head.current) {
+                head.current.rotation.y = THREE.MathUtils.lerp(head.current.rotation.y, 0, 0.1);
+                head.current.rotation.x = Math.sin(t * 0.5) * 0.05;
             }
         }
     });
 
     return (
-        <group ref={group} scale={[1.8, 1.8, 1.8]} position={[0, -1.2, 0]}>
-            <primitive object={gltf.scene} />
-            
-            {/* --- CUSTOM STUDENT FACE (Eyes, Eyebrows, Mouth) --- */}
-            <group position={[0, 2.55, 0.45]}>
-                {/* Expressive Eyes */}
-                <mesh position={[-0.08, 0.08, 0]}>
-                    <sphereGeometry args={[0.035, 16, 16]} />
-                    <meshBasicMaterial color="#111" />
-                </mesh>
-                <mesh position={[0.08, 0.08, 0]}>
-                    <sphereGeometry args={[0.035, 16, 16]} />
-                    <meshBasicMaterial color="#111" />
-                </mesh>
-                
-                {/* Eyebrows */}
-                <mesh position={[-0.08, 0.14, 0]}>
-                    <boxGeometry args={[0.06, 0.01, 0.01]} />
-                    <meshBasicMaterial color="#442200" />
-                </mesh>
-                <mesh position={[0.08, 0.14, 0]}>
-                    <boxGeometry args={[0.06, 0.01, 0.01]} />
-                    <meshBasicMaterial color="#442200" />
-                </mesh>
+        <group ref={group} scale={[1.2, 1.2, 1.2]} position={[0, -0.5, 0]}>
+            {/* --- BODY (Hoodie) --- */}
+            <mesh position={[0, 0.8, 0]} castShadow>
+                <boxGeometry args={[0.6, 0.8, 0.4]} />
+                <meshStandardMaterial color="#dc2626" roughness={0.3} metalness={0.1} />
+            </mesh>
 
-                {/* Human Mouth */}
-                <mesh position={[0, -0.05, 0]}>
-                    <boxGeometry args={[0.1, status === 'speaking' ? Math.sin(Date.now() * 0.02) * 0.04 + 0.02 : 0.015, 0.01]} />
+            {/* --- HEAD (Human Teenager) --- */}
+            <group ref={head} position={[0, 1.5, 0]}>
+                {/* Face */}
+                <mesh castShadow>
+                    <boxGeometry args={[0.45, 0.45, 0.4]} />
+                    <meshStandardMaterial color="#ffe0bd" />
+                </mesh>
+                {/* Gamer Hair */}
+                <mesh position={[0, 0.2, 0]}>
+                    <boxGeometry args={[0.5, 0.2, 0.45]} />
+                    <meshStandardMaterial color="#332211" />
+                </mesh>
+                {/* Eyes */}
+                <mesh position={[-0.1, 0.05, 0.21]}>
+                    <sphereGeometry args={[0.04, 16, 16]} />
+                    <meshBasicMaterial color="#000" />
+                </mesh>
+                <mesh position={[0.1, 0.05, 0.21]}>
+                    <sphereGeometry args={[0.04, 16, 16]} />
+                    <meshBasicMaterial color="#000" />
+                </mesh>
+                {/* Mouth */}
+                <mesh position={[0, -0.1, 0.21]}>
+                    <boxGeometry args={[0.12, status === 'speaking' ? 0.05 : 0.015, 0.01]} />
                     <meshBasicMaterial color="#882222" />
                 </mesh>
             </group>
+
+            {/* --- ARMS --- */}
+            <mesh ref={leftArm} position={[-0.45, 1, 0]} castShadow>
+                <boxGeometry args={[0.18, 0.7, 0.18]} />
+                <meshStandardMaterial color="#dc2626" />
+            </mesh>
+            <mesh ref={rightArm} position={[0.45, 1, 0]} castShadow>
+                <boxGeometry args={[0.18, 0.7, 0.18]} />
+                <meshStandardMaterial color="#dc2626" />
+            </mesh>
+
+            {/* --- LEGS (Jeans) --- */}
+            <mesh ref={leftLeg} position={[-0.2, 0.2, 0]} castShadow>
+                <boxGeometry args={[0.22, 0.8, 0.22]} />
+                <meshStandardMaterial color="#0d9488" />
+            </mesh>
+            <mesh ref={rightLeg} position={[0.2, 0.2, 0]} castShadow>
+                <boxGeometry args={[0.22, 0.8, 0.22]} />
+                <meshStandardMaterial color="#0d9488" />
+            </mesh>
+
+            {/* --- SNEAKERS --- */}
+            <mesh position={[-0.2, -0.25, 0.05]}>
+                <boxGeometry args={[0.25, 0.15, 0.4]} />
+                <meshStandardMaterial color="#fff" />
+            </mesh>
+            <mesh position={[0.2, -0.25, 0.05]}>
+                <boxGeometry args={[0.25, 0.15, 0.4]} />
+                <meshStandardMaterial color="#fff" />
+            </mesh>
         </group>
     );
 }
@@ -129,6 +149,7 @@ export default function AstraAvatar() {
     const dragOffset = useRef({ x: 0, y: 0 });
     const recognitionRef = useRef<any>(null);
 
+    // --- Global Drag Logic ---
     useEffect(() => {
         const handleGlobalMouseMove = (e: MouseEvent) => {
             if (isDragging.current) {
@@ -248,13 +269,20 @@ export default function AstraAvatar() {
                 </div>
             )}
 
-            <div onMouseDown={(e) => { isDragging.current = true; dragOffset.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y }; }} style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}>
-                <Canvas style={{ background: 'transparent' }}>
-                    <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={35} />
-                    <ambientLight intensity={1.5} />
+            <div 
+                onMouseDown={(e) => { 
+                    isDragging.current = true; 
+                    dragOffset.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y }; 
+                }} 
+                style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}
+            >
+                <Canvas shadows>
+                    <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={30} />
+                    <ambientLight intensity={1} />
+                    <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={2} castShadow />
                     <Environment preset="city" />
                     <Suspense fallback={null}>
-                        <PremiumAvatar status={status} autoRotate={autoRotate} isMoving={isMoving} enableRoaming={enableRoaming} />
+                        <StudentBot status={status} isMoving={isMoving} />
                     </Suspense>
                     <ContactShadows opacity={0.4} scale={10} blur={2.5} far={4} />
                 </Canvas>
@@ -290,5 +318,3 @@ export default function AstraAvatar() {
         </div>
     );
 }
-
-useGLTF.preload('/astra_model.glb');
