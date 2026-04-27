@@ -109,7 +109,7 @@ function ExpressiveBot({ status, isMoving, enableRoaming }: { status: string, is
     });
 
     return (
-        <group ref={group} scale={[0.45, 0.45, 0.45]} position={[0, -0.8, 0]}>
+        <group ref={group} scale={[0.22, 0.22, 0.22]} position={[0, -0.4, 0]}>
             <primitive object={gltf.scene} />
         </group>
     );
@@ -274,7 +274,7 @@ export default function AstraAvatar() {
                 style={{ width: '100%', height: '100%', position: 'relative', cursor: isDragging.current ? 'grabbing' : 'grab' }}
             >
                 <Canvas shadows>
-                    <PerspectiveCamera makeDefault position={[0, 0, 4.5]} fov={28} />
+                    <PerspectiveCamera makeDefault position={[0, 0.3, 8]} fov={20} />
                     <ambientLight intensity={1.5} />
                     <spotLight position={[5, 5, 5]} angle={0.3} penumbra={1} intensity={2} castShadow />
                     <Environment preset="city" />
