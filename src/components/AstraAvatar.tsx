@@ -130,7 +130,6 @@ export default function AstraAvatar() {
     const [showSettings, setShowSettings] = useState(false);
     const [isHidden, setIsHidden] = useState(false);
     const [inputLanguage, setInputLanguage] = useState('en-IN');
-    const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
     const [showChatBubble, setShowChatBubble] = useState(false);
     
     const containerRef = useRef<HTMLDivElement>(null);
@@ -239,7 +238,7 @@ export default function AstraAvatar() {
         const pageName = ctx.page.replace(/\//g, ' > ').replace(/>/g, '›').trim() || 'Home';
 
         let rolePersonality = '';
-        let navInstruction = `If the user asks you to take them to a specific page or navigate anywhere, ask them for confirmation first and append exactly "[ASK_NAVIGATE: /path]" to the very end of your response (e.g. "[ASK_NAVIGATE: /dashboard]" or "[ASK_NAVIGATE: /training/attendance]"). DO NOT use [NAVIGATE].`;
+        let navInstruction = `CRITICAL: ONLY append exactly "[NAVIGATE: /path]" to the very end of your response IF AND ONLY IF the user EXPLICITLY asks you to "take me to", "go to", "open", or "redirect to" a specific page (e.g. "[NAVIGATE: /dashboard]"). DO NOT use this command if they are just asking a question.`;
 
         if (ctx.role === 'STUDENT') {
             rolePersonality = `You are talking to a student/trainee named ${firstName}. Be a friendly, encouraging tutor. Help them with assignments, courses, and career guidance. If they're on an assessment page, wish them luck. If they're on attendance, help them track it.`;
@@ -253,7 +252,7 @@ export default function AstraAvatar() {
             rolePersonality = `You are talking to a marketer named ${firstName}. Help them with leads, campaigns, and enrollment metrics.`;
         } else {
             rolePersonality = `You are talking to a visitor. Be welcoming and help them understand the platform, courses, and enrollment process.`;
-            navInstruction = `DO NOT use the [ASK_NAVIGATE: /path] command. If they ask to go to a dashboard or specific page, politely tell them they need to log in first to access those areas.`;
+            navInstruction = `DO NOT use the [NAVIGATE: /path] command. If they ask to go to a dashboard or specific page, politely tell them they need to log in first to access those areas.`;
         }
 
         return `You are Astra, a friendly AI assistant for the EduSuite.ai Learning Management System. ${rolePersonality} The user is currently on the page: "${pageName}". IMPORTANT: Always respond in the exact same language that the user is speaking to you in. Respond concisely in 3-4 sentences. Address them as ${firstName}. ${navInstruction} User says: ${userMessage}`;
@@ -283,13 +282,11 @@ export default function AstraAvatar() {
                     }
                     
                     // Parse Navigation Command
-                    const navMatch = finalReply.match(/\[ASK_NAVIGATE:\s*([^\]]+)\]/i);
+                    const navMatch = finalReply.match(/\[NAVIGATE:\s*([^\]]+)\]/i);
                     if (navMatch) {
                         const navPath = navMatch[1].trim();
-                        finalReply = finalReply.replace(/\[ASK_NAVIGATE:\s*([^\]]+)\]/gi, '').trim();
-                        setPendingNavigation(navPath);
-                    } else {
-                        setPendingNavigation(null);
+                        finalReply = finalReply.replace(/\[NAVIGATE:\s*([^\]]+)\]/gi, '').trim();
+                        router.push(navPath);
                     }
 
                     setResponseText(finalReply);
@@ -335,17 +332,6 @@ export default function AstraAvatar() {
                 <div style={{ position: 'absolute', ...bubbleStyle, width: '260px', background: 'white', padding: '18px', borderRadius: '20px', boxShadow: '0 15px 40px rgba(0,0,0,0.15)', border: '1px solid #f1f5f9', zIndex: 10000 }}>
                     <button onClick={(e) => { e.stopPropagation(); setShowChatBubble(false); }} style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '14px', fontWeight: 'bold' }}>✕</button>
                     <p style={{ margin: 0, fontSize: '13px', color: '#1e293b', fontWeight: 600, lineHeight: 1.5, paddingRight: '12px' }}>{responseText}</p>
-                    
-                    {pendingNavigation && (
-                        <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
-                            <button onClick={(e) => { e.stopPropagation(); router.push(pendingNavigation); setPendingNavigation(null); setShowChatBubble(false); }} style={{ flex: 1, background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                                🚀 Go to Page
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); setPendingNavigation(null); }} style={{ flex: 1, background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', padding: '8px 6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
-                                Cancel
-                            </button>
-                        </div>
-                    )}
                     
                     <div style={{ position: 'absolute', top: '25px', ...(isLeftHalf ? { left: '-10px', clipPath: 'polygon(100% 0%, 100% 100%, 0% 50%)' } : { right: '-10px', clipPath: 'polygon(0% 0%, 0% 100%, 100% 50%)' }), width: '16px', height: '16px', background: 'white' }}></div>
                 </div>
