@@ -37,7 +37,8 @@ export default function VisualResumeEditor() {
       });
       if (res.ok) {
         const data = await res.json();
-        // Ensure arrays exist
+        // Ensure arrays and objects exist
+        if (!data.personal) data.personal = {};
         if (!data.skills) data.skills = [];
         if (!data.experience) data.experience = [];
         if (!data.education) data.education = [];
@@ -275,12 +276,15 @@ export default function VisualResumeEditor() {
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
-                  {resume.skills.map((skill: string, idx: number) => (
-                    <div key={idx} style={{ background: 'var(--primary-glow)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '16px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {skill}
-                      <button onClick={() => handleChange(prev => ({ ...prev, skills: prev.skills.filter((_:any, i:number) => i !== idx) }))} style={{ background: 'transparent', border: 'none', color: 'var(--primary)', cursor: 'pointer' }}>×</button>
-                    </div>
-                  ))}
+                  {resume.skills.map((skill: any, idx: number) => {
+                    const skillStr = typeof skill === 'object' ? skill.name || JSON.stringify(skill) : skill;
+                    return (
+                      <div key={idx} style={{ background: 'var(--primary-glow)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '16px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {skillStr}
+                        <button onClick={() => handleChange(prev => ({ ...prev, skills: prev.skills.filter((_:any, i:number) => i !== idx) }))} style={{ background: 'transparent', border: 'none', color: 'var(--primary)', cursor: 'pointer' }}>×</button>
+                      </div>
+                    );
+                  })}
                 </div>
                 <input 
                   type="text" className="form-input w-full" placeholder="e.g. React, Python, Data Analysis"
@@ -316,7 +320,7 @@ export default function VisualResumeEditor() {
                         return (
                         <div key={bIdx} style={{ display: 'flex', gap: '8px' }}>
                           <textarea 
-                            value={bullet} rows={2} className="form-input w-full"
+                            value={typeof bullet === 'object' ? JSON.stringify(bullet) : bullet} rows={2} className="form-input w-full"
                             onChange={e => handleChange(prev => { const n = [...prev.experience]; n[expIdx].bullets[bIdx] = e.target.value; return {...prev, experience: n}; })}
                           />
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -427,8 +431,10 @@ export default function VisualResumeEditor() {
                   <div>
                     <h4 style={{ fontSize: '10px', color: '#3b82f6', textTransform: 'uppercase', marginBottom: '8px' }}>Skills</h4>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                       {resume.skills.map((s:string, i:number) => (
-                         <span key={i} style={{ fontSize: '9px', padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>{s}</span>
+                       {resume.skills.map((s:any, i:number) => (
+                         <span key={i} style={{ fontSize: '9px', padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
+                           {typeof s === 'object' ? s.name || JSON.stringify(s) : s}
+                         </span>
                        ))}
                     </div>
                   </div>
@@ -488,7 +494,13 @@ export default function VisualResumeEditor() {
                       <div style={{ fontStyle: 'italic', fontSize: '10pt', color: resume.template === 'creative' ? '#3b82f6' : '#555', marginBottom: '4px', fontWeight: resume.template === 'creative' ? 600 : 400 }}>{exp.company}</div>
                       {exp.bullets && exp.bullets.length > 0 && (
                         <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px', fontSize: '10.5pt' }}>
-                          {exp.bullets.map((b: string, j: number) => b.trim() && <li key={j} style={{ marginBottom: '4px' }}>{b}</li>)}
+                          {exp.bullets.map((b: any, j: number) => {
+                             const bulletStr = typeof b === 'object' ? JSON.stringify(b) : b;
+                             if (typeof bulletStr === 'string' && bulletStr.trim()) {
+                               return <li key={j} style={{ marginBottom: '4px' }}>{bulletStr}</li>;
+                             }
+                             return null;
+                          })}
                         </ul>
                       )}
                     </div>
