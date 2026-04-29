@@ -29,6 +29,24 @@ export default function DrillsPage() {
     const recognitionRef = useRef<any>(null);
     const transcriptRef = useRef('');
     const promptShownAtRef = useRef<number>(0);
+    const sessionStartRef = useRef<number>(0);
+
+    // Unmount session logging
+    useEffect(() => {
+        return () => {
+            if (sessionStartRef.current > 0) {
+                const duration_seconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+                const token = getToken();
+                if (token && duration_seconds > 10) {
+                    fetch(`${API_BASE}/api/english/session/log`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ module_name: 'THINK_DRILLS', duration_seconds })
+                    }).catch(() => {});
+                }
+            }
+        };
+    }, []);
 
     const loadDrill = async (type: DrillType) => {
         setDrillType(type);
@@ -43,7 +61,8 @@ export default function DrillsPage() {
             setContent(data.content);
             setStep('drill');
             promptShownAtRef.current = Date.now(); // Start tracking hesitation
-        } catch { setContent({}); setStep('drill'); promptShownAtRef.current = Date.now(); }
+            sessionStartRef.current = Date.now();
+        } catch { setContent({}); setStep('drill'); promptShownAtRef.current = Date.now(); sessionStartRef.current = Date.now(); }
         setLoading(false);
     };
 
@@ -105,11 +124,14 @@ export default function DrillsPage() {
         stopTimer();
         setEvaluating(true);
         const hesitation_seconds = promptShownAtRef.current > 0 ? (Date.now() - promptShownAtRef.current) / 1000 : 0;
+        const total_session_seconds = sessionStartRef.current > 0 ? Math.floor((Date.now() - sessionStartRef.current) / 1000) : 0;
+        sessionStartRef.current = 0; // Prevent unmount logging
+
         try {
             const promptText = content?.scene || content?.starter || content?.topic || content?.word || '';
             const res = await apiFetch('/api/english/drills/evaluate', {
                 method: 'POST',
-                body: JSON.stringify({ drill_type: drillType, prompt_text: promptText, response_text: response, duration_seconds: timer, hesitation_seconds }),
+                body: JSON.stringify({ drill_type: drillType, prompt_text: promptText, response_text: response, duration_seconds: timer, hesitation_seconds, total_session_seconds }),
             });
             const data = await res.json();
             setFeedback(data);
@@ -118,7 +140,30 @@ export default function DrillsPage() {
         setEvaluating(false);
     };
 
-    const reset = () => { setStep('select'); setContent(null); setResponse(''); setFeedback(null); setTimer(0); };
+    const resetDrill = () => {
+        setStep('select');
+        setContent({});
+        setResponse('');
+        setFeedback(null);
+        setTimer(0);
+        sessionStartRef.current = 0;
+    };
+    
+    const goBack = () => {
+        if (sessionStartRef.current > 0) {
+            const duration_seconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+            const token = getToken();
+            if (token && duration_seconds > 10) {
+                fetch(`${API_BASE}/api/english/session/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ module_name: 'THINK_DRILLS', duration_seconds })
+                }).catch(() => {});
+            }
+            sessionStartRef.current = 0;
+        }
+        setStep('select');
+    };
     const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
     const timePercent = (timer / maxTime) * 100;
 
@@ -155,7 +200,7 @@ export default function DrillsPage() {
             <div className="animate-in">
                 <div className="page-header">
                     <div><h1 className="page-title">📊 Drill Results</h1></div>
-                    <button className="btn btn-primary" onClick={reset}>Try Another</button>
+                    <button className="btn btn-primary" onClick={resetDrill}>Try Another</button>
                 </div>
                 <div className="card" style={{ marginBottom: '24px', padding: '24px', background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid #86efac', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                     <div style={{ display: 'flex', gap: '24px' }}>
@@ -190,7 +235,7 @@ export default function DrillsPage() {
         <div className="animate-in">
             <div className="page-header">
                 <div><h1 className="page-title">{drill.icon} {drill.title}</h1><p className="page-subtitle">{drill.desc}</p></div>
-                <button className="btn btn-secondary" onClick={reset}>← Back</button>
+                <button className="btn btn-secondary" onClick={goBack}>← Back</button>
             </div>
 
             {/* Prompt */}

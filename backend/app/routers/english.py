@@ -39,6 +39,7 @@ class EvaluateRequest(BaseModel):
     prompt_text: Optional[str] = ""
     duration_seconds: Optional[int] = 60
     hesitation_seconds: Optional[float] = 0.0
+    total_session_seconds: Optional[int] = 0
 
 class ConversationRequest(BaseModel):
     message: str
@@ -60,6 +61,7 @@ class DrillSubmitRequest(BaseModel):
     response_text: str
     duration_seconds: Optional[int] = 60
     hesitation_seconds: Optional[float] = 0.0
+    total_session_seconds: Optional[int] = 0
 
 class StreakCheckinRequest(BaseModel):
     practice_minutes: Optional[int] = 5
@@ -308,13 +310,15 @@ Transcript:
     if fluency >= 8:
         xp = int(xp * 1.5)
 
+    final_duration = max(body.duration_seconds, body.total_session_seconds)
+    
     # Save session
     session = EnglishPracticeSession(
         id=str(uuid.uuid4()), user_id=user.id, exercise_type=body.exercise_type,
         prompt_text=body.prompt_text, transcript=body.transcript,
         wpm=wpm, filler_count=fillers, grammar_accuracy=grammar,
         vocabulary_score=vocab, fluency_score=fluency,
-        ai_feedback=json.dumps(feedback), duration_seconds=body.duration_seconds,
+        ai_feedback=json.dumps(feedback), duration_seconds=final_duration,
         hesitation_time_seconds=body.hesitation_seconds,
         xp_earned=xp
     )
@@ -330,7 +334,7 @@ Transcript:
     progress.confidence_score = (progress.confidence_score * n + confidence) / (n + 1)
     progress.avg_hesitation_time = (progress.avg_hesitation_time * n + body.hesitation_seconds) / (n + 1)
     progress.total_sessions += 1
-    progress.total_practice_minutes += max(body.duration_seconds // 60, 1)
+    progress.total_practice_minutes += max(final_duration // 60, 1)
     progress.xp_total += xp
     progress.level = calculate_level(progress.xp_total)
 
@@ -503,11 +507,13 @@ async def evaluate_drill(body: DrillSubmitRequest, user: User = Depends(get_curr
     confidence = feedback.get("confidence_score", 5)
     xp = int(score * 3)
 
+    final_duration = max(body.duration_seconds, body.total_session_seconds)
+    
     session = EnglishPracticeSession(
         id=str(uuid.uuid4()), user_id=user.id, exercise_type=body.drill_type,
         prompt_text=body.prompt_text, transcript=body.response_text,
         fluency_score=score, ai_feedback=json.dumps(feedback),
-        duration_seconds=body.duration_seconds, hesitation_time_seconds=body.hesitation_seconds, xp_earned=xp
+        duration_seconds=final_duration, hesitation_time_seconds=body.hesitation_seconds, xp_earned=xp
     )
     db.add(session)
 
@@ -517,7 +523,7 @@ async def evaluate_drill(body: DrillSubmitRequest, user: User = Depends(get_curr
     progress.avg_hesitation_time = (progress.avg_hesitation_time * n + body.hesitation_seconds) / (n + 1)
     progress.xp_total += xp
     progress.total_sessions += 1
-    progress.total_practice_minutes += max(body.duration_seconds // 60, 1)
+    progress.total_practice_minutes += max(final_duration // 60, 1)
     progress.level = calculate_level(progress.xp_total)
 
     today = date.today().isoformat()

@@ -24,7 +24,6 @@ export default function RoleplayPage() {
 
     useEffect(() => {
         apiGet('/api/english/roleplay/scenarios').then(d => setScenarios(d.scenarios || [])).catch(() => {}).finally(() => setLoading(false));
-        sessionStartRef.current = Date.now();
         return () => {
             if (sessionStartRef.current > 0) {
                 const duration_seconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
@@ -80,6 +79,7 @@ export default function RoleplayPage() {
 
     const startScenario = (s: Scenario) => {
         setSelected(s);
+        sessionStartRef.current = Date.now(); // Start tracking here
         setMessages([{ role: 'assistant', content: `🎭 **Scenario: ${s.title}**\n\n${s.description}\n\nI'll play my role now. Let's begin!\n\n---\n\n*${s.ai_role.replace('You are', "I'm")}*\n\nGo ahead, start the conversation!` }]);
     };
 
@@ -166,7 +166,22 @@ export default function RoleplayPage() {
         <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button className="btn btn-secondary btn-sm" onClick={() => { setSelected(null); setMessages([]); }}>← Scenarios</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => { 
+                        if (sessionStartRef.current > 0) {
+                            const duration_seconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+                            const token = getToken();
+                            if (token && duration_seconds > 10) {
+                                fetch(`${API_BASE}/api/english/session/log`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                    body: JSON.stringify({ module_name: 'ROLEPLAY', duration_seconds })
+                                }).catch(() => {});
+                            }
+                        }
+                        sessionStartRef.current = 0;
+                        setSelected(null); 
+                        setMessages([]); 
+                    }}>← Scenarios</button>
                     <div><div style={{ fontWeight: 700, fontSize: '15px' }}>🎭 {selected.title}</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{selected.category}</div></div>
                 </div>
             </div>

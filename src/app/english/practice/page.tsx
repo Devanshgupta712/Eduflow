@@ -21,6 +21,24 @@ export default function SpeakingPracticePage() {
     const timerRef = useRef<any>(null);
     const transcriptRef = useRef('');
     const promptShownAtRef = useRef<number>(0);
+    const sessionStartRef = useRef<number>(0);
+
+    // Unmount session logging
+    useEffect(() => {
+        return () => {
+            if (sessionStartRef.current > 0) {
+                const duration_seconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+                const token = getToken();
+                if (token && duration_seconds > 10) {
+                    fetch(`${API_BASE}/api/english/session/log`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ module_name: 'PRACTICE', duration_seconds })
+                    }).catch(() => {});
+                }
+            }
+        };
+    }, []);
 
     const exercises = [
         { type: 'READ_ALOUD' as ExerciseType, icon: '📖', title: 'Read Aloud', desc: 'Read a passage clearly and fluently', xp: '10 XP', color: '#3b82f6' },
@@ -36,7 +54,8 @@ export default function SpeakingPracticePage() {
             setContent(data.content);
             setStep('practice');
             promptShownAtRef.current = Date.now();
-        } catch { setContent(null); setStep('practice'); promptShownAtRef.current = Date.now(); }
+            sessionStartRef.current = Date.now();
+        } catch { setContent(null); setStep('practice'); promptShownAtRef.current = Date.now(); sessionStartRef.current = Date.now(); }
         setLoading(false);
     };
 
@@ -87,6 +106,9 @@ export default function SpeakingPracticePage() {
         if (!transcriptRef.current && !transcript) return;
         setEvaluating(true);
         const hesitation_seconds = promptShownAtRef.current > 0 ? (Date.now() - promptShownAtRef.current) / 1000 : 0;
+        const total_session_seconds = sessionStartRef.current > 0 ? Math.floor((Date.now() - sessionStartRef.current) / 1000) : 0;
+        sessionStartRef.current = 0; // Prevent unmount logging
+
         try {
             const res = await apiFetch('/api/english/practice/evaluate', {
                 method: 'POST',
@@ -96,6 +118,7 @@ export default function SpeakingPracticePage() {
                     prompt_text: content?.text || content?.topic || content?.starter || '',
                     duration_seconds: timer,
                     hesitation_seconds,
+                    total_session_seconds,
                 }),
             });
             const data = await res.json();
@@ -111,6 +134,23 @@ export default function SpeakingPracticePage() {
         setTranscript('');
         setFeedback(null);
         setTimer(0);
+        sessionStartRef.current = 0;
+    };
+    
+    const goBack = () => {
+        if (sessionStartRef.current > 0) {
+            const duration_seconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+            const token = getToken();
+            if (token && duration_seconds > 10) {
+                fetch(`${API_BASE}/api/english/session/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ module_name: 'PRACTICE', duration_seconds })
+                }).catch(() => {});
+            }
+            sessionStartRef.current = 0;
+        }
+        setStep('select');
     };
 
     const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
@@ -224,7 +264,7 @@ export default function SpeakingPracticePage() {
                     <h1 className="page-title">{exercises.find(e => e.type === exerciseType)?.icon} {exercises.find(e => e.type === exerciseType)?.title}</h1>
                     <p className="page-subtitle">{exercises.find(e => e.type === exerciseType)?.desc}</p>
                 </div>
-                <button className="btn btn-secondary" onClick={resetPractice}>← Back</button>
+                <button className="btn btn-secondary" onClick={goBack}>← Back</button>
             </div>
 
             {/* Prompt Card */}
