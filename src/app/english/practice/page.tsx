@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { apiGet, apiPost, apiFetch, API_BASE } from '@/lib/api';
+import { apiGet, apiPost, apiFetch, API_BASE, getToken } from '@/lib/api';
 import Link from 'next/link';
 
 type ExerciseType = 'READ_ALOUD' | 'ONE_MINUTE_TALK' | 'TONGUE_TWISTER';
