@@ -114,6 +114,7 @@ const navSections: NavSection[] = [
         roles: ['SUPER_ADMIN', 'ADMIN', 'TRAINER', 'STUDENT'],
         items: [
             { label: 'Dashboard', href: '/english', icon: '🗣️' },
+            { label: 'Live Call', href: '/english/live-call', icon: '📞' },
             { label: 'Speaking Practice', href: '/english/practice', icon: '🎙️' },
             { label: 'AI Conversation', href: '/english/conversation', icon: '🤖' },
             { label: 'Roleplay', href: '/english/roleplay', icon: '🎭' },

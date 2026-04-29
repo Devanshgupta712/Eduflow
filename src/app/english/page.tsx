@@ -44,10 +44,11 @@ export default function EnglishDashboard() {
     const xpPercent = Math.min(100, Math.max(0, (xpInLevel / xpRange) * 100));
 
     const modules = [
-        { title: 'Speaking Practice', desc: 'Read Aloud, 1-Min Talk, Tongue Twisters', icon: '🎙️', href: '/english/practice', color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
-        { title: 'AI Conversation', desc: 'Chat with AI in 5 different modes', icon: '🤖', href: '/english/conversation', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' },
+        { title: 'Live AI Call', desc: 'Real-time voice conversation', icon: '📞', href: '/english/live-call', color: '#10b981', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
+        { title: 'Speaking Practice', desc: 'Read Aloud, 1-Min Talk', icon: '🎙️', href: '/english/practice', color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
+        { title: 'AI Conversation', desc: 'Chat with AI in 5 modes', icon: '🤖', href: '/english/conversation', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' },
         { title: 'Roleplay', desc: 'Practice real-world scenarios', icon: '🎭', href: '/english/roleplay', color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)' },
-        { title: 'Think-in-English', desc: 'Drills to stop mental translation', icon: '🧠', href: '/english/drills', color: '#10b981', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
+        { title: 'Think-in-English', desc: 'Drills to stop mental translation', icon: '🧠', href: '/english/drills', color: '#ec4899', gradient: 'linear-gradient(135deg, #ec4899, #be185d)' },
         { title: 'Leaderboard', desc: 'See how you rank in your batch', icon: '🏆', href: '/english/leaderboard', color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)' },
     ];
 
