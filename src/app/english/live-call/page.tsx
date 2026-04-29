@@ -14,6 +14,7 @@ export default function LiveCallPage() {
     const timerRef = useRef<any>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const hesitationStartRef = useRef<number>(0);
+    const sessionStartRef = useRef<number>(0);
 
     // Initialize Speech Synthesis
     useEffect(() => {
@@ -24,6 +25,19 @@ export default function LiveCallPage() {
             if (synthRef.current) synthRef.current.cancel();
             if (timerRef.current) clearInterval(timerRef.current);
             if (recognitionRef.current) recognitionRef.current.stop();
+            
+            // Log session time on unmount
+            if (sessionStartRef.current > 0) {
+                const duration_seconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+                const token = getToken();
+                if (token && duration_seconds > 10) {
+                    fetch(`${API_BASE}/api/english/session/log`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ module_name: 'LIVE_CALL', duration_seconds })
+                    }).catch(() => {});
+                }
+            }
         };
     }, []);
 
@@ -37,6 +51,7 @@ export default function LiveCallPage() {
         setConversation([]);
         setDuration(0);
         setCallStatus('THINKING');
+        sessionStartRef.current = Date.now(); // Start tracking session length
         
         timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
         
@@ -48,6 +63,18 @@ export default function LiveCallPage() {
 
     const endCall = () => {
         setCallStatus('IDLE');
+        if (sessionStartRef.current > 0) {
+            const duration_seconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+            const token = getToken();
+            if (token && duration_seconds > 10) {
+                fetch(`${API_BASE}/api/english/session/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ module_name: 'LIVE_CALL', duration_seconds })
+                }).catch(() => {});
+            }
+            sessionStartRef.current = 0;
+        }
         if (synthRef.current) synthRef.current.cancel();
         if (recognitionRef.current) {
             recognitionRef.current.onend = null;

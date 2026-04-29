@@ -72,6 +72,10 @@ class ChallengeSubmitRequest(BaseModel):
 class HesitationTrackRequest(BaseModel):
     hesitation_seconds: float
 
+class SessionLogRequest(BaseModel):
+    module_name: str
+    duration_seconds: int
+
 
 # ──── Helper: Call Groq API ────
 async def call_groq(system_prompt: str, user_message: str, stream: bool = False):
@@ -628,17 +632,39 @@ async def track_hesitation(body: HesitationTrackRequest, user: User = Depends(ge
     progress.total_sessions += 1
     return {"status": "success", "avg_hesitation_time": progress.avg_hesitation_time}
 
+# ──── 12.5. Log Non-Evaluated Session Time ────
+@router.post("/session/log")
+async def log_session_time(body: SessionLogRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    progress = await get_or_create_progress(user.id, db)
+    minutes = max(body.duration_seconds // 60, 1)
+    
+    # We create a dummy session just to track the time cleanly in history
+    session = EnglishPracticeSession(
+        id=str(uuid.uuid4()), user_id=user.id, exercise_type=body.module_name.upper(),
+        duration_seconds=body.duration_seconds, xp_earned=0,
+        fluency_score=progress.confidence_score # Just dummy value
+    )
+    db.add(session)
+    
+    progress.total_practice_minutes += minutes
+    progress.total_sessions += 1
+    return {"status": "logged", "total_minutes": progress.total_practice_minutes}
+
 # ──── 13. Admin Reports ────
 @router.get("/admin/reports")
-async def get_admin_reports(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_admin_reports(batch_id: Optional[str] = None, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     if user.role not in ["ADMIN", "SUPER_ADMIN", "TRAINER"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    result = await db.execute(
-        select(EnglishUserProgress, User.name, User.email)
-        .join(User, User.id == EnglishUserProgress.user_id)
-        .order_by(desc(EnglishUserProgress.xp_total))
-    )
+    from app.models.batch import BatchStudent
+
+    query = select(EnglishUserProgress, User.name, User.email).join(User, User.id == EnglishUserProgress.user_id)
+    
+    if batch_id:
+        query = query.join(BatchStudent, BatchStudent.student_id == User.id).where(BatchStudent.batch_id == batch_id)
+        
+    query = query.order_by(desc(EnglishUserProgress.xp_total))
+    result = await db.execute(query)
     rows = result.all()
 
     return {"reports": [
@@ -656,6 +682,59 @@ async def get_admin_reports(user: User = Depends(get_current_user), db: AsyncSes
         }
         for (p, name, email) in rows
     ]}
+
+# ──── 13.5. Admin Student Breakdown ────
+@router.get("/admin/reports/{student_id}")
+async def get_student_english_breakdown(student_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if user.role not in ["ADMIN", "SUPER_ADMIN", "TRAINER"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Get user basics
+    user_res = await db.execute(select(User).where(User.id == student_id))
+    student = user_res.scalars().first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    progress = await get_or_create_progress(student_id, db)
+    
+    # Calculate time spent per module
+    mod_res = await db.execute(
+        select(EnglishPracticeSession.exercise_type, func.sum(EnglishPracticeSession.duration_seconds))
+        .where(EnglishPracticeSession.user_id == student_id)
+        .group_by(EnglishPracticeSession.exercise_type)
+    )
+    module_breakdown = {row[0]: round(row[1] / 60, 1) for row in mod_res.all()}
+    
+    # Get recent 5 sessions
+    ses_res = await db.execute(
+        select(EnglishPracticeSession)
+        .where(EnglishPracticeSession.user_id == student_id)
+        .order_by(desc(EnglishPracticeSession.created_at))
+        .limit(5)
+    )
+    recent = ses_res.scalars().all()
+
+    return {
+        "student": {"name": student.name, "email": student.email},
+        "progress": {
+            "level": progress.level,
+            "xp_total": progress.xp_total,
+            "confidence_score": round(progress.confidence_score, 1),
+            "avg_hesitation_time": round(progress.avg_hesitation_time, 1),
+            "total_sessions": progress.total_sessions,
+            "total_practice_minutes": progress.total_practice_minutes,
+            "streak": progress.current_streak
+        },
+        "module_breakdown": module_breakdown,
+        "recent_sessions": [
+            {
+                "type": s.exercise_type,
+                "date": s.created_at.isoformat() if s.created_at else None,
+                "score": s.fluency_score,
+                "duration_min": round(s.duration_seconds / 60, 1)
+            } for s in recent
+        ]
+    }
 
 # ──── 14. Weekly Progress ────
 @router.get("/progress/weekly")

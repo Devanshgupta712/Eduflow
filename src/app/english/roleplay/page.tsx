@@ -20,9 +20,24 @@ export default function RoleplayPage() {
     const chatEndRef = useRef<HTMLDivElement>(null);
     const recognitionRef = useRef<any>(null);
     const hesitationStartRef = useRef<number>(0);
+    const sessionStartRef = useRef<number>(0);
 
     useEffect(() => {
         apiGet('/api/english/roleplay/scenarios').then(d => setScenarios(d.scenarios || [])).catch(() => {}).finally(() => setLoading(false));
+        sessionStartRef.current = Date.now();
+        return () => {
+            if (sessionStartRef.current > 0) {
+                const duration_seconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+                const token = getToken();
+                if (token && duration_seconds > 10) {
+                    fetch(`${API_BASE}/api/english/session/log`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ module_name: 'ROLEPLAY', duration_seconds })
+                    }).catch(() => {});
+                }
+            }
+        };
     }, []);
 
     useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
