@@ -196,13 +196,11 @@ export default function ConversationPage() {
             {/* Input */}
             <div style={{ display: 'flex', gap: '12px', flexShrink: 0, alignItems: 'center' }}>
                 <div style={{ flex: 1, position: 'relative' }}>
-                    <input
-                        value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                        placeholder={isRecording ? "Listening... Speak now" : "Tap microphone to speak..."}
-                        className="form-input"
-                        style={{ width: '100%', padding: '14px 18px', borderRadius: '14px', fontSize: '15px', background: isRecording ? 'var(--danger-glow)' : 'var(--bg-secondary)', color: isRecording ? 'var(--danger)' : 'var(--text-primary)' }}
-                        disabled={streaming || isRecording}
-                    />
+                    <div
+                        style={{ width: '100%', padding: '14px 18px', borderRadius: '14px', fontSize: '15px', background: isRecording ? 'var(--danger-glow)' : 'var(--bg-secondary)', color: isRecording ? 'var(--danger)' : 'var(--text-primary)', minHeight: '52px', display: 'flex', alignItems: 'center', border: '1px solid var(--border)' }}
+                    >
+                        {input || <span style={{ color: 'var(--text-muted)' }}>{isRecording ? "Listening... Speak now" : "Tap microphone to speak..."}</span>}
+                    </div>
                     {isRecording && <div style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />}
                 </div>
                 <button 
