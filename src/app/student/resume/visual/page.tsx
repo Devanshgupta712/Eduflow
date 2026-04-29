@@ -541,14 +541,25 @@ export default function VisualResumeEditor() {
                   Skills
                   {resume.template === 'executive' && <span style={{ flex: 1, height: '1px', background: '#cbd5e0', marginLeft: '15px' }}></span>}
                 </h2>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <ul style={{ margin: '0', paddingLeft: '20px', fontSize: '10.5pt' }}>
                   {resume.skills.map((skill: any, i: number) => {
                     const skillStr = typeof skill === 'object' ? skill.name || JSON.stringify(skill) : skill;
+                    // If it contains a colon, bold the category part
+                    const colonIdx = skillStr.indexOf(':');
+                    if (colonIdx > -1) {
+                      const category = skillStr.substring(0, colonIdx);
+                      const items = skillStr.substring(colonIdx + 1);
+                      return (
+                        <li key={i} style={{ marginBottom: '4px', color: '#333' }}>
+                          <span style={{ fontWeight: 700 }}>{category}:</span>{items}
+                        </li>
+                      );
+                    }
                     return (
-                      <span key={i} style={{ padding: '4px 8px', fontSize: '10pt', color: '#333', background: resume.template === 'tech' ? '#fff' : '#f3f4f6', border: resume.template === 'tech' ? 'none' : '1px solid #e5e7eb', borderRadius: '4px' }}>{skillStr}{resume.template === 'tech' ? (i < resume.skills.length - 1 ? ', ' : '') : ''}</span>
+                      <li key={i} style={{ marginBottom: '4px', color: '#333' }}>{skillStr}</li>
                     );
                   })}
-                </div>
+                </ul>
               </div>
             )}
 
