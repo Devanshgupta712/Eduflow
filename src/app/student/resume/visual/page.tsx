@@ -43,7 +43,6 @@ export default function VisualResumeEditor() {
         if (!data.education) data.education = [];
         if (!data.projects) data.projects = [];
         if (!data.certifications) data.certifications = [];
-
         // Normalize skills to string array (AI sometimes returns categorized objects)
         let flatSkills: string[] = [];
         if (data.skills && Array.isArray(data.skills)) {
@@ -51,9 +50,13 @@ export default function VisualResumeEditor() {
             if (typeof s === 'string') {
               flatSkills.push(s);
             } else if (typeof s === 'object' && s !== null) {
-              if (s.items && Array.isArray(s.items)) flatSkills.push(...s.items);
-              else if (s.name) flatSkills.push(s.name);
-              else {
+              if (s.category && s.items && Array.isArray(s.items)) {
+                flatSkills.push(`${s.category}: ${s.items.join(', ')}`);
+              } else if (s.items && Array.isArray(s.items)) {
+                flatSkills.push(...s.items);
+              } else if (s.name) {
+                flatSkills.push(s.name);
+              } else {
                 Object.values(s).forEach((val: any) => {
                   if (typeof val === 'string') flatSkills.push(val);
                   else if (Array.isArray(val)) flatSkills.push(...val);
