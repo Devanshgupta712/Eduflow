@@ -229,8 +229,52 @@ export default function AstraAvatar() {
         }
     }, [status, pendingNavigationPath, router]);
 
+    // --- Client-side Route Normalizer (AI-proof) ---
+    const ROUTE_MAP: Record<string, string> = {
+        '/batches': '/admin/batches',
+        '/courses': '/admin/courses',
+        '/students': '/admin/students',
+        '/registrations': '/admin/registrations',
+        '/leaves': '/admin/leaves',
+        '/time-tracking': '/admin/time-tracking',
+        '/reports': '/admin/reports',
+        '/sessions': '/admin/sessions',
+        '/feedback': '/admin/feedback',
+        '/suggestions': '/admin/suggestions',
+        '/users': '/admin/users',
+        '/settings': '/admin/settings',
+        '/attendance': '/training/attendance',
+        '/tasks': '/training/tasks',
+        '/assignments': '/training/assignments',
+        '/videos': '/training/videos',
+        '/violations': '/training/violations',
+        '/projects': '/training/projects',
+        '/leads': '/marketing/leads',
+        '/campaigns': '/marketing/campaigns',
+        '/jobs': '/placement/jobs',
+        '/assessments': '/placement/assessments',
+        '/mock-interviews': '/placement/mock-interviews',
+        '/practice': '/placement/practice',
+        '/profile': '/student/profile',
+        '/resume': '/student/resume',
+        '/notifications': '/student/notifications',
+    };
+
+    const normalizeNavPath = (raw: string): string => {
+        const trimmed = raw.trim().toLowerCase();
+        // Already a full known path — return as-is
+        if (trimmed.startsWith('/admin/') || trimmed.startsWith('/training/') ||
+            trimmed.startsWith('/marketing/') || trimmed.startsWith('/placement/') ||
+            trimmed.startsWith('/student/') || trimmed === '/dashboard') {
+            return trimmed;
+        }
+        // Correct short/wrong paths using map
+        return ROUTE_MAP[trimmed] || trimmed;
+    };
+
     // --- Walk + Cursor Click Animation ---
-    const walkAndClick = (navPath: string) => {
+    const walkAndClick = (rawNavPath: string) => {
+        const navPath = normalizeNavPath(rawNavPath);
         // Find the link using multiple selector strategies
         let linkEl: HTMLElement | null = 
             document.querySelector(`a[href="${navPath}"]`) ||
