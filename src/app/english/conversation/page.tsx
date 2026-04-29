@@ -24,9 +24,46 @@ export default function ConversationPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [streaming, setStreaming] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const recognitionRef = useRef<any>(null);
 
     useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+    const startRecording = () => {
+        setIsRecording(true);
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-IN';
+
+            recognition.onresult = (event: any) => {
+                let final = '';
+                for (let i = 0; i < event.results.length; i++) {
+                    final += event.results[i][0].transcript + ' ';
+                }
+                setInput(final.trim());
+            };
+
+            recognition.onerror = () => setIsRecording(false);
+            recognition.onend = () => setIsRecording(false);
+
+            recognition.start();
+            recognitionRef.current = recognition;
+        } else {
+            alert("Speech recognition is not supported in this browser.");
+            setIsRecording(false);
+        }
+    };
+
+    const stopRecording = () => {
+        setIsRecording(false);
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
+        }
+    };
 
     const sendMessage = async () => {
         if (!input.trim() || streaming) return;
@@ -132,8 +169,8 @@ export default function ConversationPage() {
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>{currentMode.icon}</div>
                         <p style={{ fontWeight: 600, fontSize: '16px', marginBottom: '8px' }}>Start the conversation!</p>
                         <p style={{ fontSize: '13px' }}>
-                            {mode === 'CASUAL' ? 'Say hi, talk about your day, or ask about hobbies!' :
-                             mode === 'INTERVIEW' ? 'Type "Let\'s start the interview" to begin!' :
+                            {mode === 'CASUAL' ? 'Say hi, talk about your day, or ask about hobbies using your microphone!' :
+                             mode === 'INTERVIEW' ? 'Say "Let\'s start the interview" to begin!' :
                              mode === 'DEBATE' ? 'Share your opinion on any topic and I\'ll debate you!' :
                              mode === 'STORY' ? 'Start a story with "Once upon a time..." or any opening!' :
                              'Describe a situation like "I\'m at a restaurant" to begin!'}
@@ -157,18 +194,31 @@ export default function ConversationPage() {
             </div>
 
             {/* Input */}
-            <div style={{ display: 'flex', gap: '12px', flexShrink: 0 }}>
-                <input
-                    value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                    placeholder="Type your message in English..."
-                    className="form-input"
-                    style={{ flex: 1, padding: '14px 18px', borderRadius: '14px', fontSize: '15px' }}
-                    disabled={streaming}
-                />
+            <div style={{ display: 'flex', gap: '12px', flexShrink: 0, alignItems: 'center' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                    <input
+                        value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
+                        placeholder={isRecording ? "Listening... Speak now" : "Tap microphone to speak..."}
+                        className="form-input"
+                        style={{ width: '100%', padding: '14px 18px', borderRadius: '14px', fontSize: '15px', background: isRecording ? 'var(--danger-glow)' : 'var(--bg-secondary)', color: isRecording ? 'var(--danger)' : 'var(--text-primary)' }}
+                        disabled={streaming || isRecording}
+                    />
+                    {isRecording && <div style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />}
+                </div>
+                <button 
+                    className={`btn ${isRecording ? 'btn-danger' : 'btn-primary'}`} 
+                    onClick={isRecording ? stopRecording : startRecording} 
+                    disabled={streaming} 
+                    style={{ borderRadius: '14px', padding: '14px', width: '52px', height: '52px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}
+                    title={isRecording ? "Stop Recording" : "Start Speaking"}
+                >
+                    {isRecording ? '⏹️' : '🎙️'}
+                </button>
                 <button className="btn btn-primary" onClick={sendMessage} disabled={streaming || !input.trim()} style={{ borderRadius: '14px', padding: '14px 24px' }}>
                     {streaming ? '...' : '➤'}
                 </button>
             </div>
+            <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
         </div>
     );
 }

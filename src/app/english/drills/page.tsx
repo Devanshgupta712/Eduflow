@@ -24,8 +24,10 @@ export default function DrillsPage() {
     const [feedback, setFeedback] = useState<any>(null);
     const [evaluating, setEvaluating] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
     const timerRef = useRef<any>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const recognitionRef = useRef<any>(null);
+    const transcriptRef = useRef('');
 
     const loadDrill = async (type: DrillType) => {
         setDrillType(type);
@@ -46,16 +48,55 @@ export default function DrillsPage() {
     const startTimer = () => {
         setIsActive(true);
         setTimer(0);
-        textareaRef.current?.focus();
+        setResponse('');
+        transcriptRef.current = '';
+        setIsRecording(true);
+        
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-IN';
+
+            recognition.onresult = (event: any) => {
+                let final = '';
+                for (let i = 0; i < event.results.length; i++) {
+                    final += event.results[i][0].transcript + ' ';
+                }
+                transcriptRef.current = final.trim();
+                setResponse(final.trim());
+            };
+
+            recognition.onerror = () => { };
+            recognition.onend = () => {
+                if (timerRef.current && isActive) recognition.start();
+            };
+
+            recognition.start();
+            recognitionRef.current = recognition;
+        } else {
+            alert("Speech recognition is not supported in this browser.");
+        }
+
         timerRef.current = setInterval(() => {
             setTimer(prev => {
-                if (prev + 1 >= maxTime) { clearInterval(timerRef.current); setIsActive(false); return maxTime; }
+                if (prev + 1 >= maxTime) { stopTimer(); return maxTime; }
                 return prev + 1;
             });
         }, 1000);
     };
 
-    const stopTimer = () => { clearInterval(timerRef.current); setIsActive(false); };
+    const stopTimer = () => {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+        setIsActive(false);
+        setIsRecording(false);
+        if (recognitionRef.current) {
+            recognitionRef.current.onend = null;
+            recognitionRef.current.stop();
+        }
+    };
 
     const submitDrill = async () => {
         if (!response.trim()) return;
@@ -176,20 +217,25 @@ export default function DrillsPage() {
                 {!isActive && timer === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px' }}>
                         <button className="btn btn-primary btn-lg" onClick={startTimer} style={{ borderRadius: '99px', padding: '16px 40px', fontSize: '16px' }}>
-                            ⏱️ Start Timer & Type
+                            🎙️ Start Timer & Speak
                         </button>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '12px' }}>You have {maxTime} seconds. Think in English — don't translate!</p>
                     </div>
                 ) : (
                     <>
-                        <textarea ref={textareaRef} value={response} onChange={e => setResponse(e.target.value)}
-                            placeholder="Type your response here in English... Think fast, don't translate!"
-                            style={{ width: '100%', minHeight: '160px', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', fontSize: '15px', lineHeight: 1.7, resize: 'vertical', fontFamily: 'inherit' }}
-                            disabled={timer >= maxTime}
-                        />
+                        <div style={{ width: '100%', minHeight: '160px', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', fontSize: '15px', lineHeight: 1.7, color: response ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                            {response || (isRecording ? 'Listening... Speak now.' : 'Transcription will appear here.')}
+                        </div>
+                        {isRecording && (
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px' }}>
+                                {[...Array(5)].map((_, i) => (
+                                    <div key={i} style={{ width: '4px', height: '20px', background: '#ef4444', borderRadius: '99px', animation: `pulse ${0.5 + i * 0.15}s infinite alternate` }} />
+                                ))}
+                            </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', alignItems: 'center' }}>
                             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{response.split(/\s+/).filter(Boolean).length} words</span>
-                            {isActive && <button className="btn btn-secondary btn-sm" onClick={stopTimer}>⏸️ Pause</button>}
+                            {isActive && <button className="btn btn-danger btn-sm" onClick={stopTimer}>⏹️ Stop Early</button>}
                         </div>
                     </>
                 )}
@@ -203,6 +249,7 @@ export default function DrillsPage() {
                     </button>
                 </div>
             )}
+            <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scaleY(1)} 50%{opacity:0.5;transform:scaleY(0.5)} }`}</style>
         </div>
     );
 }
