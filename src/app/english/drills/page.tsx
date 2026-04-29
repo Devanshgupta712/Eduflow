@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { apiGet, apiFetch } from '@/lib/api';
+import { useState, useRef, useEffect } from 'react';
+import { apiGet, apiFetch, getToken, API_BASE } from '@/lib/api';
 import Link from 'next/link';
 
 type DrillType = 'PICTURE_DESCRIPTION' | 'STORY_CONTINUATION' | 'OPINION_BUILDER' | 'WORD_ASSOCIATION' | 'RAPID_FIRE';
