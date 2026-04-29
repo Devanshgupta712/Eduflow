@@ -44,13 +44,15 @@ function ExpressiveBot({ status, isMoving, enableRoaming }: { status: string, is
 
         let targetAction: THREE.AnimationAction | null = null;
 
-        if (status === 'waving' || status === 'listening') {
+        if (status === 'clicking') {
+            targetAction = findAnim('punch', 'thumbsup', 'yes');
+        } else if (status === 'waving' || status === 'listening') {
             targetAction = findAnim('wave', 'thumbsup', 'yes');
         } else if (status === 'speaking') {
             targetAction = findAnim('talk', 'idle', 'yes');
         } else if (status === 'thinking') {
             targetAction = findAnim('idle', 'stand');
-        } else if (enableRoaming && isMoving) {
+        } else if ((enableRoaming && isMoving) || status === 'walking_to_click') {
             targetAction = findAnim('walk', 'walking', 'run', 'running');
         } else {
             // Idle: just stand still
@@ -131,6 +133,7 @@ export default function AstraAvatar() {
     const [isHidden, setIsHidden] = useState(false);
     const [inputLanguage, setInputLanguage] = useState('en-IN');
     const [showChatBubble, setShowChatBubble] = useState(false);
+    const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(null);
     
     const containerRef = useRef<HTMLDivElement>(null);
     const posRef = useRef({ x: typeof window !== 'undefined' ? window.innerWidth - 320 : 800, y: typeof window !== 'undefined' ? window.innerHeight - 420 : 400 });
@@ -178,20 +181,30 @@ export default function AstraAvatar() {
         let animationFrameId: number;
         let lastMoveTime = 0;
         const updatePos = (time: number) => {
-            if (enableRoaming && status === 'idle' && !isDragging.current) {
+            if ((enableRoaming && status === 'idle' && !isDragging.current) || status === 'walking_to_click') {
                 const dx = targetRef.current.x - posRef.current.x;
                 const dy = targetRef.current.y - posRef.current.y;
                 const distance = Math.sqrt(dx*dx + dy*dy);
-                if (distance < 50 || time - lastMoveTime > 8000) {
-                    targetRef.current = { x: Math.random() * (window.innerWidth - 350) + 50, y: Math.random() * (window.innerHeight - 500) + 50 };
-                    lastMoveTime = time;
+                
+                if (enableRoaming && status === 'idle') {
+                    if (distance < 50 || time - lastMoveTime > 8000) {
+                        targetRef.current = { x: Math.random() * (window.innerWidth - 350) + 50, y: Math.random() * (window.innerHeight - 500) + 50 };
+                        lastMoveTime = time;
+                    }
                 }
+
                 if (distance > 10) {
                     setIsMoving(true);
-                    posRef.current.x += dx * 0.012;
-                    posRef.current.y += dy * 0.012;
+                    const speed = status === 'walking_to_click' ? 0.05 : 0.012;
+                    posRef.current.x += dx * speed;
+                    posRef.current.y += dy * speed;
                     if (containerRef.current) containerRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
-                } else { setIsMoving(false); }
+                } else { 
+                    setIsMoving(false); 
+                    if (status === 'walking_to_click') {
+                        setStatus('clicking');
+                    }
+                }
             } else if (!isDragging.current) {
                 setIsMoving(false);
             }
@@ -200,6 +213,19 @@ export default function AstraAvatar() {
         animationFrameId = requestAnimationFrame(updatePos);
         return () => cancelAnimationFrame(animationFrameId);
     }, [enableRoaming, status]);
+
+    useEffect(() => {
+        if (status === 'clicking') {
+            const timer = setTimeout(() => {
+                if (pendingNavigationPath) {
+                    router.push(pendingNavigationPath);
+                    setPendingNavigationPath(null);
+                }
+                setStatus('idle');
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [status, pendingNavigationPath, router]);
 
     const handleAstraClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -283,23 +309,35 @@ export default function AstraAvatar() {
                     
                     // Parse Navigation Command
                     const navMatch = finalReply.match(/\[NAVIGATE:\s*([^\]]+)\]/i);
+                    let isNavigating = false;
                     if (navMatch) {
                         const navPath = navMatch[1].trim();
                         finalReply = finalReply.replace(/\[NAVIGATE:\s*([^\]]+)\]/gi, '').trim();
-                        router.push(navPath);
+                        isNavigating = true;
+                        
+                        const linkEl = document.querySelector(`a[href="${navPath}"]`) as HTMLElement;
+                        if (linkEl) {
+                            const rect = linkEl.getBoundingClientRect();
+                            targetRef.current = { x: Math.max(0, rect.left - 80), y: Math.max(0, rect.top - 80) };
+                            setPendingNavigationPath(navPath);
+                            setStatus('walking_to_click');
+                        } else {
+                            router.push(navPath);
+                        }
                     }
 
                     setResponseText(finalReply);
                     setShowChatBubble(true);
-                    setStatus('waving');
+                    if (!isNavigating) setStatus('waving');
+                    
                     setTimeout(() => {
-                        setStatus('speaking');
+                        if (!isNavigating) setStatus('speaking');
                         const utterance = new SpeechSynthesisUtterance(finalReply);
                         utterance.lang = inputLanguage; // Ensure TTS engine uses the right accent
                         const voice = voices.find(v => v.name === selectedVoice);
                         if (voice) utterance.voice = voice;
                         utterance.volume = volume;
-                        utterance.onend = () => setStatus('idle');
+                        utterance.onend = () => { if (!isNavigating) setStatus('idle'); };
                         window.speechSynthesis.speak(utterance);
                     }, 800);
                 } catch (e) { setStatus('idle'); }
