@@ -325,6 +325,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     return response
 
 from app.routers import auth, admin, marketing, training, placement, sessions, resume
+from app.routers import english as english_router
 
 # Register routers
 app.include_router(auth.router)
@@ -335,6 +336,7 @@ app.include_router(placement.router)
 app.include_router(ai.router)
 app.include_router(sessions.router)
 app.include_router(resume.router)
+app.include_router(english_router.router)
 
 if __name__ == "__main__":
     import uvicorn

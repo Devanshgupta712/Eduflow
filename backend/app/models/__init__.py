@@ -11,6 +11,10 @@ from app.models.notification import Notification, Message, Video, Feedback, Sugg
 from app.models.setting import SystemSetting
 from app.models.session import Session, StudentFeedback
 from app.models.resume import Resume
+from app.models.english import (
+    EnglishUserProgress, EnglishPracticeSession, EnglishConversation,
+    EnglishRoleplay, EnglishBadge, EnglishChallenge, EnglishChallengeSubmission
+)
 
 __all__ = [
     "User",
@@ -23,6 +27,8 @@ __all__ = [
     "Notification", "Message", "Video", "Feedback", "Suggestion",
     "SystemSetting",
     "Resume",
+    "EnglishUserProgress", "EnglishPracticeSession", "EnglishConversation",
+    "EnglishRoleplay", "EnglishBadge", "EnglishChallenge", "EnglishChallengeSubmission",
 ]
 
 

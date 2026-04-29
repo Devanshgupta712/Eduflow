@@ -110,6 +110,18 @@ const navSections: NavSection[] = [
         ],
     },
     {
+        title: 'English Fluency',
+        roles: ['SUPER_ADMIN', 'ADMIN', 'TRAINER', 'STUDENT'],
+        items: [
+            { label: 'Dashboard', href: '/english', icon: '🗣️' },
+            { label: 'Speaking Practice', href: '/english/practice', icon: '🎙️' },
+            { label: 'AI Conversation', href: '/english/conversation', icon: '🤖' },
+            { label: 'Roleplay', href: '/english/roleplay', icon: '🎭' },
+            { label: 'Think Drills', href: '/english/drills', icon: '🧠' },
+            { label: 'Leaderboard', href: '/english/leaderboard', icon: '🏆' },
+        ],
+    },
+    {
         title: 'System',
         roles: ['SUPER_ADMIN', 'ADMIN'],
         items: [
