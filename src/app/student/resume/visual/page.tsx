@@ -543,7 +543,7 @@ export default function VisualResumeEditor() {
                 </h2>
                 <ul style={{ margin: '0', paddingLeft: '20px', fontSize: '10.5pt' }}>
                   {(() => {
-                    const categorized: JSX.Element[] = [];
+                    const categorized: any[] = [];
                     const uncategorized: string[] = [];
                     
                     resume.skills.forEach((skill: any, i: number) => {
