@@ -142,6 +142,7 @@ export default function AstraAvatar() {
     const isDragging = useRef(false);
     const dragOffset = useRef({ x: 0, y: 0 });
     const recognitionRef = useRef<any>(null);
+    const walkAndClickRef = useRef<(path: string) => void>(() => {});
 
     // --- Global Drag Logic ---
     useEffect(() => {
@@ -234,13 +235,12 @@ export default function AstraAvatar() {
         let linkEl: HTMLElement | null = 
             document.querySelector(`a[href="${navPath}"]`) ||
             document.querySelector(`a[href$="${navPath}"]`) ||
-            document.querySelector(`[data-href="${navPath}"]`);
+            null;
 
-        // Fallback: search by text content matching last segment
+        // Fallback: full querySelectorAll scan
         if (!linkEl) {
-            const slug = navPath.split('/').pop() || '';
             document.querySelectorAll('a').forEach((a) => {
-                if (!linkEl && a.href.includes(navPath)) linkEl = a as HTMLElement;
+                if (!linkEl && (a as HTMLAnchorElement).href.includes(navPath)) linkEl = a as HTMLElement;
             });
         }
 
@@ -257,29 +257,25 @@ export default function AstraAvatar() {
             setStatus('walking_to_click');
             setPendingNavigationPath(navPath);
 
-            // Animate floating cursor hand to link
+            // Animate floating cursor hand starting at Astra's position
             setCursorPos({ x: posRef.current.x + 140, y: posRef.current.y + 100, visible: true, clicking: false });
             
-            // Step 1: show cursor at Astra's position
             setTimeout(() => {
-                // Step 2: glide cursor to target link using CSS transition
                 setCursorPos({ x: targetX - 16, y: targetY - 16, visible: true, clicking: false });
             }, 100);
 
-            // Step 3: pulse-click animation on the link
             setTimeout(() => {
                 setCursorPos(prev => ({ ...prev, clicking: true }));
-                // Highlight the link briefly
-                if (linkEl) {
-                    const orig = linkEl.style.outline;
-                    linkEl.style.outline = '3px solid #10b981';
-                    linkEl.style.outlineOffset = '4px';
-                    linkEl.style.borderRadius = '8px';
-                    setTimeout(() => { if (linkEl) { linkEl.style.outline = orig; } }, 800);
+                const el = linkEl;
+                if (el) {
+                    const orig = el.style.outline;
+                    el.style.outline = '3px solid #10b981';
+                    el.style.outlineOffset = '4px';
+                    el.style.borderRadius = '8px';
+                    setTimeout(() => { if (el) { el.style.outline = orig; } }, 800);
                 }
             }, 1400);
 
-            // Step 4: navigate and hide cursor
             setTimeout(() => {
                 setCursorPos(prev => ({ ...prev, visible: false, clicking: false }));
                 router.push(navPath);
@@ -287,10 +283,12 @@ export default function AstraAvatar() {
                 setStatus('idle');
             }, 2000);
         } else {
-            // No link found on screen — just navigate directly
+            // No link found on screen — navigate directly
             router.push(navPath);
         }
     };
+    // Always keep the ref up-to-date so speech useEffect closure is never stale
+    walkAndClickRef.current = walkAndClick;
 
     const handleAstraClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -329,7 +327,34 @@ export default function AstraAvatar() {
         const pageName = ctx.page.replace(/\//g, ' > ').replace(/>/g, '›').trim() || 'Home';
 
         let rolePersonality = '';
-        let navInstruction = `CRITICAL: ONLY append exactly "[NAVIGATE: /path]" to the very end of your response IF AND ONLY IF the user EXPLICITLY asks you to "take me to", "go to", "open", or "redirect to" a specific page (e.g. "[NAVIGATE: /dashboard]"). DO NOT use this command if they are just asking a question.`;
+        let navInstruction = `CRITICAL: ONLY append exactly "[NAVIGATE: /path]" to the very end of your response IF AND ONLY IF the user EXPLICITLY asks you to "take me to", "go to", "open", or "redirect to" a specific page. DO NOT use this command if they are just asking a question. Use ONLY these exact paths:
+- Dashboard → [NAVIGATE: /dashboard]
+- Leads → [NAVIGATE: /marketing/leads]
+- Campaigns → [NAVIGATE: /marketing/campaigns]
+- Courses → [NAVIGATE: /admin/courses]
+- Batches → [NAVIGATE: /admin/batches]
+- Registrations → [NAVIGATE: /admin/registrations]
+- Students → [NAVIGATE: /admin/students]
+- Leaves (admin) → [NAVIGATE: /admin/leaves]
+- Time Tracking → [NAVIGATE: /admin/time-tracking]
+- Reports (admin) → [NAVIGATE: /admin/reports]
+- Sessions (admin) → [NAVIGATE: /admin/sessions]
+- Feedback (admin) → [NAVIGATE: /admin/feedback]
+- Attendance → [NAVIGATE: /training/attendance]
+- Tasks (trainer) → [NAVIGATE: /training/tasks]
+- Assignments → [NAVIGATE: /training/assignments]
+- Videos → [NAVIGATE: /training/videos]
+- Violations → [NAVIGATE: /training/violations]
+- My Profile → [NAVIGATE: /student/profile]
+- My Courses → [NAVIGATE: /student/courses]
+- Job Board → [NAVIGATE: /student/jobs]
+- Notifications → [NAVIGATE: /student/notifications]
+- Resume Builder → [NAVIGATE: /student/resume]
+- Jobs (placement) → [NAVIGATE: /placement/jobs]
+- Assessments → [NAVIGATE: /placement/assessments]
+- Mock Interviews → [NAVIGATE: /placement/mock-interviews]
+- Settings → [NAVIGATE: /admin/settings]
+- Users → [NAVIGATE: /admin/users]`;
 
         if (ctx.role === 'STUDENT') {
             rolePersonality = `You are talking to a student/trainee named ${firstName}. Be a friendly, encouraging tutor. Help them with assignments, courses, and career guidance. If they're on an assessment page, wish them luck. If they're on attendance, help them track it.`;
@@ -379,7 +404,7 @@ export default function AstraAvatar() {
                         const navPath = navMatch[1].trim();
                         finalReply = finalReply.replace(/\[NAVIGATE:\s*([^\]]+)\]/gi, '').trim();
                         isNavigating = true;
-                        walkAndClick(navPath);
+                        walkAndClickRef.current(navPath);
                     }
 
                     setResponseText(finalReply);
