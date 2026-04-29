@@ -134,6 +134,7 @@ export default function AstraAvatar() {
     const [inputLanguage, setInputLanguage] = useState('en-IN');
     const [showChatBubble, setShowChatBubble] = useState(false);
     const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(null);
+    const [cursorPos, setCursorPos] = useState<{ x: number; y: number; visible: boolean; clicking: boolean }>({ x: 0, y: 0, visible: false, clicking: false });
     
     const containerRef = useRef<HTMLDivElement>(null);
     const posRef = useRef({ x: typeof window !== 'undefined' ? window.innerWidth - 320 : 800, y: typeof window !== 'undefined' ? window.innerHeight - 420 : 400 });
@@ -227,6 +228,70 @@ export default function AstraAvatar() {
         }
     }, [status, pendingNavigationPath, router]);
 
+    // --- Walk + Cursor Click Animation ---
+    const walkAndClick = (navPath: string) => {
+        // Find the link using multiple selector strategies
+        let linkEl: HTMLElement | null = 
+            document.querySelector(`a[href="${navPath}"]`) ||
+            document.querySelector(`a[href$="${navPath}"]`) ||
+            document.querySelector(`[data-href="${navPath}"]`);
+
+        // Fallback: search by text content matching last segment
+        if (!linkEl) {
+            const slug = navPath.split('/').pop() || '';
+            document.querySelectorAll('a').forEach((a) => {
+                if (!linkEl && a.href.includes(navPath)) linkEl = a as HTMLElement;
+            });
+        }
+
+        if (linkEl) {
+            const rect = linkEl.getBoundingClientRect();
+            const targetX = rect.left + rect.width / 2;
+            const targetY = rect.top + rect.height / 2;
+
+            // Walk Astra's body toward the link
+            targetRef.current = { 
+                x: Math.max(0, rect.left - 160), 
+                y: Math.max(0, rect.top - 100) 
+            };
+            setStatus('walking_to_click');
+            setPendingNavigationPath(navPath);
+
+            // Animate floating cursor hand to link
+            setCursorPos({ x: posRef.current.x + 140, y: posRef.current.y + 100, visible: true, clicking: false });
+            
+            // Step 1: show cursor at Astra's position
+            setTimeout(() => {
+                // Step 2: glide cursor to target link using CSS transition
+                setCursorPos({ x: targetX - 16, y: targetY - 16, visible: true, clicking: false });
+            }, 100);
+
+            // Step 3: pulse-click animation on the link
+            setTimeout(() => {
+                setCursorPos(prev => ({ ...prev, clicking: true }));
+                // Highlight the link briefly
+                if (linkEl) {
+                    const orig = linkEl.style.outline;
+                    linkEl.style.outline = '3px solid #10b981';
+                    linkEl.style.outlineOffset = '4px';
+                    linkEl.style.borderRadius = '8px';
+                    setTimeout(() => { if (linkEl) { linkEl.style.outline = orig; } }, 800);
+                }
+            }, 1400);
+
+            // Step 4: navigate and hide cursor
+            setTimeout(() => {
+                setCursorPos(prev => ({ ...prev, visible: false, clicking: false }));
+                router.push(navPath);
+                setPendingNavigationPath(null);
+                setStatus('idle');
+            }, 2000);
+        } else {
+            // No link found on screen — just navigate directly
+            router.push(navPath);
+        }
+    };
+
     const handleAstraClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (status === 'speaking' || status === 'thinking') {
@@ -314,16 +379,7 @@ export default function AstraAvatar() {
                         const navPath = navMatch[1].trim();
                         finalReply = finalReply.replace(/\[NAVIGATE:\s*([^\]]+)\]/gi, '').trim();
                         isNavigating = true;
-                        
-                        const linkEl = document.querySelector(`a[href="${navPath}"]`) as HTMLElement;
-                        if (linkEl) {
-                            const rect = linkEl.getBoundingClientRect();
-                            targetRef.current = { x: Math.max(0, rect.left - 80), y: Math.max(0, rect.top - 80) };
-                            setPendingNavigationPath(navPath);
-                            setStatus('walking_to_click');
-                        } else {
-                            router.push(navPath);
-                        }
+                        walkAndClick(navPath);
                     }
 
                     setResponseText(finalReply);
@@ -400,6 +456,23 @@ export default function AstraAvatar() {
                         {status === 'listening' ? '👂 Listen' : status === 'thinking' ? '🧠 Think' : status === 'speaking' ? '🛑 Stop' : status === 'waving' ? '👋 Hi!' : '💬 Ask'}
                     </div>
                 </div>
+
+        {/* Floating Cursor Hand for Walk-and-Click */}
+        {cursorPos.visible && (
+            <div style={{
+                position: 'fixed',
+                left: cursorPos.x,
+                top: cursorPos.y,
+                zIndex: 99999999,
+                fontSize: '28px',
+                pointerEvents: 'none',
+                transition: 'left 1.3s cubic-bezier(0.4, 0, 0.2, 1), top 1.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: cursorPos.clicking ? 'scale(0.7)' : 'scale(1)',
+                filter: cursorPos.clicking ? 'drop-shadow(0 0 8px #10b981)' : 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))'
+            }}>
+                👆
+            </div>
+        )}
             </div>
             {showSettings && (
                 <div style={{ position: 'absolute', top: '120px', right: '20px', width: '240px', background: 'white', padding: '20px', borderRadius: '20px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: '1px solid #f1f5f9', zIndex: 100 }}>
