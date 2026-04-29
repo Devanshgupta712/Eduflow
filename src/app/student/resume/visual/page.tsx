@@ -542,23 +542,37 @@ export default function VisualResumeEditor() {
                   {resume.template === 'executive' && <span style={{ flex: 1, height: '1px', background: '#cbd5e0', marginLeft: '15px' }}></span>}
                 </h2>
                 <ul style={{ margin: '0', paddingLeft: '20px', fontSize: '10.5pt' }}>
-                  {resume.skills.map((skill: any, i: number) => {
-                    const skillStr = typeof skill === 'object' ? skill.name || JSON.stringify(skill) : skill;
-                    // If it contains a colon, bold the category part
-                    const colonIdx = skillStr.indexOf(':');
-                    if (colonIdx > -1) {
-                      const category = skillStr.substring(0, colonIdx);
-                      const items = skillStr.substring(colonIdx + 1);
-                      return (
-                        <li key={i} style={{ marginBottom: '4px', color: '#333' }}>
-                          <span style={{ fontWeight: 700 }}>{category}:</span>{items}
-                        </li>
-                      );
-                    }
+                  {(() => {
+                    const categorized: JSX.Element[] = [];
+                    const uncategorized: string[] = [];
+                    
+                    resume.skills.forEach((skill: any, i: number) => {
+                      const skillStr = typeof skill === 'object' ? skill.name || JSON.stringify(skill) : skill;
+                      const colonIdx = skillStr.indexOf(':');
+                      if (colonIdx > -1) {
+                        const category = skillStr.substring(0, colonIdx);
+                        const items = skillStr.substring(colonIdx + 1);
+                        categorized.push(
+                          <li key={i} style={{ marginBottom: '4px', color: '#333' }}>
+                            <span style={{ fontWeight: 700 }}>{category}:</span>{items}
+                          </li>
+                        );
+                      } else {
+                        uncategorized.push(skillStr);
+                      }
+                    });
+
                     return (
-                      <li key={i} style={{ marginBottom: '4px', color: '#333' }}>{skillStr}</li>
+                      <>
+                        {categorized}
+                        {uncategorized.length > 0 && (
+                          <li style={{ marginBottom: '4px', color: '#333' }}>
+                            <span style={{ fontWeight: 700 }}>Other Skills:</span> {uncategorized.join(', ')}
+                          </li>
+                        )}
+                      </>
                     );
-                  })}
+                  })()}
                 </ul>
               </div>
             )}
