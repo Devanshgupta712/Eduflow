@@ -39,11 +39,30 @@ export default function VisualResumeEditor() {
         const data = await res.json();
         // Ensure arrays and objects exist
         if (!data.personal) data.personal = {};
-        if (!data.skills) data.skills = [];
         if (!data.experience) data.experience = [];
         if (!data.education) data.education = [];
         if (!data.projects) data.projects = [];
         if (!data.certifications) data.certifications = [];
+
+        // Normalize skills to string array (AI sometimes returns categorized objects)
+        let flatSkills: string[] = [];
+        if (data.skills && Array.isArray(data.skills)) {
+          for (let s of data.skills) {
+            if (typeof s === 'string') {
+              flatSkills.push(s);
+            } else if (typeof s === 'object' && s !== null) {
+              if (s.items && Array.isArray(s.items)) flatSkills.push(...s.items);
+              else if (s.name) flatSkills.push(s.name);
+              else {
+                Object.values(s).forEach((val: any) => {
+                  if (typeof val === 'string') flatSkills.push(val);
+                  else if (Array.isArray(val)) flatSkills.push(...val);
+                });
+              }
+            }
+          }
+        }
+        data.skills = [...new Set(flatSkills)].filter(Boolean);
         setResume(data);
       } else {
         alert("Failed to load resume");
@@ -507,6 +526,28 @@ export default function VisualResumeEditor() {
                   ))}
               </div>
             )}
+            {resume.skills && resume.skills.length > 0 && (
+              <div style={{ marginBottom: '20px' }}>
+                <h2 style={{ 
+                  fontSize: '12pt', fontWeight: 700, 
+                  borderBottom: resume.template === 'minimal' ? '1px solid #eee' : (resume.template === 'executive' ? 'none' : '2px solid #000'), 
+                  paddingBottom: '4px', marginBottom: '8px', textTransform: 'uppercase', 
+                  color: resume.template === 'modern' ? '#2563eb' : (resume.template === 'executive' ? '#1a365d' : '#000'),
+                  display: 'flex', alignItems: 'center'
+                }}>
+                  Skills
+                  {resume.template === 'executive' && <span style={{ flex: 1, height: '1px', background: '#cbd5e0', marginLeft: '15px' }}></span>}
+                </h2>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {resume.skills.map((skill: any, i: number) => {
+                    const skillStr = typeof skill === 'object' ? skill.name || JSON.stringify(skill) : skill;
+                    return (
+                      <span key={i} style={{ padding: '4px 8px', fontSize: '10pt', color: '#333', background: resume.template === 'tech' ? '#fff' : '#f3f4f6', border: resume.template === 'tech' ? 'none' : '1px solid #e5e7eb', borderRadius: '4px' }}>{skillStr}{resume.template === 'tech' ? (i < resume.skills.length - 1 ? ', ' : '') : ''}</span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {resume.projects && resume.projects.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
@@ -530,29 +571,6 @@ export default function VisualResumeEditor() {
                       <p style={{ margin: 0, fontSize: '10.5pt' }}>{proj.description}</p>
                     </div>
                   ))}
-              </div>
-            )}
-            
-            {resume.skills && resume.skills.length > 0 && (
-              <div style={{ marginBottom: '20px' }}>
-                <h2 style={{ 
-                  fontSize: '12pt', fontWeight: 700, 
-                  borderBottom: resume.template === 'minimal' ? '1px solid #eee' : (resume.template === 'executive' ? 'none' : '2px solid #000'), 
-                  paddingBottom: '4px', marginBottom: '8px', textTransform: 'uppercase', 
-                  color: resume.template === 'modern' ? '#2563eb' : (resume.template === 'executive' ? '#1a365d' : '#000'),
-                  display: 'flex', alignItems: 'center'
-                }}>
-                  Skills
-                  {resume.template === 'executive' && <span style={{ flex: 1, height: '1px', background: '#cbd5e0', marginLeft: '15px' }}></span>}
-                </h2>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {resume.skills.map((skill: any, i: number) => {
-                    const skillStr = typeof skill === 'object' ? skill.name || JSON.stringify(skill) : skill;
-                    return (
-                      <span key={i} style={{ padding: '4px 8px', fontSize: '10pt', color: '#333', background: resume.template === 'tech' ? '#fff' : '#f3f4f6', border: resume.template === 'tech' ? 'none' : '1px solid #e5e7eb', borderRadius: '4px' }}>{skillStr}{resume.template === 'tech' ? (i < resume.skills.length - 1 ? ', ' : '') : ''}</span>
-                    );
-                  })}
-                </div>
               </div>
             )}
 
