@@ -20,6 +20,7 @@ export default function SpeakingPracticePage() {
     const recognitionRef = useRef<any>(null);
     const timerRef = useRef<any>(null);
     const transcriptRef = useRef('');
+    const promptShownAtRef = useRef<number>(0);
 
     const exercises = [
         { type: 'READ_ALOUD' as ExerciseType, icon: '📖', title: 'Read Aloud', desc: 'Read a passage clearly and fluently', xp: '10 XP', color: '#3b82f6' },
@@ -34,7 +35,8 @@ export default function SpeakingPracticePage() {
             const data = await apiGet(`/api/english/practice/content?exercise_type=${type}`);
             setContent(data.content);
             setStep('practice');
-        } catch { setContent(null); setStep('practice'); }
+            promptShownAtRef.current = Date.now();
+        } catch { setContent(null); setStep('practice'); promptShownAtRef.current = Date.now(); }
         setLoading(false);
     };
 
@@ -84,6 +86,7 @@ export default function SpeakingPracticePage() {
     const submitForEvaluation = async () => {
         if (!transcriptRef.current && !transcript) return;
         setEvaluating(true);
+        const hesitation_seconds = promptShownAtRef.current > 0 ? (Date.now() - promptShownAtRef.current) / 1000 : 0;
         try {
             const res = await apiFetch('/api/english/practice/evaluate', {
                 method: 'POST',
@@ -92,6 +95,7 @@ export default function SpeakingPracticePage() {
                     exercise_type: exerciseType,
                     prompt_text: content?.text || content?.topic || content?.starter || '',
                     duration_seconds: timer,
+                    hesitation_seconds,
                 }),
             });
             const data = await res.json();

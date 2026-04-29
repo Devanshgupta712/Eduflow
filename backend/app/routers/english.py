@@ -38,6 +38,7 @@ class EvaluateRequest(BaseModel):
     exercise_type: str
     prompt_text: Optional[str] = ""
     duration_seconds: Optional[int] = 60
+    hesitation_seconds: Optional[float] = 0.0
 
 class ConversationRequest(BaseModel):
     message: str
@@ -58,6 +59,7 @@ class DrillSubmitRequest(BaseModel):
     prompt_text: str
     response_text: str
     duration_seconds: Optional[int] = 60
+    hesitation_seconds: Optional[float] = 0.0
 
 class StreakCheckinRequest(BaseModel):
     practice_minutes: Optional[int] = 5
@@ -66,6 +68,9 @@ class StreakCheckinRequest(BaseModel):
 class ChallengeSubmitRequest(BaseModel):
     challenge_id: str
     submission_text: str
+
+class HesitationTrackRequest(BaseModel):
+    hesitation_seconds: float
 
 
 # ──── Helper: Call Groq API ────
@@ -212,6 +217,7 @@ async def get_progress(user: User = Depends(get_current_user), db: AsyncSession 
             "avg_grammar_accuracy": round(progress.avg_grammar_accuracy, 1),
             "avg_vocabulary_score": round(progress.avg_vocabulary_score, 1),
             "confidence_score": round(progress.confidence_score, 1),
+            "avg_hesitation_time": round(progress.avg_hesitation_time, 1),
             "total_sessions": progress.total_sessions,
         },
         "recent_sessions": [
@@ -290,6 +296,7 @@ Transcript:
     fillers = feedback.get("filler_count", 0)
     grammar = feedback.get("grammar_accuracy", 70) if "grammar_accuracy" in feedback else (len(feedback.get("grammar_errors", [])) == 0) * 100
     vocab = feedback.get("vocabulary_score", 5)
+    confidence = feedback.get("confidence_score", 5)
 
     # XP based on exercise type
     xp_map = {"READ_ALOUD": 10, "ONE_MINUTE_TALK": 20, "TONGUE_TWISTER": 5, "SHADOWING": 15, "RAPID_FIRE": 15, "PICTURE_DESCRIPTION": 20, "STORY_CONTINUATION": 25, "OPINION_BUILDER": 20, "WORD_ASSOCIATION": 10}
@@ -304,6 +311,7 @@ Transcript:
         wpm=wpm, filler_count=fillers, grammar_accuracy=grammar,
         vocabulary_score=vocab, fluency_score=fluency,
         ai_feedback=json.dumps(feedback), duration_seconds=body.duration_seconds,
+        hesitation_time_seconds=body.hesitation_seconds,
         xp_earned=xp
     )
     db.add(session)
@@ -315,7 +323,8 @@ Transcript:
     progress.avg_filler_count = (progress.avg_filler_count * n + fillers) / (n + 1)
     progress.avg_grammar_accuracy = (progress.avg_grammar_accuracy * n + grammar) / (n + 1)
     progress.avg_vocabulary_score = (progress.avg_vocabulary_score * n + vocab) / (n + 1)
-    progress.confidence_score = (progress.avg_grammar_accuracy / 10 + progress.avg_vocabulary_score + (progress.avg_wpm / 20)) / 3
+    progress.confidence_score = (progress.confidence_score * n + confidence) / (n + 1)
+    progress.avg_hesitation_time = (progress.avg_hesitation_time * n + body.hesitation_seconds) / (n + 1)
     progress.total_sessions += 1
     progress.total_practice_minutes += max(body.duration_seconds // 60, 1)
     progress.xp_total += xp
@@ -484,20 +493,24 @@ async def evaluate_drill(body: DrillSubmitRequest, user: User = Depends(get_curr
         try:
             feedback = json.loads(ai_response[start:end])
         except:
-            feedback = {"overall_score": 5, "tip": "Keep practicing!"}
+            feedback = {"overall_score": 5, "confidence_score": 5, "tip": "Keep practicing!"}
 
     score = feedback.get("overall_score", 5)
+    confidence = feedback.get("confidence_score", 5)
     xp = int(score * 3)
 
     session = EnglishPracticeSession(
         id=str(uuid.uuid4()), user_id=user.id, exercise_type=body.drill_type,
         prompt_text=body.prompt_text, transcript=body.response_text,
         fluency_score=score, ai_feedback=json.dumps(feedback),
-        duration_seconds=body.duration_seconds, xp_earned=xp
+        duration_seconds=body.duration_seconds, hesitation_time_seconds=body.hesitation_seconds, xp_earned=xp
     )
     db.add(session)
 
     progress = await get_or_create_progress(user.id, db)
+    n = progress.total_sessions
+    progress.confidence_score = (progress.confidence_score * n + confidence) / (n + 1)
+    progress.avg_hesitation_time = (progress.avg_hesitation_time * n + body.hesitation_seconds) / (n + 1)
     progress.xp_total += xp
     progress.total_sessions += 1
     progress.total_practice_minutes += max(body.duration_seconds // 60, 1)
@@ -604,3 +617,75 @@ async def get_history(limit: int = 20, user: User = Depends(get_current_user), d
         }
         for s in sessions
     ]}
+
+# ──── 12. Hesitation Tracking (for Live Call/Conversation) ────
+@router.post("/track_hesitation")
+async def track_hesitation(body: HesitationTrackRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    progress = await get_or_create_progress(user.id, db)
+    n = progress.total_sessions
+    # Treat each tracked hesitation as a mini-session for averaging
+    progress.avg_hesitation_time = (progress.avg_hesitation_time * n + body.hesitation_seconds) / (n + 1)
+    progress.total_sessions += 1
+    return {"status": "success", "avg_hesitation_time": progress.avg_hesitation_time}
+
+# ──── 13. Admin Reports ────
+@router.get("/admin/reports")
+async def get_admin_reports(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if user.role not in ["ADMIN", "SUPER_ADMIN", "TRAINER"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    result = await db.execute(
+        select(EnglishUserProgress, User.name, User.email)
+        .join(User, User.id == EnglishUserProgress.user_id)
+        .order_by(desc(EnglishUserProgress.xp_total))
+    )
+    rows = result.all()
+
+    return {"reports": [
+        {
+            "user_id": p.user_id,
+            "name": name,
+            "email": email,
+            "total_practice_minutes": p.total_practice_minutes,
+            "xp_total": p.xp_total,
+            "level": p.level,
+            "confidence_score": round(p.confidence_score, 1),
+            "avg_hesitation_time": round(p.avg_hesitation_time, 1),
+            "total_sessions": p.total_sessions,
+            "last_practice_date": p.last_practice_date
+        }
+        for (p, name, email) in rows
+    ]}
+
+# ──── 14. Weekly Progress ────
+@router.get("/progress/weekly")
+async def get_weekly_progress(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from datetime import datetime, timedelta
+    
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=7)
+    
+    result = await db.execute(
+        select(
+            func.date(EnglishPracticeSession.created_at).label("practice_date"),
+            func.sum(EnglishPracticeSession.duration_seconds).label("total_seconds"),
+            func.sum(EnglishPracticeSession.xp_earned).label("total_xp")
+        )
+        .where(EnglishPracticeSession.user_id == user.id)
+        .where(EnglishPracticeSession.created_at >= start_date)
+        .group_by(func.date(EnglishPracticeSession.created_at))
+    )
+    
+    rows = result.all()
+    weekly_data = []
+    
+    # Fill missing days
+    for i in range(6, -1, -1):
+        d = (end_date - timedelta(days=i)).strftime("%Y-%m-%d")
+        found = next((r for r in rows if str(r.practice_date) == d), None)
+        if found:
+            weekly_data.append({"date": d, "minutes": round(found.total_seconds / 60, 1), "xp": found.total_xp})
+        else:
+            weekly_data.append({"date": d, "minutes": 0, "xp": 0})
+            
+    return {"weekly_data": weekly_data}

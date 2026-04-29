@@ -19,6 +19,7 @@ export default function RoleplayPage() {
     const [isRecording, setIsRecording] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
     const recognitionRef = useRef<any>(null);
+    const hesitationStartRef = useRef<number>(0);
 
     useEffect(() => {
         apiGet('/api/english/roleplay/scenarios').then(d => setScenarios(d.scenarios || [])).catch(() => {}).finally(() => setLoading(false));
@@ -28,6 +29,7 @@ export default function RoleplayPage() {
 
     const startRecording = () => {
         setIsRecording(true);
+        hesitationStartRef.current = Date.now(); // Start tracking hesitation
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
             const recognition = new SpeechRecognition();
@@ -68,6 +70,9 @@ export default function RoleplayPage() {
 
     const sendMessage = async () => {
         if (!input.trim() || streaming || !selected) return;
+        const hesitation_seconds = hesitationStartRef.current > 0 ? (Date.now() - hesitationStartRef.current) / 1000 : 0;
+        hesitationStartRef.current = 0; // Reset
+
         const userMsg: Message = { role: 'user', content: input.trim() };
         const updated = [...messages, userMsg];
         setMessages(updated);
@@ -78,6 +83,16 @@ export default function RoleplayPage() {
 
         try {
             const token = getToken();
+            
+            // Track hesitation
+            if (token && hesitation_seconds > 0) {
+                fetch(`${API_BASE}/api/english/track_hesitation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ hesitation_seconds })
+                }).catch(() => {});
+            }
+
             const resp = await fetch(`${API_BASE}/api/english/roleplay/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },

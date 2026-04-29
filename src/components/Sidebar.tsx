@@ -53,6 +53,7 @@ const navSections: NavSection[] = [
             { label: 'Batches', href: '/admin/batches', icon: '👥', roles: ['SUPER_ADMIN', 'ADMIN', 'TRAINER'], permission: 'manage_batches' },
             { label: 'Registrations', href: '/admin/registrations', icon: '📝', roles: ['SUPER_ADMIN', 'ADMIN'], permission: 'manage_courses' },
             { label: 'Students', href: '/admin/students', icon: '🎓' },
+            { label: 'English Reports', href: '/admin/english', icon: '📊' },
             { label: 'Leaves', href: '/admin/leaves', icon: '🗓️', permission: 'manage_leaves' },
             { label: 'Time Tracking', href: '/admin/time-tracking', icon: '⏱️', roles: ['SUPER_ADMIN', 'ADMIN'] },
             { label: 'Reports', href: '/admin/reports', icon: '📈', roles: ['SUPER_ADMIN', 'ADMIN'] },

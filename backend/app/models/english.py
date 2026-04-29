@@ -56,6 +56,7 @@ class EnglishUserProgress(Base):
     avg_grammar_accuracy: Mapped[float] = mapped_column(Float, default=0.0)
     avg_vocabulary_score: Mapped[float] = mapped_column(Float, default=0.0)
     confidence_score: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_hesitation_time: Mapped[float] = mapped_column(Float, default=0.0)
     total_sessions: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -79,6 +80,7 @@ class EnglishPracticeSession(Base):
     fluency_score: Mapped[float] = mapped_column(Float, default=0.0)
     ai_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
     duration_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    hesitation_time_seconds: Mapped[float] = mapped_column(Float, default=0.0)
     xp_earned: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -98,6 +100,7 @@ class EnglishConversation(Base):
     vocabulary_score: Mapped[float] = mapped_column(Float, default=0.0)
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     duration_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    hesitation_time_seconds: Mapped[float] = mapped_column(Float, default=0.0)
     xp_earned: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -115,6 +118,7 @@ class EnglishRoleplay(Base):
     scenario_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     dialogue: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON string
     scores: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON string
+    hesitation_time_seconds: Mapped[float] = mapped_column(Float, default=0.0)
     xp_earned: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

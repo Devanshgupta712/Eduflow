@@ -13,6 +13,7 @@ export default function LiveCallPage() {
     const synthRef = useRef<SpeechSynthesis | null>(null);
     const timerRef = useRef<any>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const hesitationStartRef = useRef<number>(0);
 
     // Initialize Speech Synthesis
     useEffect(() => {
@@ -63,6 +64,8 @@ export default function LiveCallPage() {
         }
 
         setCallStatus('LISTENING');
+        hesitationStartRef.current = Date.now(); // Start tracking hesitation
+
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
         recognition.continuous = false; // Stop after a pause
@@ -99,6 +102,8 @@ export default function LiveCallPage() {
     };
 
     const handleUserSpeech = async (text: string) => {
+        const hesitation_seconds = (Date.now() - hesitationStartRef.current) / 1000;
+        
         // Stop listening
         if (recognitionRef.current) {
             recognitionRef.current.onend = null;
@@ -109,8 +114,17 @@ export default function LiveCallPage() {
         const newUserMsg = { role: 'user', content: text };
         setConversation(prev => [...prev, newUserMsg]);
 
+        // Track hesitation
+        const token = getToken();
+        if (token) {
+            fetch(`${API_BASE}/api/english/track_hesitation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ hesitation_seconds })
+            }).catch(() => {});
+        }
+
         try {
-            const token = getToken();
             const resp = await fetch(`${API_BASE}/api/english/conversation/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },

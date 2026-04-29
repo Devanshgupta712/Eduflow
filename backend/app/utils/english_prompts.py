@@ -12,10 +12,12 @@ RULES:
 4. Estimate Words Per Minute (WPM) based on word count and duration.
 5. Score grammar accuracy as a percentage (how many sentences are grammatically correct).
 6. Score vocabulary richness (variety of words used, avoiding repetition).
+7. Calculate a `confidence_score` (1-10) based on hesitation time, flow, and lack of filler words.
 
 You MUST respond in valid JSON format ONLY. No extra text. Example:
 {
     "fluency_score": 7.5,
+    "confidence_score": 8,
     "wpm": 120,
     "filler_words_found": ["um", "like"],
     "filler_count": 4,
@@ -115,6 +117,7 @@ Score their description on:
 Respond in JSON:
 {
     "overall_score": 7.5,
+    "confidence_score": 8,
     "vocabulary_score": 7,
     "grammar_score": 8,
     "detail_score": 6,
@@ -150,6 +153,7 @@ Evaluate:
 Respond in JSON:
 {
     "overall_score": 7,
+    "confidence_score": 7,
     "creativity_score": 8,
     "grammar_score": 6,
     "vocabulary_score": 7,
@@ -171,6 +175,7 @@ Evaluate:
 Respond in JSON:
 {
     "overall_score": 7,
+    "confidence_score": 8,
     "clarity_score": 8,
     "reasoning_score": 6,
     "grammar_score": 7,
@@ -318,6 +323,12 @@ ROLEPLAY_SCENARIOS = [
     },
     {
         "category": "Professional",
+        "title": "Salary Negotiation",
+        "description": "You have received a job offer but the salary is 20% lower than your expectation. Negotiate politely but firmly for a higher package.",
+        "ai_role": "You are the Hiring Manager who really wants the candidate but has a strict budget. Be tough but fair."
+    },
+    {
+        "category": "Professional",
         "title": "Team Meeting — Project Status Update",
         "description": "You are giving a status update in a team meeting. Explain what you worked on, any blockers, and what you plan to do next.",
         "ai_role": "You are the team lead who asks follow-up questions about the project status."
@@ -329,6 +340,12 @@ ROLEPLAY_SCENARIOS = [
         "ai_role": "You are the client who is concerned about the delay and wants reassurance."
     },
     {
+        "category": "Professional",
+        "title": "Resolving a Conflict with a Colleague",
+        "description": "A colleague took credit for your idea in a meeting. Confront them professionally to resolve the issue.",
+        "ai_role": "You are the colleague who didn't mean to take credit, but you are a bit defensive."
+    },
+    {
         "category": "Daily Life",
         "title": "Restaurant — Ordering Food",
         "description": "You are at a restaurant and want to order food for yourself and a friend. Ask about menu items, dietary options, and make your order.",
@@ -336,9 +353,33 @@ ROLEPLAY_SCENARIOS = [
     },
     {
         "category": "Daily Life",
+        "title": "Doctor's Appointment",
+        "description": "You are visiting a doctor for a persistent cough and fever. Describe your symptoms clearly.",
+        "ai_role": "You are the doctor. Ask relevant questions about symptoms, duration, and medical history."
+    },
+    {
+        "category": "Daily Life",
         "title": "Hotel Check-in",
         "description": "You have arrived at a hotel and need to check in. You have a reservation but want to request a room change.",
         "ai_role": "You are the hotel front desk receptionist helping with check-in."
+    },
+    {
+        "category": "Daily Life",
+        "title": "Customer Support — Defective Product",
+        "description": "You bought a laptop and it stopped working after 2 days. Call customer support to request a replacement.",
+        "ai_role": "You are the customer support agent who needs to verify the warranty and troubleshoot before offering a replacement."
+    },
+    {
+        "category": "Travel",
+        "title": "Airport Customs",
+        "description": "You are arriving in a foreign country. The customs officer asks you questions about your trip, duration, and purpose.",
+        "ai_role": "You are a serious airport customs officer asking standard security questions."
+    },
+    {
+        "category": "Travel",
+        "title": "Asking for Directions",
+        "description": "You are lost in a new city and your phone battery is dead. Ask a local for directions to the nearest train station.",
+        "ai_role": "You are a helpful but busy local trying to give clear directions."
     },
     {
         "category": "Workplace",
@@ -358,6 +399,12 @@ ROLEPLAY_SCENARIOS = [
         "description": "You are at a tech networking event. Introduce yourself to someone new and have a professional conversation.",
         "ai_role": "You are another professional at the networking event. Be friendly and ask engaging questions."
     },
+    {
+        "category": "Social",
+        "title": "Making Plans for the Weekend",
+        "description": "Call your friend to make plans for the upcoming long weekend. Suggest an activity and decide on a time.",
+        "ai_role": "You are the friend. You are busy on Saturday but free on Sunday."
+    }
 ]
 
 # ──── Word Association Words ────

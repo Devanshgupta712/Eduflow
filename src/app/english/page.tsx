@@ -11,28 +11,30 @@ const LEVEL_CONFIG: Record<string, { color: string; label: string; minXP: number
     FLUENT: { color: '#10b981', label: 'Fluent', minXP: 1500, maxXP: 3000 },
 };
 
-export default function EnglishDashboard() {
+export default function EnglishDashboardPage() {
     const [progress, setProgress] = useState<any>(null);
     const [recentSessions, setRecentSessions] = useState<any[]>([]);
     const [badges, setBadges] = useState<any[]>([]);
+    const [weeklyData, setWeeklyData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        apiGet('/api/english/progress')
-            .then((data) => {
-                setProgress(data.progress);
-                setRecentSessions(data.recent_sessions || []);
-                setBadges(data.badges || []);
-            })
-            .catch(() => {
-                setProgress({
-                    total_practice_minutes: 0, current_streak: 0, longest_streak: 0,
-                    xp_total: 0, level: 'BEGINNER', avg_wpm: 0, avg_filler_count: 0,
-                    avg_grammar_accuracy: 0, avg_vocabulary_score: 0, confidence_score: 0,
-                    total_sessions: 0,
-                });
-            })
-            .finally(() => setLoading(false));
+        Promise.all([
+            apiGet('/api/english/progress'),
+            apiGet('/api/english/progress/weekly')
+        ]).then(([progData, weekData]) => {
+            setProgress(progData.progress);
+            setRecentSessions(progData.recent_sessions || []);
+            setBadges(progData.badges || []);
+            setWeeklyData(weekData.weekly_data || []);
+        }).catch(() => {
+            setProgress({
+                total_practice_minutes: 0, current_streak: 0, longest_streak: 0,
+                xp_total: 0, level: 'BEGINNER', avg_wpm: 0, avg_filler_count: 0,
+                avg_grammar_accuracy: 0, avg_vocabulary_score: 0, confidence_score: 0,
+                total_sessions: 0, avg_hesitation_time: 0,
+            });
+        }).finally(() => setLoading(false));
     }, []);
 
     if (loading) return <div className="animate-in" style={{ padding: '60px', textAlign: 'center' }}><div className="spinner" /><p>Loading your fluency data...</p></div>;
@@ -101,6 +103,38 @@ export default function EnglishDashboard() {
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{p.total_practice_minutes} min total practice</div>
                 </div>
             </div>
+
+            {/* Stats Overview */}
+            <div className="grid-4" style={{ marginBottom: '32px' }}>
+                <div className="stat-card primary"><div className="stat-icon primary">⚡</div><div className="stat-info"><h3>Speed (WPM)</h3><div className="stat-value">{progress.avg_wpm || 0}</div></div></div>
+                <div className="stat-card success"><div className="stat-icon success">🛡️</div><div className="stat-info"><h3>Confidence</h3><div className="stat-value">{progress.confidence_score || 0}/10</div></div></div>
+                <div className="stat-card accent"><div className="stat-icon accent">⏱️</div><div className="stat-info"><h3>Avg Hesitation</h3><div className="stat-value">{progress.avg_hesitation_time || 0}s</div></div></div>
+                <div className="stat-card danger"><div className="stat-icon danger">⏱️</div><div className="stat-info"><h3>Total Time</h3><div className="stat-value">{progress.total_practice_minutes || 0} min</div></div></div>
+            </div>
+
+            {/* Weekly Activity */}
+            {weeklyData.length > 0 && (
+                <div className="card" style={{ marginBottom: '32px', padding: '24px' }}>
+                    <h2 style={{ fontSize: '18px', fontWeight: 800, marginBottom: '24px' }}>📈 Weekly Activity</h2>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '160px', marginTop: '20px' }}>
+                        {weeklyData.map((day, idx) => {
+                            const maxMins = Math.max(...weeklyData.map(d => d.minutes), 10);
+                            const heightPercent = Math.max((day.minutes / maxMins) * 100, 5);
+                            return (
+                                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>{day.minutes}m</div>
+                                    <div style={{ 
+                                        width: '100%', height: `${heightPercent}%`, 
+                                        background: day.minutes > 0 ? 'var(--primary)' : 'var(--bg-tertiary)', 
+                                        borderRadius: '6px 6px 0 0', transition: 'height 0.5s ease' 
+                                    }} />
+                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* ── Fluency Scorecard ── */}
             <div className="card" style={{ marginBottom: '28px', padding: '28px' }}>

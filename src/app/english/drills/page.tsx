@@ -28,6 +28,7 @@ export default function DrillsPage() {
     const timerRef = useRef<any>(null);
     const recognitionRef = useRef<any>(null);
     const transcriptRef = useRef('');
+    const promptShownAtRef = useRef<number>(0);
 
     const loadDrill = async (type: DrillType) => {
         setDrillType(type);
@@ -41,7 +42,8 @@ export default function DrillsPage() {
             const data = await apiGet(`/api/english/drills/random?drill_type=${type}`);
             setContent(data.content);
             setStep('drill');
-        } catch { setContent({}); setStep('drill'); }
+            promptShownAtRef.current = Date.now(); // Start tracking hesitation
+        } catch { setContent({}); setStep('drill'); promptShownAtRef.current = Date.now(); }
         setLoading(false);
     };
 
@@ -102,11 +104,12 @@ export default function DrillsPage() {
         if (!response.trim()) return;
         stopTimer();
         setEvaluating(true);
+        const hesitation_seconds = promptShownAtRef.current > 0 ? (Date.now() - promptShownAtRef.current) / 1000 : 0;
         try {
             const promptText = content?.scene || content?.starter || content?.topic || content?.word || '';
             const res = await apiFetch('/api/english/drills/evaluate', {
                 method: 'POST',
-                body: JSON.stringify({ drill_type: drillType, prompt_text: promptText, response_text: response, duration_seconds: timer }),
+                body: JSON.stringify({ drill_type: drillType, prompt_text: promptText, response_text: response, duration_seconds: timer, hesitation_seconds }),
             });
             const data = await res.json();
             setFeedback(data);
