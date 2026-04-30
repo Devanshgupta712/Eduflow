@@ -1040,17 +1040,18 @@ async def list_assignments(
     
     # If Student, only show their batch assignments OR assignments mapped directly to them
     if user.role == Role.STUDENT:
+        from sqlalchemy import or_, and_
+
         # Check BatchStudent table
         batch_result = await db.execute(select(BatchStudent.batch_id).where(BatchStudent.student_id == user.id))
         batch_student_ids = set(batch_result.scalars().all())
 
-        # ALSO check Registration table (students enrolled via registration flow)
-        from app.models.registration import Registration, RegistrationStatus
+        # ALSO check Registration table — include ALL statuses (pending, confirmed, approved)
+        from app.models.registration import Registration
         reg_result = await db.execute(
             select(Registration.batch_id).where(
                 Registration.student_id == user.id,
                 Registration.batch_id != None,
-                Registration.status.in_([RegistrationStatus.CONFIRMED, RegistrationStatus.APPROVED])
             )
         )
         reg_batch_ids = set(r for r in reg_result.scalars().all() if r)
@@ -1058,11 +1059,23 @@ async def list_assignments(
         # Combine both sources
         student_batches = list(batch_student_ids | reg_batch_ids)
 
-        from sqlalchemy import or_
         if student_batches:
-            query = query.where(or_(Assignment.batch_id.in_(student_batches), Assignment.student_id == user.id))
+            # Show assignments for their batches OR assigned directly OR global (no batch, no specific student)
+            query = query.where(
+                or_(
+                    Assignment.batch_id.in_(student_batches),
+                    Assignment.student_id == user.id,
+                    and_(Assignment.batch_id == None, Assignment.student_id == None),
+                )
+            )
         else:
-            query = query.where(Assignment.student_id == user.id)
+            # Student not in any batch — show global + directly assigned
+            query = query.where(
+                or_(
+                    Assignment.student_id == user.id,
+                    and_(Assignment.batch_id == None, Assignment.student_id == None),
+                )
+            )
 
         # Hide assignments scheduled for future
         query = query.where(or_(Assignment.scheduled_at == None, Assignment.scheduled_at <= datetime.utcnow()))
