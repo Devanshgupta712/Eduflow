@@ -386,21 +386,19 @@ function StudentAssessmentsContent() {
                 </button>
 
                 {/* Batch Filter Dropdown */}
-                {studentBatches.length > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '8px 14px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🏷️ Batch:</span>
-                        <select
-                            value={selectedBatch}
-                            onChange={e => setSelectedBatch(e.target.value)}
-                            style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
-                        >
-                            <option value="ALL">All Batches</option>
-                            {studentBatches.map(b => (
-                                <option key={b.id} value={b.id}>{b.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '8px 14px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🏷️ Batch:</span>
+                    <select
+                        value={selectedBatch}
+                        onChange={e => setSelectedBatch(e.target.value)}
+                        style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                    >
+                        <option value="ALL">All Batches</option>
+                        {studentBatches.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                    </select>
+                </div>
 
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                     Showing {(() => {
