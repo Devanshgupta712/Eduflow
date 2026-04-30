@@ -55,7 +55,7 @@ class UserOut(BaseModel):
     name: str
     phone: str | None
     role: str
-    student_id: str | None
+    student_id: str | None = None
     avatar: str | None = None
     dob: str | None = None
     education_status: str | None = None
@@ -141,7 +141,7 @@ class StudentOut(BaseModel):
     name: str
     email: str
     phone: str | None
-    student_id: str | None
+    student_id: str | None = None
     role: str
     can_build_resume: bool = False
     is_active: bool

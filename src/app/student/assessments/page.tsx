@@ -11,6 +11,7 @@ import PreflightChecklist from '@/components/PreflightChecklist';
 function StudentAssessmentsContent() {
     const [assignments, setAssignments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [activeSubmission, setActiveSubmission] = useState<any>(null);
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -168,18 +169,25 @@ function StudentAssessmentsContent() {
 
     const loadAssignments = async () => {
         try {
+            setError(null);
+            console.log("DEBUG: Fetching assignments...");
             const data = await apiGet('/api/training/assignments');
+            console.log("DEBUG: Received assignments:", data);
             setAssignments(data);
-            // Extract unique batches from returned assignments for the filter dropdown
+            
+            // Build unique batch list for filter
             const batchMap = new Map<string, string>();
-            data.forEach((a: any) => {
-                if (a.batch_id && a.batch_name) {
-                    batchMap.set(a.batch_id, a.batch_name);
-                }
-            });
+            if (Array.isArray(data)) {
+                data.forEach((a: any) => {
+                    if (a.batch_id && a.batch_name) {
+                        batchMap.set(a.batch_id, a.batch_name);
+                    }
+                });
+            }
             setStudentBatches(Array.from(batchMap.entries()).map(([id, name]) => ({ id, name })));
-        } catch (error) {
-            console.error(error);
+        } catch (err: any) {
+            console.error("Assignment Load Error:", err);
+            setError(err.message || "Failed to load assignments");
         } finally {
             setLoading(false);
         }
