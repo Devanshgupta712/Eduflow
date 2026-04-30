@@ -265,7 +265,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         name=body.name,
         phone=body.phone,
         role=body.role,
-        student_id=student_id,
+        # student_id=student_id,
     )
 
     db.add(user)
