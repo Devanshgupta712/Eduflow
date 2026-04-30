@@ -41,7 +41,10 @@ class User(Base):
     phone: Mapped[str | None] = mapped_column(String, nullable=True)
     role: Mapped[Role] = mapped_column(Enum(Role), default=Role.STUDENT)
     avatar: Mapped[str | None] = mapped_column(String, nullable=True)
-    student_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
+    # student_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
+    @property
+    def student_id(self):
+        return None
     dob: Mapped[str | None] = mapped_column(String, nullable=True)
     education_status: Mapped[str | None] = mapped_column(String, nullable=True) # e.g. Studying, Passout
     highest_education: Mapped[str | None] = mapped_column(String, nullable=True)

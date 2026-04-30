@@ -1156,13 +1156,13 @@ async def list_assignments(
             "batch_name": batch.name if batch else None,
             "total_marks": a.total_marks,
             "assigned_by": trainer.name if trainer else None,
-            "due_date": a.due_date.isoformat() if a.due_date else None,
-            "scheduled_at": a.scheduled_at.isoformat() if a.scheduled_at else None,
+            "due_date": a.due_date.isoformat() + "Z" if a.due_date else None,
+            "scheduled_at": a.scheduled_at.isoformat() + "Z" if a.scheduled_at else None,
             "time_limit": a.time_limit or 0,
             "is_randomized": a.is_randomized,
             "structured_content": a.structured_content,
             "submission_count": sub_count.scalar() or 0,
-            "created_at": a.created_at.isoformat() if a.created_at else None,
+            "created_at": a.created_at.isoformat() + "Z" if a.created_at else None,
             "my_submission": student_sub,
             "status": current_status
         })

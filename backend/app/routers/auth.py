@@ -565,7 +565,7 @@ async def get_my_notifications(
         {
             "id": n.id, "title": n.title, "message": n.message,
             "read": n.read, "type": n.type, "reference_id": n.reference_id,
-            "created_at": n.created_at.isoformat() if n.created_at else None,
+            "created_at": n.created_at.isoformat() + "Z" if n.created_at else None,
         }
         for n in notifs
     ]
