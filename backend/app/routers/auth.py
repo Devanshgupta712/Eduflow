@@ -720,7 +720,7 @@ async def scan_attendance_qr(
             "date": today.isoformat(),
             "user_name": user.name,
             "role": role_val,
-            "student_id": user.student_id or user.id,
+            "user_id": user.id,
             "session_number": session_number
         }
     else:
@@ -744,7 +744,7 @@ async def scan_attendance_qr(
             "date": today.isoformat(),
             "user_name": user.name,
             "role": role_val,
-            "student_id": user.student_id or user.id,
+            "user_id": user.id,
             "session_number": session_number
         }
         
