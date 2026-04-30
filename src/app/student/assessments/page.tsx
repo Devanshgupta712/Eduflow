@@ -454,8 +454,8 @@ function StudentAssessmentsContent() {
                                         </div>
                                     )}
                                 </div>
-                                <span className={`badge ${a.status === 'COMPLETED' ? 'badge-success' : (a.status === 'IN_PROGRESS' ? 'badge-info' : 'badge-warning')}`}>
-                                    {a.status === 'COMPLETED' ? 'Completed' : (a.status === 'IN_PROGRESS' ? 'In Progress' : 'Pending')}
+                                <span className={`badge ${a.status === 'COMPLETED' ? 'badge-success' : (a.status === 'IN_PROGRESS' ? 'badge-info' : (a.status === 'SCHEDULED' ? 'badge-warning' : 'badge-primary'))}`}>
+                                    {a.status === 'COMPLETED' ? 'Completed' : (a.status === 'IN_PROGRESS' ? 'In Progress' : (a.status === 'SCHEDULED' ? 'Scheduled' : 'Pending'))}
                                 </span>
                             </div>
                             <p className="text-muted text-sm">{a.description?.slice(0, 100)}...</p>
@@ -466,6 +466,14 @@ function StudentAssessmentsContent() {
                                         onClick={() => setReportData(a)}
                                     >
                                         🔍 View Assessment Report
+                                    </button>
+                                ) : a.status === 'SCHEDULED' ? (
+                                    <button
+                                        className="btn btn-ghost"
+                                        disabled
+                                        style={{ width: '100%', marginTop: 'auto', background: 'var(--bg-secondary)', border: '1px dashed var(--border)', color: 'var(--text-muted)' }}
+                                    >
+                                        🕒 Unlocks at {new Date(a.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </button>
                                 ) : (
                                     <button

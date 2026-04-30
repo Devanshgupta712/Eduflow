@@ -1077,8 +1077,9 @@ async def list_assignments(
                 )
             )
 
-        # Hide assignments scheduled for future
-        query = query.where(or_(Assignment.scheduled_at == None, Assignment.scheduled_at <= datetime.utcnow()))
+        # We no longer hide assignments scheduled for the future. 
+        # This prevents the "Notification arrived but assignment is missing" panic.
+        # The frontend will now show them but with a "Scheduled" status.
     elif user.role == Role.TRAINER:
         from sqlalchemy import or_
         batch_ids_result = await db.execute(select(Batch.id).where(Batch.trainer_id == user.id))
@@ -1137,6 +1138,12 @@ async def list_assignments(
 
         batch = await db.get(Batch, a.batch_id) if a.batch_id else None
 
+        # Check if it's scheduled for future
+        is_scheduled = False
+        if a.scheduled_at and a.scheduled_at > datetime.utcnow() and current_status == "PENDING":
+            is_scheduled = True
+            current_status = "SCHEDULED"
+
         out.append({
             "id": a.id, "title": a.title, "description": a.description,
             "type": a.type.value, "batch_id": a.batch_id,
@@ -1144,6 +1151,7 @@ async def list_assignments(
             "total_marks": a.total_marks,
             "assigned_by": trainer.name if trainer else None,
             "due_date": a.due_date.isoformat() if a.due_date else None,
+            "scheduled_at": a.scheduled_at.isoformat() if a.scheduled_at else None,
             "time_limit": a.time_limit or 0,
             "is_randomized": a.is_randomized,
             "structured_content": a.structured_content,
