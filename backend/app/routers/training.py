@@ -1058,6 +1058,12 @@ async def list_assignments(
 
         # Combine both sources
         student_batches = list(batch_student_ids | reg_batch_ids)
+        
+        # DEBUG LOGS
+        print(f"DEBUG: Student ID: {user.id}")
+        print(f"DEBUG: BatchStudent IDs: {batch_student_ids}")
+        print(f"DEBUG: Registration Batch IDs: {reg_batch_ids}")
+        print(f"DEBUG: Combined Batches: {student_batches}")
 
         if student_batches:
             # Show assignments for their batches OR assigned directly OR global (no batch, no specific student)
