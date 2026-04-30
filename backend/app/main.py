@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI):
                 result = await conn.execute(text("PRAGMA table_info(users)"))
                 user_cols = [row[1] for row in result.fetchall()]
                 user_migrations = [
+                    ("student_id", "TEXT"),
                     ("studentId", "TEXT"),
                     ("isActive", "BOOLEAN DEFAULT true"),
                     ("isVerified", "BOOLEAN DEFAULT false"),
@@ -207,6 +208,7 @@ async def lifespan(app: FastAPI):
                     # Resume Builder & Account Blocking
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS can_build_resume BOOLEAN DEFAULT FALSE",
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS student_id VARCHAR(100) UNIQUE",
                     """CREATE TABLE IF NOT EXISTS resumes (
                         id VARCHAR PRIMARY KEY,
                         student_id VARCHAR REFERENCES users(id),

@@ -265,7 +265,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         name=body.name,
         phone=body.phone,
         role=body.role,
-        # student_id=student_id,
+        student_id=student_id,
     )
 
     db.add(user)
@@ -720,7 +720,7 @@ async def scan_attendance_qr(
             "date": today.isoformat(),
             "user_name": user.name,
             "role": role_val,
-            "user_id": user.id,
+            "student_id": user.student_id or user.id,
             "session_number": session_number
         }
     else:
@@ -744,7 +744,7 @@ async def scan_attendance_qr(
             "date": today.isoformat(),
             "user_name": user.name,
             "role": role_val,
-            "user_id": user.id,
+            "student_id": user.student_id or user.id,
             "session_number": session_number
         }
         
