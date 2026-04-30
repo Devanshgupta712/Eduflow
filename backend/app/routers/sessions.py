@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, and_, or_
+from sqlalchemy import select, delete, and_, or_, func
 from app.utils.email import send_session_notification
 
 from app.database import get_db

@@ -1118,9 +1118,9 @@ async def list_assignments(
             sess = sess_res.scalars().first()
 
             if sess:
-                if sess.status in [SessionStatus.COMPLETED, SessionStatus.FAILED, SessionStatus.EXPIRED]:
+                if sess.is_completed:
                     current_status = "COMPLETED"
-                elif sess.status == SessionStatus.ACTIVE:
+                else:
                     current_status = "IN_PROGRESS"
 
             if sub:
