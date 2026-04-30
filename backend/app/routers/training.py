@@ -1059,29 +1059,21 @@ async def list_assignments(
         # Combine both sources
         student_batches = list(batch_student_ids | reg_batch_ids)
         
-        # DEBUG LOGS
-        print(f"DEBUG: Student ID: {user.id}")
-        print(f"DEBUG: BatchStudent IDs: {batch_student_ids}")
-        print(f"DEBUG: Registration Batch IDs: {reg_batch_ids}")
-        print(f"DEBUG: Combined Batches: {student_batches}")
-
-        if student_batches:
-            # Show assignments for their batches OR assigned directly OR global (no batch, no specific student)
-            query = query.where(
-                or_(
-                    Assignment.batch_id.in_(student_batches),
-                    Assignment.student_id == user.id,
-                    and_(Assignment.batch_id == None, Assignment.student_id == None),
+        # Broaden the query to ensure no assignments are missed
+        # 1. Match Batch IDs (from BatchStudent or Registration)
+        # 2. Match direct student assignments
+        # 3. Match global assignments (no batch, no student)
+        query = query.where(
+            or_(
+                Assignment.batch_id.in_(student_batches) if student_batches else False,
+                Assignment.student_id == user.id,
+                # Global assignments (no batch, no student) — handle both None and empty string
+                and_(
+                    or_(Assignment.batch_id == None, Assignment.batch_id == ""),
+                    or_(Assignment.student_id == None, Assignment.student_id == "")
                 )
             )
-        else:
-            # Student not in any batch — show global + directly assigned
-            query = query.where(
-                or_(
-                    Assignment.student_id == user.id,
-                    and_(Assignment.batch_id == None, Assignment.student_id == None),
-                )
-            )
+        )
 
         # We no longer hide assignments scheduled for the future. 
         # This prevents the "Notification arrived but assignment is missing" panic.
