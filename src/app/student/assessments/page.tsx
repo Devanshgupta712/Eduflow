@@ -24,10 +24,12 @@ function StudentAssessmentsContent() {
     const [finalScore, setFinalScore] = useState<number | null>(null);
     const [timeLeft, setTimeLeft] = useState<number | null>(null); // seconds remaining
 
-    // Date filter — defaults to today
+    // Date filter — defaults to showing ALL so students don't miss assignments created on other days
     const today = new Date().toISOString().split('T')[0];
     const [selectedDate, setSelectedDate] = useState(today);
-    const [showAllDates, setShowAllDates] = useState(false);
+    const [showAllDates, setShowAllDates] = useState(true); // Default to show ALL
+    const [selectedBatch, setSelectedBatch] = useState<string>('ALL');
+    const [studentBatches, setStudentBatches] = useState<{id: string; name: string}[]>([]);
 
     const [content, setContent] = useState('');
     const [file, setFile] = useState<File | null>(null);
@@ -168,6 +170,14 @@ function StudentAssessmentsContent() {
         try {
             const data = await apiGet('/api/training/assignments');
             setAssignments(data);
+            // Extract unique batches from returned assignments for the filter dropdown
+            const batchMap = new Map<string, string>();
+            data.forEach((a: any) => {
+                if (a.batch_id && a.batch_name) {
+                    batchMap.set(a.batch_id, a.batch_name);
+                }
+            });
+            setStudentBatches(Array.from(batchMap.entries()).map(([id, name]) => ({ id, name })));
         } catch (error) {
             console.error(error);
         } finally {
@@ -355,8 +365,9 @@ function StudentAssessmentsContent() {
                 <div className="stat-card accent"><div className="stat-icon accent">🔒</div><div className="stat-info"><h3>Security</h3><div className="stat-value">Active</div></div></div>
             </div>
 
-            {/* Date Filter */}
+            {/* Filters Row: Date + Batch */}
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
+                {/* Date Filter */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '8px 14px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                     <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📅 Date:</span>
                     <input
@@ -373,25 +384,55 @@ function StudentAssessmentsContent() {
                 >
                     {showAllDates ? '✕ Showing All' : 'Show All Dates'}
                 </button>
+
+                {/* Batch Filter Dropdown */}
+                {studentBatches.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '8px 14px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🏷️ Batch:</span>
+                        <select
+                            value={selectedBatch}
+                            onChange={e => setSelectedBatch(e.target.value)}
+                            style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                        >
+                            <option value="ALL">All Batches</option>
+                            {studentBatches.map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    Showing {(showAllDates ? assignments : assignments.filter(a => {
-                        const created = a.created_at ? a.created_at.split('T')[0] : '';
-                        const due = a.due_date ? a.due_date.split('T')[0] : '';
-                        return created === selectedDate || due === selectedDate;
-                    })).length} of {assignments.length}
+                    Showing {(() => {
+                        let list = showAllDates ? assignments : assignments.filter(a => {
+                            const created = a.created_at ? a.created_at.split('T')[0] : '';
+                            const due = a.due_date ? a.due_date.split('T')[0] : '';
+                            return created === selectedDate || due === selectedDate;
+                        });
+                        if (selectedBatch !== 'ALL') list = list.filter(a => a.batch_id === selectedBatch);
+                        return list.length;
+                    })()} of {assignments.length}
                 </span>
             </div>
 
             {loading ? <p>Loading...</p> : (() => {
-                const filteredAssignments = showAllDates
+                let filteredAssignments = showAllDates
                     ? assignments
                     : assignments.filter(a => {
                         const created = a.created_at ? a.created_at.split('T')[0] : '';
                         const due = a.due_date ? a.due_date.split('T')[0] : '';
                         return created === selectedDate || due === selectedDate;
                     });
+                if (selectedBatch !== 'ALL') {
+                    filteredAssignments = filteredAssignments.filter(a => a.batch_id === selectedBatch);
+                }
+                const emptyMsg = assignments.length === 0
+                    ? { title: 'No assignments yet', sub: 'No assignments have been assigned to you yet.' }
+                    : selectedBatch !== 'ALL'
+                    ? { title: 'No assignments for this batch', sub: 'Try selecting a different batch or "All Batches".' }
+                    : { title: 'No assignments for this date', sub: 'Click "Show All Dates" to see all your assignments.' };
                 return filteredAssignments.length === 0 ? (
-                    <div className="card"><div className="empty-state"><div className="empty-icon">📝</div><h3>{assignments.length === 0 ? 'No assignments yet' : 'No assignments for this date'}</h3><p className="text-sm text-muted">{assignments.length === 0 ? 'No assignments assigned to you yet.' : 'Select a different date or click "Show All Dates".'}</p></div></div>
+                    <div className="card"><div className="empty-state"><div className="empty-icon">📝</div><h3>{emptyMsg.title}</h3><p className="text-sm text-muted">{emptyMsg.sub}</p></div></div>
                 ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
                     {filteredAssignments.map(a => (
@@ -399,6 +440,9 @@ function StudentAssessmentsContent() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{ flex: 1 }}>
                                     <h3 style={{ margin: 0, fontWeight: 600 }}>{a.title}</h3>
+                                    {a.batch_name && (
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 600 }}>🏷️ {a.batch_name}</div>
+                                    )}
                                     {a.my_submission && (
                                         <div style={{ 
                                             display: 'inline-block', marginTop: '6px',
