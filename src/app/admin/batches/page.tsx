@@ -18,7 +18,16 @@ export default function BatchesPage() {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [form, setForm] = useState({ course_id: '', name: '', start_date: '', end_date: '', schedule_time: '', trainer_id: '', schedule_link: '' });
+    const [form, setForm] = useState({ 
+        course_id: '', 
+        name: '', 
+        start_date: '', 
+        end_date: '', 
+        start_time: '', 
+        end_time: '', 
+        trainer_id: '', 
+        schedule_link: '' 
+    });
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [canManageBatches, setCanManageBatches] = useState(false);
@@ -83,12 +92,17 @@ export default function BatchesPage() {
         setError('');
         setSubmitting(true);
         try {
+            // Combine times into timeframe string
+            const schedule_time = form.start_time && form.end_time 
+                ? `${form.start_time} - ${form.end_time}` 
+                : null;
+
             const payload = {
                 course_id: form.course_id || null,
                 name: form.name,
                 start_date: form.start_date,
                 end_date: form.end_date,
-                schedule_time: form.schedule_time || null,
+                schedule_time: schedule_time,
                 schedule_link: form.schedule_link || null,
                 trainer_id: form.trainer_id || null,
             };
@@ -97,13 +111,13 @@ export default function BatchesPage() {
                 await apiPut(`/api/admin/batches/${editingId}`, payload);
                 setShowModal(false);
                 setEditingId(null);
-                setForm({ course_id: '', name: '', start_date: '', end_date: '', schedule_time: '', trainer_id: '', schedule_link: '' });
+                setForm({ course_id: '', name: '', start_date: '', end_date: '', start_time: '', end_time: '', trainer_id: '', schedule_link: '' });
                 loadData();
             } else {
                 const res = await apiPost('/api/admin/batches', payload);
                 if (res.ok) {
                     setShowModal(false);
-                    setForm({ course_id: '', name: '', start_date: '', end_date: '', schedule_time: '', trainer_id: '', schedule_link: '' });
+                    setForm({ course_id: '', name: '', start_date: '', end_date: '', start_time: '', end_time: '', trainer_id: '', schedule_link: '' });
                     loadData();
                 } else {
                     const d = await res.json().catch(() => ({}));
@@ -123,12 +137,23 @@ export default function BatchesPage() {
     
     const openEdit = (b: Batch) => {
         setEditingId(b.id);
+        
+        // Split schedule_time back into start/end
+        let s_time = '';
+        let e_time = '';
+        if (b.schedule_time && b.schedule_time.includes('-')) {
+            const parts = b.schedule_time.split('-');
+            s_time = parts[0].trim();
+            e_time = parts[1].trim();
+        }
+
         setForm({
             course_id: b.course_name ? courses.find(c => c.name === b.course_name)?.id || '' : '',
             name: b.name,
             start_date: b.start_date.split('T')[0],
             end_date: b.end_date.split('T')[0],
-            schedule_time: b.schedule_time || '',
+            start_time: s_time,
+            end_time: e_time,
             schedule_link: b.schedule_link || '',
             trainer_id: b.trainer_name ? trainers.find(t => t.name === b.trainer_name)?.id || '' : ''
         });
@@ -355,26 +380,32 @@ export default function BatchesPage() {
 
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">Schedule Timeframe</label>
+                                    <label className="form-label">Session Start (Clock)</label>
                                     <input 
                                         className="form-input" 
-                                        placeholder="e.g. 10:00 AM - 01:00 PM" 
-                                        value={form.schedule_time} 
-                                        onChange={e => setForm({ ...form, schedule_time: e.target.value })} 
+                                        type="time"
+                                        required
+                                        value={form.start_time} 
+                                        onChange={e => setForm({ ...form, start_time: e.target.value })} 
                                     />
-                                    {form.schedule_time && !form.schedule_time.includes('-') && !form.schedule_time.toUpperCase().includes(' TO ') && (
-                                        <p style={{ color: '#f59e0b', fontSize: '11px', marginTop: '4px', fontWeight: 600 }}>
-                                            ⚠️ Use a dash (e.g. 10 AM - 1 PM) for conflict checking to work.
-                                        </p>
-                                    )}
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Designated Lead Trainer</label>
-                                    <select className="form-select" value={form.trainer_id} onChange={e => setForm({ ...form, trainer_id: e.target.value })}>
-                                        <option value="">Unassigned (No Trainer)</option>
-                                        {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                    </select>
+                                    <label className="form-label">Session End (Clock)</label>
+                                    <input 
+                                        className="form-input" 
+                                        type="time"
+                                        required
+                                        value={form.end_time} 
+                                        onChange={e => setForm({ ...form, end_time: e.target.value })} 
+                                    />
                                 </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Designated Lead Trainer</label>
+                                <select className="form-select" value={form.trainer_id} onChange={e => setForm({ ...form, trainer_id: e.target.value })}>
+                                    <option value="">Unassigned (No Trainer)</option>
+                                    {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
                             </div>
 
                             <div className="form-group">
