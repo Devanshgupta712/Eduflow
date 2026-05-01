@@ -8,6 +8,7 @@ export default function StudentCoursesPage() {
     const [courses, setCourses] = useState<any[]>([]);
     const [timeLog, setTimeLog] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [currentTime, setCurrentTime] = useState(new Date());
 
     useEffect(() => {
         apiGet('/api/auth/my-courses').then(setCourses).catch(() => { });
@@ -21,16 +22,42 @@ export default function StudentCoursesPage() {
             .finally(() => setLoading(false));
     }, []);
 
+    // Live Ticker Effect
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
     const activeCourses = courses.filter((c: any) => c.status === 'ACTIVE');
     const totalFee = courses.reduce((sum: number, c: any) => sum + (c.fee_total || 0), 0);
     const totalPaid = courses.reduce((sum: number, c: any) => sum + (c.fee_paid || 0), 0);
     const primaryCourse = activeCourses[0] || courses[0];
 
-    const getTodayHours = () => {
-        if (!timeLog) return '0h 0m';
-        if (timeLog.logout_time) return `${Math.floor(timeLog.total_minutes / 60)}h ${timeLog.total_minutes % 60}m`;
-        const mins = Math.floor((Date.now() - new Date(timeLog.login_time).getTime()) / 60000);
-        return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+    const getTodayHours = (includeSeconds = false) => {
+        if (!timeLog) return includeSeconds ? '0h 0m 00s' : '0h 0m';
+        if (timeLog.logout_time) {
+            const totalSecs = (timeLog.total_minutes || 0) * 60;
+            const h = Math.floor(totalSecs / 3600);
+            const m = Math.floor((totalSecs % 3600) / 60);
+            const s = totalSecs % 60;
+            return includeSeconds ? `${h}h ${m}m ${s.toString().padStart(2, '0')}s` : `${h}h ${m}m`;
+        }
+        
+        // Active Session Calculation
+        const loginTime = new Date(timeLog.login_time).getTime();
+        const diffMs = currentTime.getTime() - loginTime;
+        const diffSecs = Math.max(0, Math.floor(diffMs / 1000));
+        
+        const h = Math.floor(diffSecs / 3600);
+        const m = Math.floor((diffSecs % 3600) / 60);
+        const s = diffSecs % 60;
+        
+        if (includeSeconds) {
+            return `${h}h ${m}m ${s.toString().padStart(2, '0')}s`;
+        }
+        return `${h}h ${m}m`;
     };
 
     const isActiveSession = timeLog && !timeLog.logout_time;
@@ -67,12 +94,13 @@ export default function StudentCoursesPage() {
                     </div>
 
                     {/* Live Session Card */}
-                    <div className="glass-premium" style={{ padding: '20px 28px', borderRadius: '20px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(16px)', textAlign: 'right' }}>
+                    <div className="glass-premium" style={{ padding: '20px 28px', borderRadius: '20px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(16px)', textAlign: 'right', minWidth: '220px' }}>
                         <div style={{ fontSize: '11px', fontWeight: 600, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Today's Hours</div>
-                        <div style={{ fontSize: '36px', fontWeight: 600, lineHeight: 1, letterSpacing: '-0.04em' }}>{getTodayHours()}</div>
+                        <div style={{ fontSize: '36px', fontWeight: 600, lineHeight: 1, letterSpacing: '-0.04em', fontFamily: 'monospace' }}>{getTodayHours(true)}</div>
                         {isActiveSession && (
-                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#4ade80', marginTop: '8px' }}>
-                                ● Live since {new Date(timeLog.login_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#4ade80', marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                                <span className="animate-pulse" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4ade80' }} />
+                                Live since {new Date(timeLog.login_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </div>
                         )}
                     </div>
@@ -259,7 +287,7 @@ export default function StudentCoursesPage() {
                                 </div>
                                 <div style={{ padding: '12px', background: 'var(--primary-glow)', borderRadius: '12px', textAlign: 'center' }}>
                                     <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '4px' }}>Duration</div>
-                                    <div style={{ fontSize: '22px', fontWeight: 600, color: 'var(--primary)' }}>{getTodayHours()}</div>
+                                    <div style={{ fontSize: '22px', fontWeight: 600, color: 'var(--primary)', fontFamily: 'monospace' }}>{getTodayHours(true)}</div>
                                 </div>
                                 <Link href="/student/time-tracking" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textDecoration: 'none' }}>
                                     View Full History →
