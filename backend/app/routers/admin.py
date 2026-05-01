@@ -48,14 +48,40 @@ def parse_flexible_date(date_str: str):
     except:
         return datetime.now()
 
-def parse_times(date_obj: datetime, timeframe: str):
-    """Helper to parse '05:00 - 06:00' into start/end datetimes."""
+def _parse_time_str(t_str: str) -> tuple[int, int]:
+    """Parses '10:00 AM', '1 PM', or '13:00' into (hour, minute)."""
+    t_str = t_str.upper().strip()
+    is_pm = "PM" in t_str
+    is_am = "AM" in t_str
+    clean_t = t_str.replace("AM", "").replace("PM", "").strip()
+    
+    h, m = 0, 0
     try:
-        parts = timeframe.split('-')
+        if ":" in clean_t:
+            parts = clean_t.split(':')
+            h = int(parts[0])
+            m = int(parts[1]) if len(parts) > 1 else 0
+        else:
+            h = int(clean_t)
+    except:
+        pass
+    
+    if is_pm and h < 12: h += 12
+    if is_am and h == 12: h = 0
+    return h, m
+
+def parse_times(date_obj: datetime, timeframe: str):
+    """Helper to parse '10:00 AM - 01:00 PM' into start/end datetimes."""
+    try:
+        # Support dash, "to", " - "
+        t = timeframe.upper().replace(" TO ", "-")
+        parts = t.split('-')
         s_str = parts[0].strip()
-        e_str = parts[1].strip()
-        s_h, s_m = map(int, s_str.split(':'))
-        e_h, e_m = map(int, e_str.split(':'))
+        e_str = parts[1].strip() if len(parts) > 1 else s_str
+        
+        s_h, s_m = _parse_time_str(s_str)
+        e_h, e_m = _parse_time_str(e_str)
+        
         start = date_obj.replace(hour=s_h, minute=s_m, second=0, microsecond=0)
         end = date_obj.replace(hour=e_h, minute=e_m, second=0, microsecond=0)
         return start, end
@@ -63,24 +89,40 @@ def parse_times(date_obj: datetime, timeframe: str):
         return date_obj, date_obj + timedelta(hours=1)
 
 def times_overlap(time1: str, time2: str) -> bool:
-    """Checks if two 'HH:MM - HH:MM' timeframe strings overlap."""
+    """Checks if two '10:00 AM - 01:00 PM' timeframe strings overlap."""
     if not time1 or not time2: return False
     try:
         def to_minutes(t_str):
-            h, m = map(int, t_str.split(':'))
+            h, m = _parse_time_str(t_str)
             return h * 60 + m
 
-        # Handle potential multiple dashes or spaces
-        parts1 = [p.strip() for p in time1.split('-')]
-        parts2 = [p.strip() for p in time2.split('-')]
+        parts1 = [p.strip() for p in time1.upper().replace(" TO ", "-").split('-')]
+        parts2 = [p.strip() for p in time2.upper().replace(" TO ", "-").split('-')]
         if len(parts1) < 2 or len(parts2) < 2: return False
 
         s1, e1 = to_minutes(parts1[0]), to_minutes(parts1[1])
         s2, e2 = to_minutes(parts2[0]), to_minutes(parts2[1])
 
+        # Handle midnight wrap if necessary (simplified: assume same day)
         return max(s1, s2) < min(e1, e2)
     except:
         return False
+
+def validate_schedule_time(time_str: str):
+    """Ensures the timeframe string can be parsed into start/end."""
+    if not time_str: return
+    try:
+        t = time_str.upper().replace(" TO ", "-")
+        parts = t.split('-')
+        if len(parts) < 2:
+            raise ValueError("Timeframe must contain a start and end time (e.g. 10 AM - 1 PM)")
+        
+        # Test parsing both parts
+        _parse_time_str(parts[0])
+        _parse_time_str(parts[1])
+    except Exception as e:
+        detail = str(e) if "Timeframe must" in str(e) else "Invalid time format. Please use 'HH:MM AM - HH:MM PM' or 'HH:MM - HH:MM'."
+        raise HTTPException(status_code=400, detail=detail)
 
 def dates_overlap(start1: datetime, end1: datetime, start2: datetime, end2: datetime) -> bool:
     """Checks if two date ranges overlap."""
@@ -357,6 +399,10 @@ async def create_batch(
     s_date = parse_flexible_date(body.start_date)
     e_date = parse_flexible_date(body.end_date)
     
+    # Validate timeframe format
+    if body.schedule_time:
+        validate_schedule_time(body.schedule_time)
+    
     # Trainer conflict check
     if body.trainer_id and body.schedule_time:
         conflict = await check_batch_conflict(db, body.trainer_id, body.schedule_time, s_date, e_date, is_trainer=True)
@@ -424,6 +470,10 @@ async def update_batch(
     new_e_date = parse_flexible_date(body.end_date) if body.end_date is not None else batch.end_date
     new_time = body.schedule_time if body.schedule_time is not None else batch.schedule_time
     new_trainer = (body.trainer_id if body.trainer_id else None) if hasattr(body, 'trainer_id') and body.trainer_id is not None else batch.trainer_id
+    
+    # Validate timeframe format
+    if body.schedule_time:
+        validate_schedule_time(body.schedule_time)
 
     # Trainer conflict check
     if new_trainer and new_time:

@@ -356,7 +356,17 @@ export default function BatchesPage() {
                             <div className="form-row">
                                 <div className="form-group">
                                     <label className="form-label">Schedule Timeframe</label>
-                                    <input className="form-input" placeholder="e.g. 10:00 AM - 01:00 PM" value={form.schedule_time} onChange={e => setForm({ ...form, schedule_time: e.target.value })} />
+                                    <input 
+                                        className="form-input" 
+                                        placeholder="e.g. 10:00 AM - 01:00 PM" 
+                                        value={form.schedule_time} 
+                                        onChange={e => setForm({ ...form, schedule_time: e.target.value })} 
+                                    />
+                                    {form.schedule_time && !form.schedule_time.includes('-') && !form.schedule_time.toUpperCase().includes(' TO ') && (
+                                        <p style={{ color: '#f59e0b', fontSize: '11px', marginTop: '4px', fontWeight: 600 }}>
+                                            ⚠️ Use a dash (e.g. 10 AM - 1 PM) for conflict checking to work.
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Designated Lead Trainer</label>
