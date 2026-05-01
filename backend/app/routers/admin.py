@@ -62,6 +62,67 @@ def parse_times(date_obj: datetime, timeframe: str):
     except:
         return date_obj, date_obj + timedelta(hours=1)
 
+def times_overlap(time1: str, time2: str) -> bool:
+    """Checks if two 'HH:MM - HH:MM' timeframe strings overlap."""
+    if not time1 or not time2: return False
+    try:
+        def to_minutes(t_str):
+            h, m = map(int, t_str.split(':'))
+            return h * 60 + m
+
+        # Handle potential multiple dashes or spaces
+        parts1 = [p.strip() for p in time1.split('-')]
+        parts2 = [p.strip() for p in time2.split('-')]
+        if len(parts1) < 2 or len(parts2) < 2: return False
+
+        s1, e1 = to_minutes(parts1[0]), to_minutes(parts1[1])
+        s2, e2 = to_minutes(parts2[0]), to_minutes(parts2[1])
+
+        return max(s1, s2) < min(e1, e2)
+    except:
+        return False
+
+def dates_overlap(start1: datetime, end1: datetime, start2: datetime, end2: datetime) -> bool:
+    """Checks if two date ranges overlap."""
+    return max(start1, start2) <= min(end1, end2)
+
+async def check_batch_conflict(
+    db: AsyncSession, 
+    user_id: str, 
+    schedule_time: str, 
+    start_date: datetime, 
+    end_date: datetime, 
+    exclude_batch_id: str = None, 
+    is_trainer: bool = False
+):
+    """Checks if a user (student or trainer) has a conflicting batch schedule."""
+    if not schedule_time: return None
+
+    if is_trainer:
+        # Check trainer's other batches
+        query = select(Batch).where(
+            Batch.trainer_id == user_id,
+            Batch.is_active == True
+        )
+    else:
+        # Check student's other batches
+        query = select(Batch).join(BatchStudent, Batch.id == BatchStudent.batch_id).where(
+            BatchStudent.student_id == user_id,
+            Batch.is_active == True
+        )
+    
+    if exclude_batch_id:
+        query = query.where(Batch.id != exclude_batch_id)
+    
+    result = await db.execute(query)
+    other_batches = result.scalars().all()
+
+    for other in other_batches:
+        if other.schedule_time and times_overlap(schedule_time, other.schedule_time):
+            if dates_overlap(start_date, end_date, other.start_date, other.end_date):
+                return other
+    return None
+
 @router.get("/dashboard")
 async def dashboard_stats(
     db: AsyncSession = Depends(get_db),
@@ -293,11 +354,22 @@ async def create_batch(
     _user: User = Depends(require_admin_permissions(manage_batches=True)),
 ):
     course_id = body.course_id if body.course_id else None
+    s_date = parse_flexible_date(body.start_date)
+    e_date = parse_flexible_date(body.end_date)
     
+    # Trainer conflict check
+    if body.trainer_id and body.schedule_time:
+        conflict = await check_batch_conflict(db, body.trainer_id, body.schedule_time, s_date, e_date, is_trainer=True)
+        if conflict:
+            raise HTTPException(
+                status_code=409, 
+                detail=f"Trainer Conflict: Trainer is already assigned to batch '{conflict.name}' at {conflict.schedule_time}"
+            )
+
     batch = Batch(
         course_id=course_id, name=body.name,
-        start_date=parse_flexible_date(body.start_date),
-        end_date=parse_flexible_date(body.end_date),
+        start_date=s_date,
+        end_date=e_date,
         schedule_time=body.schedule_time,
         schedule_link=body.schedule_link if hasattr(body, 'schedule_link') else None,
         trainer_id=body.trainer_id or None,
@@ -348,15 +420,29 @@ async def update_batch(
         raise HTTPException(status_code=404, detail="Batch not found")
         
     # Apply core fields
+    new_s_date = parse_flexible_date(body.start_date) if body.start_date is not None else batch.start_date
+    new_e_date = parse_flexible_date(body.end_date) if body.end_date is not None else batch.end_date
+    new_time = body.schedule_time if body.schedule_time is not None else batch.schedule_time
+    new_trainer = (body.trainer_id if body.trainer_id else None) if hasattr(body, 'trainer_id') and body.trainer_id is not None else batch.trainer_id
+
+    # Trainer conflict check
+    if new_trainer and new_time:
+        conflict = await check_batch_conflict(db, new_trainer, new_time, new_s_date, new_e_date, exclude_batch_id=batch_id, is_trainer=True)
+        if conflict:
+            raise HTTPException(
+                status_code=409, 
+                detail=f"Trainer Conflict: Trainer is already assigned to batch '{conflict.name}' at {conflict.schedule_time}"
+            )
+
     if body.name is not None: batch.name = body.name
     if body.course_id is not None: 
         batch.course_id = body.course_id if body.course_id else None
-    if body.start_date is not None: batch.start_date = parse_flexible_date(body.start_date)
-    if body.end_date is not None: batch.end_date = parse_flexible_date(body.end_date)
-    if body.schedule_time is not None: batch.schedule_time = body.schedule_time
+    if body.start_date is not None: batch.start_date = new_s_date
+    if body.end_date is not None: batch.end_date = new_e_date
+    if body.schedule_time is not None: batch.schedule_time = new_time
     if body.is_active is not None: batch.is_active = body.is_active
     if hasattr(body, 'trainer_id') and body.trainer_id is not None: 
-        batch.trainer_id = body.trainer_id if body.trainer_id else None
+        batch.trainer_id = new_trainer
 
     # 1. First commit the core batch updates (name, dates, trainer)
     try:
@@ -986,6 +1072,19 @@ async def assign_user_batch(
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
 
+    # 3. Conflict Check
+    if batch.schedule_time:
+        is_trainer = target_user.role == Role.TRAINER
+        conflict = await check_batch_conflict(
+            db, user_id, batch.schedule_time, batch.start_date, batch.end_date, is_trainer=is_trainer
+        )
+        if conflict:
+            role_str = "Trainer" if is_trainer else "Student"
+            raise HTTPException(
+                status_code=409, 
+                detail=f"{role_str} Conflict: {target_user.name} is already assigned to batch '{conflict.name}' at {conflict.schedule_time}"
+            )
+
     if target_user.role == Role.TRAINER:
         batch.trainer_id = target_user.id
         await db.flush()
@@ -994,7 +1093,7 @@ async def assign_user_batch(
     if target_user.role != Role.STUDENT:
         raise HTTPException(status_code=400, detail="User is not a student or trainer")
         
-    # 3. Check if already in this batch
+    # 4. Check if already in this batch
     existing = await db.execute(
         select(BatchStudent).where(
             BatchStudent.batch_id == body.batch_id,
