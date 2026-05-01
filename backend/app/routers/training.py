@@ -2098,7 +2098,8 @@ async def create_time_tracking(
         total_minutes=total_minutes
     )
     db.add(log)
-    await db.flush()
+    await db.commit()
+    await db.refresh(log)
     return {"status": "success", "id": log.id}
 
 @router.patch("/time-tracking/{log_id}")
@@ -2127,7 +2128,7 @@ async def update_time_tracking(
     else:
         log.total_minutes = None
         
-    await db.flush()
+    await db.commit()
     return {"status": "success"}
 
 @router.delete("/time-tracking/{log_id}")

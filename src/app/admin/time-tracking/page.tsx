@@ -197,8 +197,9 @@ export default function TimeTrackingPage() {
         e.preventDefault();
         setFormLoading(true);
         try {
-            const login_iso = new Date(`${formData.date}T${formData.login_time}`).toISOString();
-            const logout_iso = formData.logout_time ? new Date(`${formData.date}T${formData.logout_time}`).toISOString() : null;
+            // Construct naive ISO strings to avoid timezone shifting
+            const login_iso = `${formData.date}T${formData.login_time}:00`;
+            const logout_iso = formData.logout_time ? `${formData.date}T${formData.logout_time}:00` : null;
 
             if (showEditModal && editingLog) {
                 await apiPatch(`/api/training/time-tracking/${editingLog.id}`, {
