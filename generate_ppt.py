@@ -63,7 +63,7 @@ def create_lms_presentation(output_path):
         
         p = tf.paragraphs[0]
         p.text = title
-        p.font.size = Pt(17)
+        p.font.size = Pt(16)
         p.font.bold = True
         p.font.color.rgb = title_color
         p.font.name = 'Calibri'
@@ -72,7 +72,7 @@ def create_lms_presentation(output_path):
         for item in items:
             p_item = tf.add_paragraph()
             p_item.text = f"• {item}"
-            p_item.font.size = Pt(12)
+            p_item.font.size = Pt(11.5)
             p_item.font.color.rgb = TEXT_DARK
             p_item.font.name = 'Calibri'
             p_item.space_after = Pt(4)
@@ -96,14 +96,14 @@ def create_lms_presentation(output_path):
     tf.word_wrap = True
 
     p = tf.paragraphs[0]
-    p.text = "LMS DATA ARCHITECTURE & SYSTEM FLOW"
+    p.text = "LMS SYSTEM DATA FLOW & ARCHITECTURE"
     p.font.size = Pt(36)
     p.font.bold = True
     p.font.color.rgb = WHITE
     p.font.name = 'Calibri'
 
     p2 = tf.add_paragraph()
-    p2.text = "End-to-End Business Pipeline, ER Table Connections & 22-Table Schema for Data Analytics"
+    p2.text = "End-to-End Table Data Flow, ER Connections & 22-Table Relational Model for Students"
     p2.font.size = Pt(19)
     p2.font.color.rgb = GOLD
     p2.font.name = 'Calibri'
@@ -138,66 +138,105 @@ def create_lms_presentation(output_path):
     ], GOLD)
 
     # -------------------------------------------------------------
-    # SLIDE 3: Student Lifecycle Flow (Phases 1 - 5)
+    # SLIDE 3: NEW! COMPLETE STEP-BY-STEP TABLE DATA FLOW DIAGRAM
     # -------------------------------------------------------------
     slide3 = prs.slides.add_slide(blank_layout)
-    add_header(slide3, "2. End-to-End Student Lifecycle Data Pipeline", "5 Key Phases of Data Generation in an Enterprise LMS")
+    add_header(slide3, "2. Complete Step-by-Step Table Data Flow Diagram", "How Data Flows sequentially through Database Tables in 6 Business Steps")
 
-    phases = [
-        ("Phase 1: Marketing", ["Lead capture from Ads", "Call/Email logs", "Lead to Student"], BLUE_ACCENT),
-        ("Phase 2: Finance", ["Course/Batch selection", "Tuition fee tracking", "Receipt & verification"], GOLD),
-        ("Phase 3: Operations", ["Daily QR attendance", "Portal time logs", "Leave quota audit"], GREEN),
-        ("Phase 4: Learning", ["Project/Task ticketing", "Video lecture views", "Tests & feedback"], BLUE_ACCENT),
-        ("Phase 5: Placement", ["Mock interview scores", "Verbal drills", "Job application funnel"], GOLD)
+    flow_steps = [
+        ("1. INQUIRY", "leads\nlead_activities", "Prospect registers interest. Calls & emails logged.", BLUE_ACCENT),
+        ("2. ADMISSION", "users\nregistrations", "Lead converts to User. Fee payment recorded.", GOLD),
+        ("3. COHORT", "courses, batches\nbatch_students", "Student assigned to course batch cohort.", GREEN),
+        ("4. DAILY OPS", "attendance\ntime_tracking", "Daily QR login hours & portal time logged.", BLUE_ACCENT),
+        ("5. LEARNING", "projects, tasks\nassessments", "Tasks submitted, exams scored, feedback recorded.", PURPLE),
+        ("6. CAREER", "mock_interviews\njob_applications", "Mock scores logged & job selection tracked.", GOLD)
     ]
 
-    left_margin = 0.8
-    card_width = 2.2
-    gap = 0.2
-    for idx, (p_title, p_items, p_color) in enumerate(phases):
-        c_left = left_margin + idx * (card_width + gap)
-        add_card(slide3, c_left, 1.6, card_width, 5.2, p_title, p_items, p_color)
+    card_w = 1.75
+    gap_w = 0.2
+    start_x = 0.8
+    for idx, (step_num, tables, desc, col) in enumerate(flow_steps):
+        x_pos = start_x + idx * (card_w + gap_w)
+        
+        # Main step box
+        card = slide3.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(x_pos), Inches(1.6), Inches(card_w), Inches(5.2))
+        card.fill.solid()
+        card.fill.fore_color.rgb = CARD_BG
+        card.line.color.rgb = col
+        card.line.width = Pt(2.0)
+        
+        txBox = slide3.shapes.add_textbox(Inches(x_pos + 0.1), Inches(1.75), Inches(card_w - 0.2), Inches(4.9))
+        tf = txBox.text_frame
+        tf.word_wrap = True
+        
+        # Step Title
+        p = tf.paragraphs[0]
+        p.text = step_num
+        p.font.size = Pt(13)
+        p.font.bold = True
+        p.font.color.rgb = col
+        p.font.name = 'Calibri'
+        p.alignment = PP_ALIGN.CENTER
+        
+        # Table Names Badge
+        p_tbl = tf.add_paragraph()
+        p_tbl.text = f"\n[ Tables ]\n{tables}"
+        p_tbl.font.size = Pt(11)
+        p_tbl.font.bold = True
+        p_tbl.font.color.rgb = NAVY
+        p_tbl.font.name = 'Calibri'
+        p_tbl.alignment = PP_ALIGN.CENTER
+        
+        # Description
+        p_desc = tf.add_paragraph()
+        p_desc.text = f"\n{desc}"
+        p_desc.font.size = Pt(10.5)
+        p_desc.font.color.rgb = TEXT_DARK
+        p_desc.font.name = 'Calibri'
+        p_desc.alignment = PP_ALIGN.CENTER
 
     # -------------------------------------------------------------
-    # SLIDE 4: System Roles & RBAC Matrix
+    # SLIDE 4: NEW! TABLE-TO-TABLE TRANSITION DATA PIPELINE
     # -------------------------------------------------------------
     slide4 = prs.slides.add_slide(blank_layout)
-    add_header(slide4, "3. System Roles & Access Matrix", "Role-Based Access Control (RBAC) & Data Access Boundaries")
+    add_header(slide4, "3. Table-to-Table Data Transition Pipeline", "Data Inputs & Outputs Passing Between Interconnected Database Tables")
 
-    roles = [
-        ("SUPER_ADMIN / ADMIN", "Full system governance, course/batch creation, fee setup, leave approvals, user permissions", BLUE_ACCENT),
-        ("TRAINER", "Batch management, project/task assignment, attendance tracking, assessment grading", GREEN),
-        ("MARKETER", "Lead generation, prospect follow-ups (Calls/Emails/WhatsApp), registration conversion", GOLD),
-        ("STUDENT", "Class attendance, portal time logging, assignment submissions, tests, job applications", BLUE_ACCENT)
+    pipelines = [
+        ("Input Stage 1: Lead Capture", "leads (leadId) ➔ lead_activities (activityId)", "Marketers capture lead details. Every call/email adds a row in lead_activities referencing leadId.", BLUE_ACCENT),
+        ("Transition Stage 2: Enrollment", "leads ➔ users (userId) ➔ registrations", "When lead status changes to CONVERTED, a new record is created in users. Fees logged in registrations.", GOLD),
+        ("Execution Stage 3: Training", "users ➔ batch_students ➔ attendance & tasks", "Student userId is mapped to batchId. Daily attendance logs & task progress link to userId & batchId.", GREEN),
+        ("Evaluation Stage 4: Assessments", "users ➔ assessment_submissions & feedback", "Exams taken create records in assessment_submissions. Weekly ratings recorded in feedback table.", PURPLE),
+        ("Outcome Stage 5: Job Hiring", "users ➔ mock_interviews ➔ job_applications", "Mock interviews prepare students. Job applications track status from APPLIED to SELECTED.", GOLD)
     ]
 
-    top_pos = 1.6
-    for title, desc, col in roles:
-        card = slide4.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(top_pos), Inches(11.733), Inches(1.15))
+    top_pos = 1.5
+    for stage, tables_flow, explanation, col in pipelines:
+        card = slide4.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(top_pos), Inches(11.733), Inches(0.95))
         card.fill.solid()
         card.fill.fore_color.rgb = CARD_BG
         card.line.color.rgb = BORDER_COLOR
         card.line.width = Pt(1.5)
 
-        txBox = slide4.shapes.add_textbox(Inches(1.0), Inches(top_pos + 0.15), Inches(11.3), Inches(0.85))
+        txBox = slide4.shapes.add_textbox(Inches(1.0), Inches(top_pos + 0.08), Inches(11.3), Inches(0.8))
         tf = txBox.text_frame
+        
         p = tf.paragraphs[0]
-        p.text = title
-        p.font.size = Pt(17)
+        p.text = f"{stage}   |   {tables_flow}"
+        p.font.size = Pt(14)
         p.font.bold = True
         p.font.color.rgb = col
         p.font.name = 'Calibri'
         
         p2 = tf.add_paragraph()
-        p2.text = desc
-        p2.font.size = Pt(13)
+        p2.text = explanation
+        p2.font.size = Pt(11.5)
         p2.font.color.rgb = TEXT_DARK
         p2.font.name = 'Calibri'
 
-        top_pos += 1.35
+        top_pos += 1.1
 
     # -------------------------------------------------------------
-    # SLIDE 5: NEW! Central Table Connection Hubs (ER Diagram Overview)
+    # SLIDE 5: Central Table Connection Architecture (ER Hubs)
     # -------------------------------------------------------------
     slide5 = prs.slides.add_slide(blank_layout)
     add_header(slide5, "4. Central Table Connection Architecture", "The 3 Primary Hub Entities Connecting All 22 System Tables")
@@ -243,12 +282,11 @@ def create_lms_presentation(output_path):
     ], GOLD)
 
     # -------------------------------------------------------------
-    # SLIDE 6: NEW! Complete Table Connection Matrix (Foreign Keys)
+    # SLIDE 6: Complete Foreign Key Connection Map
     # -------------------------------------------------------------
     slide6 = prs.slides.add_slide(blank_layout)
     add_header(slide6, "5. Complete Foreign Key (FK) Connection Map", "Explicit Mapping of All Foreign Keys Across All 22 Database Tables")
 
-    # Table visualization
     rows, cols = 11, 3
     left, top, width, height = Inches(0.8), Inches(1.5), Inches(11.733), Inches(5.4)
     table_shape = slide6.shapes.add_table(rows, cols, left, top, width, height)
@@ -437,9 +475,9 @@ def create_lms_presentation(output_path):
     add_header(slide13, "12. Summary & Key Takeaways for Students", "Connecting Database Architecture with Real-World BI & Analytics")
 
     add_card(slide13, 0.8, 1.6, 11.733, 5.2, "🎓 Essential Lessons for Data Analytics Students", [
-        "1. Relational Integrity: Foreign key constraints ensure data consistency across complex multi-table workflows.",
-        "2. Central Hub Pattern: 'users', 'batches', and 'courses' form the core backbone of all sub-modules.",
-        "3. Domain-Driven Analytics: Organizing database tables into functional domains simplifies dashboard design.",
+        "1. Sequential Data Flow: Data moves in 6 distinct steps from Inquiry to Job Placement.",
+        "2. Table Transitions: Foreign keys (leadId, userId, batchId) connect tables sequentially.",
+        "3. Central Hub Pattern: 'users', 'batches', and 'courses' form the core backbone of all sub-modules.",
         "4. Actionable Insights: Raw transactional tables (logs, marks, fees) drive strategic business decisions.",
         "5. Complete Presentation & Reference guide available in workspace file: LMS_DATA_ARCHITECTURE_AND_FLOW.md"
     ], BLUE_ACCENT)
