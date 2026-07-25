@@ -1,0 +1,2 @@
+id,userId,batchId,leaveType,proofUrl,startDate,endDate,reason,status,approvedById,createdAt,updatedAt
+1c1cbe55-fa29-4c36-8783-7cf20a09c384,f307c945-d736-4b98-883a-840dc2ff17ff,,MEDICAL,,2026-05-18 00:00:00.000000,2026-05-20 00:00:00.000000,Test backend fix,PENDING,,2026-03-07 18:39:12,2026-03-07 18:39:12

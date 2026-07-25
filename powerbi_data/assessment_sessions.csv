@@ -1,0 +1,1 @@
+id,student_id,reference_id,reference_type,start_time,end_time,responses,tab_switch_count,fullscreen_exit_count,face_violation_count,mic_violation_count,score,completion_time_seconds,auto_submitted,is_completed,created_at,updated_at,last_heartbeat

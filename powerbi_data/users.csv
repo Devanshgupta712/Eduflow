@@ -1,0 +1,5 @@
+id,email,password,name,phone,role,avatar,studentId,isActive,createdAt,updatedAt,student_id,isVerified,verificationCode,verificationExpiry,educationStatus,highestEducation,degree,passingYear,dob,can_build_resume
+f307c945-d736-4b98-883a-840dc2ff17ff,leavetestuser@example.com,$2b$12$80.tPLx4joUK6VSMSx3KEuR9hSCqQ4iF46b/JaEITplrXPJnjWrZm,Leave Tester,9999999999,STUDENT,,APC-2026-0001,1,2026-03-07 18:39:08,2026-03-07 18:39:08,,0,,,,,,,,0
+ae95cc8b-b867-4697-b51a-4d621e3537c3,admintester@example.com,$2b$12$p0xsEkRPQNJ2Q7OWsFC0b.qgyPqZVS.ZQDmRw/YJSVLoNeWTJwa3y,Admin Tester,8888888888,ADMIN,,,1,2026-03-07 18:56:23,2026-03-07 18:56:23,,0,,,,,,,,0
+e4f28d8f-a483-47ff-80d0-3d4bd03cce36,studenttester@example.com,$2b$12$GNkV9H1i2nBRetxBYpcGK.QZ6EcydFSMx6VYdGlJ6H66NQOVr0YTS,Student Tester,7777777777,STUDENT,,APC-2026-0002,1,2026-03-07 18:56:28,2026-03-07 18:56:28,,0,,,,,,,,0
+2c589d6d-b566-4df5-ad8b-1a9b22d5aacb,tester_d3f3e3@example.com,$2b$12$xW8tvJLmYfT35VxlTXa/WuB96J9smRg//7twf7yiOh1vNyrRQyQ1G,API Tester,9999999999,STUDENT,,APC-2026-0003,1,2026-03-07 19:22:02,2026-03-07 19:22:02,,0,,,,,,,,0
