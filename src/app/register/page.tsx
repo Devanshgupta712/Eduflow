@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export default function RegisterPage() {
     const router = useRouter();
-    const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
+    const [form, setForm] = useState({ name: '', email: '', phone: '', course: 'NASSCOM', password: '', confirmPassword: '' });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -54,6 +54,7 @@ export default function RegisterPage() {
                     name: form.name,
                     email: form.email,
                     phone: form.phone || null,
+                    course: form.course,
                     password: form.password,
                     role: 'STUDENT',
                 }),
@@ -325,6 +326,25 @@ export default function RegisterPage() {
                                 onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = '#fff'; }}
                                 onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-secondary)'; }}
                             />
+                        </div>
+
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Select Course *</label>
+                            <select 
+                                required 
+                                value={form.course} 
+                                onChange={e => set('course', e.target.value)} 
+                                style={{
+                                    width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--border)',
+                                    background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '15px', outline: 'none',
+                                    transition: 'all 0.2s', cursor: 'pointer'
+                                }}
+                                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = '#fff'; }}
+                                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                            >
+                                <option value="NASSCOM">NASSCOM</option>
+                                <option value="Data Analyst">Data Analyst</option>
+                            </select>
                         </div>
 
 
