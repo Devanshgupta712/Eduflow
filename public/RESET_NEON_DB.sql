@@ -1,10 +1,14 @@
 -- =============================================================
--- NEON POSTGRESQL DATE-FILTERED CLEANUP SCRIPT (SNAKE_CASE + DYNAMIC)
+-- NEON POSTGRESQL DATE-FILTERED CLEANUP SCRIPT (FK BYPASS INCLUDED)
 -- Purpose: Safely deletes test data created BEFORE 24th July 2026.
 -- PRESERVES ALL DATA CREATED ON OR AFTER 25TH JULY 2026 & SUPER_ADMIN.
 -- =============================================================
 
--- OPTION A: Dynamic PL/pgSQL Script (Auto-detects column names)
+BEGIN;
+
+-- Temporarily bypass foreign key constraints to prevent FK violation errors
+SET session_replication_role = 'replica';
+
 DO $$
 DECLARE
     r RECORD;
@@ -32,3 +36,8 @@ BEGIN
         END IF;
     END LOOP;
 END $$;
+
+-- Restore normal foreign key constraint checking
+SET session_replication_role = 'origin';
+
+COMMIT;

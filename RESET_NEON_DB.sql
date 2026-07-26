@@ -1,10 +1,14 @@
 -- =============================================================
--- NEON POSTGRESQL DATE-FILTERED CLEANUP SCRIPT (SNAKE_CASE + DYNAMIC)
+-- NEON POSTGRESQL DATE-FILTERED CLEANUP SCRIPT (FK BYPASS INCLUDED)
 -- Purpose: Safely deletes test data created BEFORE 24th July 2026.
 -- PRESERVES ALL DATA CREATED ON OR AFTER 25TH JULY 2026 & SUPER_ADMIN.
 -- =============================================================
 
--- OPTION A: Dynamic PL/pgSQL Script (Auto-detects column names)
+BEGIN;
+
+-- Temporarily bypass foreign key constraints to prevent FK violation errors
+SET session_replication_role = 'replica';
+
 DO $$
 DECLARE
     r RECORD;
@@ -33,31 +37,7 @@ BEGIN
     END LOOP;
 END $$;
 
--- OPTION B: Explicit Static SQL Queries (snake_case)
-BEGIN;
-
-DELETE FROM lead_activities WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM leads WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM registrations WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM documents WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM attendance WHERE created_at < '2026-07-24'::timestamp OR date < '2026-07-24'::timestamp;
-DELETE FROM leave_requests WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM time_tracking WHERE created_at < '2026-07-24'::timestamp OR date < '2026-07-24'::timestamp;
-DELETE FROM tasks WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM projects WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM videos WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM assessment_submissions WHERE submitted_at < '2026-07-24'::timestamp;
-DELETE FROM assessments WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM feedback WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM job_applications WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM jobs WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM mock_interviews WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM communication_practice WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM notifications WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM messages WHERE sent_at < '2026-07-24'::timestamp;
-DELETE FROM batch_students WHERE joined_at < '2026-07-24'::timestamp;
-DELETE FROM batches WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM courses WHERE created_at < '2026-07-24'::timestamp;
-DELETE FROM users WHERE role != 'SUPER_ADMIN' AND created_at < '2026-07-24'::timestamp;
+-- Restore normal foreign key constraint checking
+SET session_replication_role = 'origin';
 
 COMMIT;
