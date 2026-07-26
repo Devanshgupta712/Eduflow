@@ -1,47 +1,57 @@
 -- =============================================================
--- NEON POSTGRESQL DATE-FILTERED CLEANUP SCRIPT (COMPLETE DEPENDENCY ORDER)
--- Purpose: Safely deletes test data created BEFORE 24th July 2026.
--- Handles all sub-child tables (sessions, assignments, etc.).
--- PRESERVES ALL DATA CREATED ON OR AFTER 25TH JULY 2026 & SUPER_ADMIN.
+-- NEON DB DIAGNOSTIC & CLEAN RESET SCRIPT
 -- =============================================================
+
+-- PART 1: DIAGNOSTIC QUERY (Run this first to see table counts & dates)
+SELECT 'users' AS table_name, COUNT(*) AS total_rows FROM users
+UNION ALL SELECT 'courses', COUNT(*) FROM courses
+UNION ALL SELECT 'batches', COUNT(*) FROM batches
+UNION ALL SELECT 'registrations', COUNT(*) FROM registrations
+UNION ALL SELECT 'leads', COUNT(*) FROM leads
+UNION ALL SELECT 'attendance', COUNT(*) FROM attendance;
+
+
+-- PART 2: COMPLETE RESET SCRIPT
+-- Wipes all test courses, batches, leads, registrations, & test users.
+-- Preserves ONLY your SUPER_ADMIN user account.
 
 DO $$
 BEGIN
-    -- 1. Sub-Child Tables (Sessions, Assignments, Milestones, Violations)
-    BEGIN DELETE FROM sessions WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM assignment_submissions WHERE submitted_at < '2026-07-24'::timestamp OR created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM assignments WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM project_milestones WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM violations WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM assessment_sessions WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
+    -- 1. Sub-Child & Leaf Tables
+    BEGIN DELETE FROM lead_activities; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM batch_students; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM attendance; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM leave_requests; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM time_tracking; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM tasks; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM videos; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM assessment_submissions; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM feedback; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM job_applications; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM mock_interviews; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM communication_practice; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM notifications; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM messages; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM documents; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM registrations; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM sessions; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM assignments; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM assignment_submissions; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM project_milestones; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM violations; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM assessment_sessions; EXCEPTION WHEN OTHERS THEN NULL; END;
 
-    -- 2. Leaf Child Tables (Attendance, Tasks, Submissions, Feedback, Jobs, Logs)
-    BEGIN DELETE FROM lead_activities WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM batch_students WHERE joined_at < '2026-07-24'::timestamp OR created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM attendance WHERE created_at < '2026-07-24'::timestamp OR date < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM leave_requests WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM time_tracking WHERE created_at < '2026-07-24'::timestamp OR date < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM tasks WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM videos WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM assessment_submissions WHERE submitted_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM feedback WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM job_applications WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM mock_interviews WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM communication_practice WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM notifications WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM messages WHERE sent_at < '2026-07-24'::timestamp OR created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM documents WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM registrations WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
+    -- 2. Mid-Level Tables
+    BEGIN DELETE FROM projects; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM assessments; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM leads; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM jobs; EXCEPTION WHEN OTHERS THEN NULL; END;
 
-    -- 3. Mid-Level Tables (Projects, Assessments, Leads, Jobs)
-    BEGIN DELETE FROM projects WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM assessments WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM leads WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM jobs WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
+    -- 3. Parent Tables
+    BEGIN DELETE FROM batches; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM courses; EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM admin_permissions; EXCEPTION WHEN OTHERS THEN NULL; END;
 
-    -- 4. Parent Tables (Batches, Courses, Permissions, Users)
-    BEGIN DELETE FROM batches WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM courses WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM admin_permissions WHERE created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM users WHERE role != 'SUPER_ADMIN' AND created_at < '2026-07-24'::timestamp; EXCEPTION WHEN OTHERS THEN NULL; END;
+    -- 4. Users: Delete all non-SUPER_ADMIN users
+    BEGIN DELETE FROM users WHERE role != 'SUPER_ADMIN'; EXCEPTION WHEN OTHERS THEN NULL; END;
 END $$;
