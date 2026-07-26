@@ -81,7 +81,7 @@ const navSections: NavSection[] = [
     },
     {
         title: 'Career',
-        roles: ['SUPER_ADMIN', 'ADMIN', 'STUDENT'],
+        roles: ['SUPER_ADMIN', 'ADMIN'],
         items: [
             { label: 'Jobs', href: '/placement/jobs', icon: '💼', roles: ['SUPER_ADMIN', 'ADMIN'] },
             { label: 'Assessments', href: '/placement/assessments', icon: '📝' },
@@ -102,17 +102,12 @@ const navSections: NavSection[] = [
             { label: 'Work Hour', href: '/student/time-tracking', icon: '⏱️' },
             { label: 'Tasks', href: '/student/tasks', icon: '📋' },
             { label: 'Assignments', href: '/student/assessments', icon: '📝' },
-            { label: 'Resume Builder', href: '/student/resume', icon: '📄', requiresResumeAccess: true },
             { label: 'Apply Leave', href: '/student/leaves', icon: '🗓️' },
-            { label: 'Job Board', href: '/student/jobs', icon: '💼' },
-            { label: 'Warnings', href: '/student/violations', icon: '⚠️' },
-            { label: 'Notifications', href: '/student/notifications', icon: '🔔' },
-            { label: 'Feedback', href: '/student/feedback', icon: '💬' },
         ],
     },
     {
         title: 'English Fluency',
-        roles: ['SUPER_ADMIN', 'ADMIN', 'TRAINER', 'STUDENT'],
+        roles: ['SUPER_ADMIN', 'ADMIN', 'TRAINER'],
         items: [
             { label: 'Dashboard', href: '/english', icon: '🗣️' },
             { label: 'Live Call', href: '/english/live-call', icon: '📞' },
@@ -254,17 +249,19 @@ export default function Sidebar({ userRole, userName, userEmail, isOpen, onClose
                         .filter((section) => section.roles.includes(userRole))
                         .map((section) => (
                             <div key={section.title} style={{ marginBottom: '28px' }}>
-                                <div style={{ 
-                                    padding: '0 12px', 
-                                    fontSize: '11px', 
-                                    fontWeight: 700, 
-                                    color: 'var(--text-muted)', 
-                                    textTransform: 'uppercase', 
-                                    letterSpacing: '0.05em',
-                                    marginBottom: '12px'
-                                }}>
-                                    {section.title}
-                                </div>
+                                {userRole !== 'STUDENT' && (
+                                    <div style={{ 
+                                        padding: '0 12px', 
+                                        fontSize: '11px', 
+                                        fontWeight: 700, 
+                                        color: 'var(--text-muted)', 
+                                        textTransform: 'uppercase', 
+                                        letterSpacing: '0.05em',
+                                        marginBottom: '12px'
+                                    }}>
+                                        {section.title}
+                                    </div>
+                                )}
                                 {section.items
                                     .filter((item) => {
                                         if (userRole === 'SUPER_ADMIN') return true;
