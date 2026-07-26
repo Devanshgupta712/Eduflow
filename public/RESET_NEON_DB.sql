@@ -1,57 +1,68 @@
 -- =============================================================
--- NEON DB DIAGNOSTIC & CLEAN RESET SCRIPT
+-- NEON POSTGRESQL AUTOMATED DATE-FILTERED CLEANUP SCRIPT (2-PASS)
+-- Purpose: Auto-detects date columns across all tables and deletes
+-- test data created BEFORE 24th July 2026 23:59:59.
+-- PRESERVES ALL DATA CREATED ON OR AFTER 25TH JULY 2026 & SUPER_ADMIN.
 -- =============================================================
 
--- PART 1: DIAGNOSTIC QUERY (Run this first to see table counts & dates)
-SELECT 'users' AS table_name, COUNT(*) AS total_rows FROM users
-UNION ALL SELECT 'courses', COUNT(*) FROM courses
-UNION ALL SELECT 'batches', COUNT(*) FROM batches
-UNION ALL SELECT 'registrations', COUNT(*) FROM registrations
-UNION ALL SELECT 'leads', COUNT(*) FROM leads
-UNION ALL SELECT 'attendance', COUNT(*) FROM attendance;
-
-
--- PART 2: COMPLETE RESET SCRIPT
--- Wipes all test courses, batches, leads, registrations, & test users.
--- Preserves ONLY your SUPER_ADMIN user account.
-
 DO $$
+DECLARE
+    r RECORD;
+    del_count INT;
+    col_name TEXT;
+    sql_stmt TEXT;
 BEGIN
-    -- 1. Sub-Child & Leaf Tables
-    BEGIN DELETE FROM lead_activities; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM batch_students; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM attendance; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM leave_requests; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM time_tracking; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM tasks; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM videos; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM assessment_submissions; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM feedback; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM job_applications; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM mock_interviews; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM communication_practice; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM notifications; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM messages; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM documents; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM registrations; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM sessions; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM assignments; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM assignment_submissions; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM project_milestones; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM violations; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM assessment_sessions; EXCEPTION WHEN OTHERS THEN NULL; END;
+    RAISE NOTICE 'Starting automated database cleanup for data prior to 2026-07-24...';
 
-    -- 2. Mid-Level Tables
-    BEGIN DELETE FROM projects; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM assessments; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM leads; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM jobs; EXCEPTION WHEN OTHERS THEN NULL; END;
+    -- PASS 1: Delete from all child/operational tables first
+    FOR r IN 
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+          AND table_type = 'BASE TABLE'
+          AND table_name NOT IN ('users', 'courses', 'batches')
+    LOOP
+        -- Find date column for this table
+        SELECT column_name INTO col_name
+        FROM information_schema.columns 
+        WHERE table_name = r.table_name 
+          AND column_name IN ('createdAt', 'created_at', 'joinedAt', 'joined_at', 'submittedAt', 'submitted_at', 'sentAt', 'sent_at', 'date')
+        LIMIT 1;
 
-    -- 3. Parent Tables
-    BEGIN DELETE FROM batches; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM courses; EXCEPTION WHEN OTHERS THEN NULL; END;
-    BEGIN DELETE FROM admin_permissions; EXCEPTION WHEN OTHERS THEN NULL; END;
+        IF col_name IS NOT NULL THEN
+            sql_stmt := format('DELETE FROM %I WHERE %I < %L::timestamp', r.table_name, col_name, '2026-07-24 23:59:59');
+            EXECUTE sql_stmt;
+            GET DIAGNOSTICS del_count = ROW_COUNT;
+            IF del_count > 0 THEN
+                RAISE NOTICE '✓ Deleted % rows from table % (column %)', del_count, r.table_name, col_name;
+            END IF;
+        END IF;
+    END LOOP;
 
-    -- 4. Users: Delete all non-SUPER_ADMIN users
-    BEGIN DELETE FROM users WHERE role != 'SUPER_ADMIN'; EXCEPTION WHEN OTHERS THEN NULL; END;
+    -- PASS 2: Delete from parent tables (batches -> courses -> users)
+    FOR r IN 
+        SELECT unnest(ARRAY['batches', 'courses', 'users']) AS table_name
+    LOOP
+        SELECT column_name INTO col_name
+        FROM information_schema.columns 
+        WHERE table_name = r.table_name 
+          AND column_name IN ('createdAt', 'created_at', 'date')
+        LIMIT 1;
+
+        IF col_name IS NOT NULL THEN
+            IF r.table_name = 'users' THEN
+                sql_stmt := format('DELETE FROM %I WHERE role != %L AND %I < %L::timestamp', r.table_name, 'SUPER_ADMIN', col_name, '2026-07-24 23:59:59');
+            ELSE
+                sql_stmt := format('DELETE FROM %I WHERE %I < %L::timestamp', r.table_name, col_name, '2026-07-24 23:59:59');
+            END IF;
+            
+            EXECUTE sql_stmt;
+            GET DIAGNOSTICS del_count = ROW_COUNT;
+            IF del_count > 0 THEN
+                RAISE NOTICE '✓ Deleted % rows from parent table % (column %)', del_count, r.table_name, col_name;
+            END IF;
+        END IF;
+    END LOOP;
+
+    RAISE NOTICE '🎉 Cleanup complete! Pre-July 24 data removed. July 25+ data & SUPER_ADMIN preserved.';
 END $$;
