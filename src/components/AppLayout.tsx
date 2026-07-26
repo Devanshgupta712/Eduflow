@@ -264,7 +264,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         return (
             <>
                 {children}
-                <ChatbotFAQ />
             </>
         );
     }
@@ -344,7 +343,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     setTimeout(() => setShowSearchResults(false), 200);
                                 }}
                             />
-<ChatbotFAQ />
                             {/* Dropdown Results */}
                             {showSearchResults && searchResults.length > 0 && (
                                 <div style={{
