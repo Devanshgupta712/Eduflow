@@ -1,68 +1,42 @@
 -- =============================================================
--- NEON POSTGRESQL DATABASE RESET SCRIPT
--- Purpose: Wipes all test data created before 24th July 2026.
--- Retains only the SUPER_ADMIN account.
+-- NEON POSTGRESQL DATE-FILTERED CLEANUP SCRIPT
+-- Purpose: Deletes ONLY test data created BEFORE 24th July 2026.
+-- PRESERVES ALL DATA CREATED ON OR AFTER 25TH JULY 2026 & SUPER_ADMIN.
 -- =============================================================
 
 BEGIN;
 
--- Disable triggers / foreign key restrictions during truncate
-SET session_replication_role = 'replica';
+-- 1. Delete transactional & operational records created BEFORE 24th July 2026
+DELETE FROM lead_activities WHERE "createdAt" < '2026-07-24';
+DELETE FROM leads WHERE "createdAt" < '2026-07-24';
+DELETE FROM registrations WHERE "createdAt" < '2026-07-24';
+DELETE FROM documents WHERE "createdAt" < '2026-07-24';
+DELETE FROM attendance WHERE "createdAt" < '2026-07-24' OR date < '2026-07-24';
+DELETE FROM leave_requests WHERE "createdAt" < '2026-07-24';
+DELETE FROM time_tracking WHERE "createdAt" < '2026-07-24' OR date < '2026-07-24';
+DELETE FROM tasks WHERE "createdAt" < '2026-07-24';
+DELETE FROM projects WHERE "createdAt" < '2026-07-24';
+DELETE FROM videos WHERE "createdAt" < '2026-07-24';
+DELETE FROM assessment_submissions WHERE "submittedAt" < '2026-07-24';
+DELETE FROM assessments WHERE "createdAt" < '2026-07-24';
+DELETE FROM feedback WHERE "createdAt" < '2026-07-24';
+DELETE FROM job_applications WHERE "createdAt" < '2026-07-24';
+DELETE FROM jobs WHERE "createdAt" < '2026-07-24';
+DELETE FROM mock_interviews WHERE "createdAt" < '2026-07-24';
+DELETE FROM communication_practice WHERE "createdAt" < '2026-07-24';
+DELETE FROM notifications WHERE "createdAt" < '2026-07-24';
+DELETE FROM messages WHERE "sentAt" < '2026-07-24';
+DELETE FROM batch_students WHERE "joinedAt" < '2026-07-24';
+DELETE FROM batches WHERE "createdAt" < '2026-07-24';
+DELETE FROM courses WHERE "createdAt" < '2026-07-24';
 
--- 1. Truncate all data tables
-TRUNCATE TABLE 
-    admin_permissions,
-    assessment_submissions,
-    assessments,
-    attendance,
-    batch_students,
-    batches,
-    communication_practice,
-    courses,
-    documents,
-    feedback,
-    job_applications,
-    jobs,
-    lead_activities,
-    leads,
-    leave_requests,
-    messages,
-    mock_interviews,
-    notifications,
-    projects,
-    registrations,
-    tasks,
-    time_tracking,
-    videos
-RESTART IDENTITY CASCADE;
-
--- 2. Clean users table: remove all users except SUPER_ADMIN
-DELETE FROM users WHERE role != 'SUPER_ADMIN';
-
--- 3. Ensure default SUPER_ADMIN user exists
-INSERT INTO users (id, email, password, name, phone, role, "isActive", "createdAt", "updatedAt")
-SELECT 
-    'f307c945-d736-4b98-883a-840dc2ff17ff', 
-    'admin@apptech.com', 
-    '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeg6Lruj3vjPGga31lW', -- admin123
-    'Super Admin', 
-    '9000000001', 
-    'SUPER_ADMIN', 
-    true, 
-    NOW(), 
-    NOW()
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = 'SUPER_ADMIN');
-
--- Re-enable foreign key constraints
-SET session_replication_role = 'DEFAULT';
+-- 2. Delete users created BEFORE 24th July 2026 (Except SUPER_ADMIN)
+DELETE FROM users WHERE role != 'SUPER_ADMIN' AND "createdAt" < '2026-07-24';
 
 COMMIT;
 
--- Verification
-SELECT table_name, row_count FROM (
-    SELECT 'users' AS table_name, COUNT(*) AS row_count FROM users
-    UNION ALL SELECT 'courses', COUNT(*) FROM courses
-    UNION ALL SELECT 'batches', COUNT(*) FROM batches
-    UNION ALL SELECT 'registrations', COUNT(*) FROM registrations
-    UNION ALL SELECT 'leads', COUNT(*) FROM leads
-) summary;
+-- Verification summary of preserved data
+SELECT 'Preserved Users (25th July onwards)' AS metric, COUNT(*) AS total FROM users WHERE "createdAt" >= '2026-07-25' OR role = 'SUPER_ADMIN'
+UNION ALL SELECT 'Preserved Registrations (25th July onwards)', COUNT(*) FROM registrations WHERE "createdAt" >= '2026-07-25'
+UNION ALL SELECT 'Preserved Batches (25th July onwards)', COUNT(*) FROM batches WHERE "createdAt" >= '2026-07-25'
+UNION ALL SELECT 'Preserved Courses (25th July onwards)', COUNT(*) FROM courses WHERE "createdAt" >= '2026-07-25';
