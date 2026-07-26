@@ -48,6 +48,12 @@ export default function BatchesPage() {
     const [enrolling, setEnrolling] = useState(false);
     const [enrollMsg, setEnrollMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+    // Bulk Enrollment State
+    const [showBulkAdd, setShowBulkAdd] = useState(false);
+    const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+    const [bulkSearch, setBulkSearch] = useState('');
+    const [bulkEnrolling, setBulkEnrolling] = useState(false);
+
     const searchParams = useSearchParams();
 
     useEffect(() => { 
@@ -249,12 +255,42 @@ export default function BatchesPage() {
         }
     };
 
+    const handleBulkEnroll = async () => {
+        if (!viewStudentsId || selectedStudentIds.size === 0) return;
+        setBulkEnrolling(true);
+        setEnrollMsg(null);
+        let successCount = 0;
+        try {
+            const studentIdsToEnroll = Array.from(selectedStudentIds);
+            await Promise.all(studentIdsToEnroll.map(id => 
+                apiFetch(`/api/admin/users/${id}/assign-batch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ batch_id: viewStudentsId })
+                }).then(res => { if (res.ok) successCount++; })
+            ));
+            setEnrollMsg({ type: 'success', text: `✅ ${successCount} student(s) added to batch successfully!` });
+            setSelectedStudentIds(new Set());
+            setShowBulkAdd(false);
+            // Refresh batch student roster list
+            const updatedStudents = await apiGet(`/api/training/batches/${viewStudentsId}/students`).catch(() => null);
+            if (updatedStudents) setStudentsList(updatedStudents);
+        } catch (err: any) {
+            setEnrollMsg({ type: 'error', text: 'Failed to enroll some students.' });
+        } finally {
+            setBulkEnrolling(false);
+        }
+    };
+
     const closeRosterModal = () => {
         setViewStudentsId(null);
         setStudentSearch('');
         setEnrollStudentId('');
         setSelectedStudentName('');
         setEnrollMsg(null);
+        setShowBulkAdd(false);
+        setSelectedStudentIds(new Set());
+        setBulkSearch('');
     };
 
     return (
@@ -428,13 +464,179 @@ export default function BatchesPage() {
             {viewStudentsId && (
                 <div className="modal-overlay" onClick={closeRosterModal}>
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                             <h2 className="modal-title" style={{ margin: 0 }}>Roster: {viewStudentsName}</h2>
-                            <button className="btn btn-sm btn-ghost" onClick={closeRosterModal}>✕ Close</button>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                {canManageBatches && (
+                                    <button
+                                        type="button"
+                                        className={`btn btn-sm ${showBulkAdd ? 'btn-primary' : 'btn-outline'}`}
+                                        onClick={() => {
+                                            setShowBulkAdd(!showBulkAdd);
+                                            setSelectedStudentIds(new Set());
+                                            setBulkSearch('');
+                                        }}
+                                        style={{ borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                    >
+                                        {showBulkAdd ? '✕ Single Add Mode' : '☑️ Bulk Add Students'}
+                                    </button>
+                                )}
+                                <button className="btn btn-sm btn-ghost" onClick={closeRosterModal}>✕ Close</button>
+                            </div>
                         </div>
 
-                        {/* Add Student — Searchable Picker */}
-                        {canManageBatches && (() => {
+                        {/* Bulk Add Mode Interface */}
+                        {canManageBatches && showBulkAdd && (
+                            <div className="card" style={{ padding: '16px', marginBottom: '24px', background: 'var(--bg-secondary)', border: '1px solid var(--primary-glow)', borderRadius: '16px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        ☑️ Select Students to Add ({selectedStudentIds.size} selected)
+                                    </h4>
+                                    <button
+                                        type="button"
+                                        className="btn btn-xs btn-outline"
+                                        onClick={() => {
+                                            const available = allStudents.filter(u => !studentsList.some(s => s.id === u.id));
+                                            const q = bulkSearch.trim().toLowerCase();
+                                            const filtered = q
+                                                ? available.filter(u => u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.student_id?.toLowerCase().includes(q))
+                                                : available;
+                                            const allSelected = filtered.length > 0 && filtered.every(s => selectedStudentIds.has(s.id));
+                                            if (allSelected) {
+                                                setSelectedStudentIds(new Set());
+                                            } else {
+                                                setSelectedStudentIds(new Set(filtered.map(s => s.id)));
+                                            }
+                                        }}
+                                        style={{ borderRadius: '6px', fontSize: '12px' }}
+                                    >
+                                        {(() => {
+                                            const available = allStudents.filter(u => !studentsList.some(s => s.id === u.id));
+                                            const q = bulkSearch.trim().toLowerCase();
+                                            const filtered = q
+                                                ? available.filter(u => u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.student_id?.toLowerCase().includes(q))
+                                                : available;
+                                            const allSelected = filtered.length > 0 && filtered.every(s => selectedStudentIds.has(s.id));
+                                            return allSelected ? 'Deselect All' : 'Select All Filtered';
+                                        })()}
+                                    </button>
+                                </div>
+
+                                {/* Filter input */}
+                                <div style={{ position: 'relative', marginBottom: '12px' }}>
+                                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '14px', pointerEvents: 'none' }}>🔍</span>
+                                    <input
+                                        className="form-input"
+                                        placeholder="Search full student list by name, email, or ID..."
+                                        style={{ paddingLeft: '36px', borderRadius: '10px', fontSize: '13px' }}
+                                        value={bulkSearch}
+                                        onChange={e => setBulkSearch(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* List of full students */}
+                                <div style={{ maxHeight: '280px', overflowY: 'auto', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg-primary)' }}>
+                                    {(() => {
+                                        const q = bulkSearch.trim().toLowerCase();
+                                        const filtered = allStudents.filter(u =>
+                                            !q || u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.student_id?.toLowerCase().includes(q)
+                                        );
+
+                                        if (filtered.length === 0) {
+                                            return (
+                                                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                                                    No students found matching "{bulkSearch}"
+                                                </div>
+                                            );
+                                        }
+
+                                        return filtered.map(s => {
+                                            const isEnrolled = studentsList.some(bStudent => bStudent.id === s.id);
+                                            const isChecked = selectedStudentIds.has(s.id);
+
+                                            return (
+                                                <div
+                                                    key={s.id}
+                                                    onClick={() => {
+                                                        if (isEnrolled) return;
+                                                        setSelectedStudentIds(prev => {
+                                                            const next = new Set(prev);
+                                                            if (next.has(s.id)) next.delete(s.id);
+                                                            else next.add(s.id);
+                                                            return next;
+                                                        });
+                                                    }}
+                                                    style={{
+                                                        padding: '10px 14px',
+                                                        borderBottom: '1px solid var(--border-light)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '12px',
+                                                        cursor: isEnrolled ? 'not-allowed' : 'pointer',
+                                                        background: isChecked ? 'var(--primary-glow)' : 'transparent',
+                                                        opacity: isEnrolled ? 0.6 : 1,
+                                                        transition: 'background 0.15s'
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isEnrolled || isChecked}
+                                                        disabled={isEnrolled}
+                                                        onChange={() => {}} 
+                                                        style={{ width: '18px', height: '18px', cursor: isEnrolled ? 'not-allowed' : 'pointer', accentColor: 'var(--primary)' }}
+                                                    />
+                                                    <div style={{
+                                                        width: '32px', height: '32px', borderRadius: '50%',
+                                                        background: isEnrolled ? 'var(--bg-secondary)' : 'var(--primary)', color: isEnrolled ? 'var(--text-muted)' : '#fff',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontWeight: 700, fontSize: '13px', flexShrink: 0
+                                                    }}>
+                                                        {s.name?.[0]?.toUpperCase()}
+                                                    </div>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            {s.name}
+                                                            {s.student_id && <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>{s.student_id}</span>}
+                                                        </div>
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            {s.email}
+                                                        </div>
+                                                    </div>
+                                                    {isEnrolled ? (
+                                                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '6px', background: 'rgba(34,197,94,0.1)', color: '#16a34a' }}>
+                                                            ✓ Enrolled
+                                                        </span>
+                                                    ) : isChecked ? (
+                                                        <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: 'var(--primary)', color: '#fff' }}>
+                                                            Selected
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            );
+                                        });
+                                    })()}
+                                </div>
+
+                                {/* Action button */}
+                                <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                        {selectedStudentIds.size > 0 ? `Selected ${selectedStudentIds.size} student(s)` : 'Click checkboxes to select students'}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        disabled={selectedStudentIds.size === 0 || bulkEnrolling}
+                                        onClick={handleBulkEnroll}
+                                        style={{ borderRadius: '10px', padding: '8px 20px', fontSize: '13px', fontWeight: 700 }}
+                                    >
+                                        {bulkEnrolling ? '⏳ Enrolling...' : `✓ Add ${selectedStudentIds.size} Student(s) to Batch`}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Add Student — Searchable Single Picker */}
+                        {canManageBatches && !showBulkAdd && (() => {
                             // Students not yet in this batch
                             const available = allStudents.filter(u => !studentsList.some(s => s.id === u.id));
                             // Filter by search query (name or email)
