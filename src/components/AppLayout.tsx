@@ -4,12 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import { getStoredUser, clearToken, setStoredUser, apiGet, apiPost } from '@/lib/api';
-import ChatbotFAQ from './ChatbotFAQ';
 import { useTheme } from '@/components/ThemeProvider';
 import Student360Report from './Student360Report';
-import SuggestionBox from './SuggestionBox';
 import { useSocket } from '@/hooks/useSocket';
-import AstraAvatar from './AstraAvatar';
 
 
 const PUBLIC_PATHS = [
@@ -527,9 +524,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     {children}
                 </div>
             </main>
-            <ChatbotFAQ />
-            {/* Global Suggestion Box for Students and Trainers */}
-            {['STUDENT', 'TRAINER'].includes(user?.role || '') && <SuggestionBox />}
             {selectedStudentId && (
                 <Student360Report
                     studentId={selectedStudentId}
