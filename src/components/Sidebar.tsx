@@ -53,7 +53,6 @@ const navSections: NavSection[] = [
             { label: 'Batches', href: '/admin/batches', icon: '👥', roles: ['SUPER_ADMIN', 'ADMIN', 'TRAINER'], permission: 'manage_batches' },
             { label: 'Registrations', href: '/admin/registrations', icon: '📝', roles: ['SUPER_ADMIN', 'ADMIN'], permission: 'manage_courses' },
             { label: 'Students', href: '/admin/students', icon: '🎓' },
-            { label: 'English Reports', href: '/admin/english', icon: '📊' },
             { label: 'Leaves', href: '/admin/leaves', icon: '🗓️', permission: 'manage_leaves' },
             { label: 'Time Tracking', href: '/admin/time-tracking', icon: '⏱️', roles: ['SUPER_ADMIN', 'ADMIN'] },
             { label: 'Reports', href: '/admin/reports', icon: '📈', roles: ['SUPER_ADMIN', 'ADMIN'] },
@@ -80,18 +79,6 @@ const navSections: NavSection[] = [
         ],
     },
     {
-        title: 'Career',
-        roles: ['SUPER_ADMIN', 'ADMIN'],
-        items: [
-            { label: 'Jobs', href: '/placement/jobs', icon: '💼', roles: ['SUPER_ADMIN', 'ADMIN'] },
-            { label: 'Assessments', href: '/placement/assessments', icon: '📝' },
-            { label: 'Mock Interviews', href: '/placement/mock-interviews', icon: '🎤' },
-            { label: 'Practice', href: '/placement/practice', icon: '🗣️' },
-            { label: 'Resume Builder', href: '/student/resume', icon: '📄' },
-            { label: 'Reports', href: '/placement/reports', icon: '📈', roles: ['SUPER_ADMIN', 'ADMIN'] },
-        ],
-    },
-    {
         title: 'Student Portal',
         roles: ['STUDENT'],
         items: [
@@ -103,19 +90,6 @@ const navSections: NavSection[] = [
             { label: 'Tasks', href: '/student/tasks', icon: '📋' },
             { label: 'Assignments', href: '/student/assessments', icon: '📝' },
             { label: 'Apply Leave', href: '/student/leaves', icon: '🗓️' },
-        ],
-    },
-    {
-        title: 'English Fluency',
-        roles: ['SUPER_ADMIN', 'ADMIN', 'TRAINER'],
-        items: [
-            { label: 'Dashboard', href: '/english', icon: '🗣️' },
-            { label: 'Live Call', href: '/english/live-call', icon: '📞' },
-            { label: 'Speaking Practice', href: '/english/practice', icon: '🎙️' },
-            { label: 'AI Conversation', href: '/english/conversation', icon: '🤖' },
-            { label: 'Roleplay', href: '/english/roleplay', icon: '🎭' },
-            { label: 'Think Drills', href: '/english/drills', icon: '🧠' },
-            { label: 'Leaderboard', href: '/english/leaderboard', icon: '🏆' },
         ],
     },
     {
