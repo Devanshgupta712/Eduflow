@@ -1,28 +1,35 @@
 -- =============================================================
--- SINGLE COMMAND NEON DB CLEANUP (PRE-JULY 24 DATA REMOVAL)
--- Purpose: Deletes all records created BEFORE 24th July 2026 23:59:59.
--- Unlinks trainer references and cleans all tables in one block.
+-- FAIL-PROOF NEON DB CLEANUP SCRIPT (AUTO DATE COLUMN DETECTION)
+-- Purpose: Auto-detects date columns (created_at, joined_at, submitted_at, etc.)
+-- across all tables and deletes pre-July 24 test data cleanly.
 -- PRESERVES ALL JULY 25TH+ STUDENTS & SUPER_ADMIN.
 -- =============================================================
 
 DO $$
 DECLARE
     r RECORD;
+    col_name TEXT;
 BEGIN
-    -- 1. Clear pre-July 24 records from all tables (except users)
+    -- 1. Loop through all tables (except users) and delete pre-July 24 rows using auto-detected date column
     FOR r IN 
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name != 'users'
     LOOP
-        BEGIN
-            EXECUTE format('DELETE FROM %I WHERE created_at < %L::timestamp', r.table_name, '2026-07-24 23:59:59');
-        EXCEPTION WHEN OTHERS THEN 
+        -- Find the date column for this table
+        SELECT column_name INTO col_name
+        FROM information_schema.columns 
+        WHERE table_name = r.table_name 
+          AND column_name IN ('createdAt', 'created_at', 'joinedAt', 'joined_at', 'submittedAt', 'submitted_at', 'sentAt', 'sent_at', 'date')
+        LIMIT 1;
+
+        IF col_name IS NOT NULL THEN
             BEGIN
-                EXECUTE format('DELETE FROM %I WHERE "createdAt" < %L::timestamp', r.table_name, '2026-07-24 23:59:59');
-            EXCEPTION WHEN OTHERS THEN NULL;
+                EXECUTE format('DELETE FROM %I WHERE %I < %L::timestamp', r.table_name, col_name, '2026-07-24 23:59:59');
+            EXCEPTION WHEN OTHERS THEN 
+                NULL;
             END;
-        END;
+        END IF;
     END LOOP;
 
     -- 2. Nullify trainer references in batches if pointing to an old pre-July 24 user
