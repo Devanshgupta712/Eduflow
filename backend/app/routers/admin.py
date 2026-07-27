@@ -631,6 +631,9 @@ async def update_user_status(
 class UserResumeAccessUpdate(BaseModel):
     can_build_resume: bool
 
+class UserOnlineModeUpdate(BaseModel):
+    is_online_student: bool
+
 @router.patch("/users/{user_id}/resume-access")
 async def update_user_resume_access(
     user_id: str,
@@ -645,6 +648,22 @@ async def update_user_resume_access(
     target_user.can_build_resume = body.can_build_resume
     await db.commit()
     return {"status": "updated", "can_build_resume": target_user.can_build_resume}
+
+
+@router.patch("/users/{user_id}/online-mode")
+async def update_user_online_mode(
+    user_id: str,
+    body: UserOnlineModeUpdate,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_admin_permissions(manage_users=True))
+):
+    target_user = await db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    target_user.is_online_student = body.is_online_student
+    await db.commit()
+    return {"status": "updated", "is_online_student": target_user.is_online_student}
 
 
 @router.patch("/users/{user_id}/password")

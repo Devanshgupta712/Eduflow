@@ -207,6 +207,7 @@ async def lifespan(app: FastAPI):
                     "ALTER TABLE batches ADD COLUMN IF NOT EXISTS schedule_link VARCHAR",
                     # Resume Builder & Account Blocking
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS can_build_resume BOOLEAN DEFAULT FALSE",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_online_student BOOLEAN DEFAULT FALSE",
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE",
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS student_id VARCHAR(100) UNIQUE",
                     """CREATE TABLE IF NOT EXISTS resumes (

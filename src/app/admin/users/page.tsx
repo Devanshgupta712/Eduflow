@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete, getStoredUser } from '@/lib/api';
 import SkeletonLoader from '@/components/SkeletonLoader';
 
-interface UserItem { id: string; name: string; email: string; role: string; phone: string | null; is_active: boolean; is_blocked: boolean; can_build_resume: boolean; created_at: string; }
+interface UserItem { id: string; name: string; email: string; role: string; phone: string | null; is_active: boolean; is_blocked: boolean; can_build_resume: boolean; is_online_student: boolean; created_at: string; }
 
 export default function UsersPage() {
     const [users, setUsers] = useState<UserItem[]>([]);
@@ -106,6 +106,17 @@ export default function UsersPage() {
             loadUsers();
         } catch (err: any) {
             alert('Error updating resume access: ' + (err.message || 'Unknown error'));
+        }
+    };
+
+    const handleToggleOnlineMode = async (user: UserItem) => {
+        try {
+            await apiPatch(`/api/admin/users/${user.id}/online-mode`, {
+                is_online_student: !user.is_online_student
+            });
+            loadUsers();
+        } catch (err: any) {
+            alert('Error updating online mode: ' + (err.message || 'Unknown error'));
         }
     };
 
@@ -300,12 +311,27 @@ export default function UsersPage() {
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                         <span className={`badge ${u.is_active ? 'badge-success' : 'badge-danger'}`}>{u.is_active ? 'Active' : 'Suspended'}</span>
                                         {u.is_blocked && <span className="badge badge-danger" style={{ background: '#7f1d1d' }}>Blocked</span>}
+                                        {u.role === 'STUDENT' && (
+                                            <span className={`badge ${u.is_online_student ? 'badge-accent' : 'badge-ghost'}`} style={{ fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                {u.is_online_student ? '🌐 ONLINE' : '🏢 OFFLINE'}
+                                            </span>
+                                        )}
                                     </div>
                                 </td>
                                 <td className="text-sm text-muted">{new Date(u.created_at).toLocaleDateString()}</td>
                                 {(isSuperAdmin || isAdmin || canManageUsers) && (
                                     <td>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                            {u.role === 'STUDENT' && canManageUsers && (
+                                                <button
+                                                    className={`btn btn-sm ${u.is_online_student ? 'btn-primary' : 'btn-outline'}`}
+                                                    onClick={() => handleToggleOnlineMode(u)}
+                                                    style={{ fontSize: '11px', borderRadius: '8px' }}
+                                                    title="Toggle Direct Mobile Punch In/Out for Online Students"
+                                                >
+                                                    {u.is_online_student ? '🌐 Online Mode' : '🏢 Offline Mode'}
+                                                </button>
+                                            )}
                                             <button
                                                 className="btn btn-sm btn-secondary"
                                                 onClick={() => setPasswordModal({ show: true, targetUser: u, newPassword: '' })}

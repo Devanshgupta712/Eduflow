@@ -63,6 +63,7 @@ class UserOut(BaseModel):
     degree: str | None = None
     passing_year: str | None = None
     can_build_resume: bool = False
+    is_online_student: bool = False
     is_active: bool
     created_at: datetime
     permissions: AdminPermissionOut | None = None

@@ -48,6 +48,7 @@ class User(Base):
     degree: Mapped[str | None] = mapped_column(String, nullable=True)
     passing_year: Mapped[str | None] = mapped_column(String, nullable=True)
     can_build_resume: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_online_student: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)

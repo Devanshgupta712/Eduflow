@@ -155,6 +155,45 @@ export default function StudentTimeTrackingPage() {
         }
     };
 
+    const [onlinePunching, setOnlinePunching] = useState(false);
+    const isOnlineStudent = user?.is_online_student === true || user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'TRAINER';
+
+    const handleOnlinePunch = async () => {
+        setOnlinePunching(true);
+        setScanResult(null);
+        try {
+            const res = await apiPost('/api/auth/online-punch', {});
+            let data;
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                data = await res.json();
+            } else {
+                const text = await res.text();
+                throw new Error(text || `Server error: ${res.status}`);
+            }
+
+            if (res.ok || (data && data.status === 'success')) {
+                setScanResult({
+                    success: true,
+                    message: data.message || 'Punch recorded successfully!'
+                });
+                loadData();
+            } else {
+                setScanResult({
+                    success: false,
+                    message: data.detail || 'Punch failed'
+                });
+            }
+        } catch (err: any) {
+            setScanResult({
+                success: false,
+                message: err.message || 'Failed to record online punch'
+            });
+        } finally {
+            setOnlinePunching(false);
+        }
+    };
+
     const todayLogs = timeLogs.filter(log => new Date(log.date).toDateString() === new Date().toDateString());
     const isActive = todayLogs.length > 0 && !todayLogs[0].logout_time;
     const todayTotalMinutes = todayLogs.reduce((sum, log) => sum + (log.total_minutes || 0), 0);
@@ -168,36 +207,75 @@ export default function StudentTimeTrackingPage() {
                 </div>
             </div>
 
-            <div className="glass-premium mb-24 reveal-on-scroll active" style={{
-                border: '1px solid var(--border)',
-                padding: '32px',
-                textAlign: 'center',
-                background: 'var(--bg-card)',
-                boxShadow: 'var(--shadow-premium)'
-            }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🕒</div>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '8px' }}>Punch Machine</h2>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '24px', maxWidth: '400px', marginInline: 'auto' }}>
-                    Scan the institute's official QR code to record your arrival. Scan the same code again when leaving to record your departure. You can punch in and out multiple times a day.
-                </p>
+            {/* Online Student Direct Punch Card */}
+            {isOnlineStudent ? (
+                <div className="glass-premium mb-24 reveal-on-scroll active" style={{
+                    border: '1px solid var(--border)',
+                    padding: '32px',
+                    textAlign: 'center',
+                    background: 'var(--bg-card)',
+                    boxShadow: 'var(--shadow-premium)'
+                }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '100px', background: 'rgba(14,165,233,0.15)', color: '#0ea5e9', fontSize: '12px', fontWeight: 700, marginBottom: '16px' }}>
+                        <span>🌐</span> ONLINE MODE AUTHORIZED
+                    </div>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '8px' }}>Direct Mobile Punch</h2>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '24px', maxWidth: '400px', marginInline: 'auto' }}>
+                        You are registered as an Online Student. Tap below to punch in or out directly from your phone.
+                    </p>
 
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
-                        className="btn btn-primary"
-                        onClick={startScanner}
-                        style={{
-                            padding: '16px 32px',
-                            fontSize: '1.1rem',
-                            fontWeight: 700,
-                            background: 'linear-gradient(135deg, #0ea5e9, #0066ff)',
-                            boxShadow: '0 4px 20px rgba(0, 102, 255, 0.4)',
-                            borderRadius: '16px'
-                        }}
-                    >
-                        ⚡ Punch In / Out
-                    </button>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleOnlinePunch}
+                            disabled={onlinePunching}
+                            style={{
+                                padding: '18px 40px',
+                                fontSize: '1.15rem',
+                                fontWeight: 700,
+                                background: isActive ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)',
+                                boxShadow: isActive ? '0 4px 20px rgba(239, 68, 68, 0.4)' : '0 4px 20px rgba(16, 185, 129, 0.4)',
+                                borderRadius: '16px',
+                                border: 'none'
+                            }}
+                        >
+                            {onlinePunching ? '⏳ Recording Punch...' : (isActive ? '🔴 Click to Punch Out' : '🟢 Click to Punch In')}
+                        </button>
+                    </div>
                 </div>
-            </div>
+            ) : (
+                /* Offline Student QR Scanner Card */
+                <div className="glass-premium mb-24 reveal-on-scroll active" style={{
+                    border: '1px solid var(--border)',
+                    padding: '32px',
+                    textAlign: 'center',
+                    background: 'var(--bg-card)',
+                    boxShadow: 'var(--shadow-premium)'
+                }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🕒</div>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '8px' }}>Punch Machine</h2>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '24px', maxWidth: '400px', marginInline: 'auto' }}>
+                        Scan the institute's official QR code to record your arrival. Scan the same code again when leaving to record your departure. You can punch in and out multiple times a day.
+                    </p>
+
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button
+                            className="btn btn-primary"
+                            onClick={startScanner}
+                            style={{
+                                padding: '16px 32px',
+                                fontSize: '1.1rem',
+                                fontWeight: 700,
+                                background: 'linear-gradient(135deg, #0ea5e9, #0066ff)',
+                                boxShadow: '0 4px 20px rgba(0, 102, 255, 0.4)',
+                                borderRadius: '16px'
+                            }}
+                        >
+                            ⚡ Punch In / Out
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div className="grid-3 mb-24 reveal-on-scroll active">
                 <div className="stat-card primary">

@@ -858,7 +858,6 @@ async def subscribe_push(
             await db.commit()
         return {"status": "updated"}
 
-    # Create new subscription
     sub = PushSubscription(
         user_id=user.id,
         endpoint=endpoint,
@@ -869,3 +868,87 @@ async def subscribe_push(
     db.add(sub)
     await db.commit()
     return {"status": "subscribed"}
+
+
+# ─── Online Direct Punch Endpoint ──────────────────────────
+@router.post("/online-punch")
+async def online_direct_punch(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="User account is inactive")
+        
+    role_val = user.role.value if hasattr(user.role, 'value') else str(user.role)
+    is_admin_or_trainer = role_val in ["SUPER_ADMIN", "ADMIN", "TRAINER"]
+    
+    if not (getattr(user, "is_online_student", False) or is_admin_or_trainer):
+        raise HTTPException(
+            status_code=403,
+            detail="Direct punch is reserved for Online Mode authorized students. Please scan the center QR code."
+        )
+
+    from app.models.attendance import TimeTracking
+    from sqlalchemy import and_, func
+    
+    utc_now = datetime.utcnow()
+    now = utc_now + timedelta(hours=5, minutes=30)
+    today = now.date()
+    
+    all_today_result = await db.execute(
+        select(TimeTracking).where(
+            and_(
+                TimeTracking.user_id == user.id,
+                func.date(TimeTracking.date) == today
+            )
+        ).order_by(TimeTracking.login_time.desc()).with_for_update()
+    )
+    today_records = all_today_result.scalars().all()
+    time_record = today_records[0] if today_records else None
+    
+    COOLDOWN_SECONDS = 5
+    if time_record:
+        last_event_time = time_record.logout_time or time_record.login_time
+        if last_event_time and (now - last_event_time).total_seconds() < COOLDOWN_SECONDS:
+            await db.rollback()
+            punch_type = "OUT" if time_record.logout_time is None else "IN"
+            raise HTTPException(
+                status_code=429,
+                detail=f"Please wait {COOLDOWN_SECONDS} seconds between button clicks."
+            )
+
+    if not time_record or time_record.logout_time is not None:
+        session_number = len(today_records) + 1
+        time_record = TimeTracking(
+            user_id=user.id,
+            date=datetime.combine(today, time.min),
+            login_time=now
+        )
+        db.add(time_record)
+        await db.commit()
+        await db.refresh(time_record)
+        return {
+            "status": "success",
+            "message": f"Online Punch In successful! Session #{session_number} started.",
+            "punch_type": "IN",
+            "login_time": now.isoformat()
+        }
+    else:
+        session_number = len(today_records)
+        time_record.logout_time = now
+        diff = now - time_record.login_time
+        time_record.total_minutes = int(diff.total_seconds() / 60)
+        
+        hours = time_record.total_minutes // 60
+        mins = time_record.total_minutes % 60
+        duration_str = f"{hours}h {mins}m" if hours > 0 else f"{mins}m"
+        
+        await db.commit()
+        await db.refresh(time_record)
+        return {
+            "status": "success",
+            "message": f"Online Punch Out successful! Session #{session_number} Duration: {duration_str}.",
+            "punch_type": "OUT",
+            "logout_time": now.isoformat(),
+            "total_hours": duration_str
+        }
