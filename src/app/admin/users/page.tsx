@@ -110,12 +110,16 @@ export default function UsersPage() {
     };
 
     const handleToggleOnlineMode = async (user: UserItem) => {
+        const nextState = !user.is_online_student;
+        setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_online_student: nextState } : u));
+
         try {
             await apiPatch(`/api/admin/users/${user.id}/online-mode`, {
-                is_online_student: !user.is_online_student
+                is_online_student: nextState
             });
             loadUsers();
         } catch (err: any) {
+            setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_online_student: user.is_online_student } : u));
             alert('Error updating online mode: ' + (err.message || 'Unknown error'));
         }
     };

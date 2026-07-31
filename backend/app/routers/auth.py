@@ -266,6 +266,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         phone=body.phone,
         role=body.role,
         student_id=student_id,
+        is_online_student=body.is_online_student,
     )
 
     db.add(user)

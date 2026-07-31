@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export default function RegisterPage() {
     const router = useRouter();
-    const [form, setForm] = useState({ name: '', email: '', phone: '', course: 'NASSCOM', password: '', confirmPassword: '' });
+    const [form, setForm] = useState({ name: '', email: '', phone: '', course: 'NASSCOM', is_online_student: false, password: '', confirmPassword: '' });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -18,18 +18,9 @@ export default function RegisterPage() {
     const [phoneError, setPhoneError] = useState('');
     const [phoneSuccess, setPhoneSuccess] = useState('');
 
-
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-
-        /*
-                if (!phoneVerified && form.email) {
-                    setError('Please verify your email address first');
-                    return;
-                }
-        */
 
         if (!/^\d{10}$/.test(form.phone)) {
             setError('Phone number must be exactly 10 digits');
@@ -55,6 +46,7 @@ export default function RegisterPage() {
                     email: form.email,
                     phone: form.phone || null,
                     course: form.course,
+                    is_online_student: form.is_online_student,
                     password: form.password,
                     role: 'STUDENT',
                 }),
@@ -344,6 +336,25 @@ export default function RegisterPage() {
                             >
                                 <option value="NASSCOM">NASSCOM</option>
                                 <option value="Data Analyst">Data Analyst</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mode of Training *</label>
+                            <select 
+                                required 
+                                value={form.is_online_student ? 'ONLINE' : 'OFFLINE'} 
+                                onChange={e => set('is_online_student', e.target.value === 'ONLINE')} 
+                                style={{
+                                    width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--border)',
+                                    background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '15px', outline: 'none',
+                                    transition: 'all 0.2s', cursor: 'pointer'
+                                }}
+                                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = '#fff'; }}
+                                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                            >
+                                <option value="OFFLINE">🏢 Offline Mode (Classroom - Physical QR Scanner)</option>
+                                <option value="ONLINE">🌐 Online Mode (Remote - Direct Mobile Punch In/Out)</option>
                             </select>
                         </div>
 

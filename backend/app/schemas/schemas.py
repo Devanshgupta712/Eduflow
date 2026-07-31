@@ -27,6 +27,7 @@ class RegisterRequest(BaseModel):
     role: str = "STUDENT"
     phone: str | None = Field(default=None, max_length=10)
     course: str | None = None
+    is_online_student: bool = False
 
 class AdminPasswordChangeRequest(BaseModel):
     new_password: str
