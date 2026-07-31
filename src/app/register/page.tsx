@@ -129,7 +129,7 @@ export default function RegisterPage() {
         }
     };
 
-    const set = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
+    const set = (key: string, val: any) => setForm(prev => ({ ...prev, [key]: val }));
 
   if (success) {
         return (
