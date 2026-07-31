@@ -454,7 +454,26 @@ export default function UsersPage() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                             <div>
                                 <h2 className="modal-title" style={{ marginBottom: '4px' }}>Manage User</h2>
-                                <p className="text-sm text-muted"><strong>{manageModal.targetUser.name}</strong> • {manageModal.targetUser.email}</p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                    <p className="text-sm text-muted"><strong>{manageModal.targetUser.name}</strong> • {manageModal.targetUser.email}</p>
+                                    {manageModal.targetUser.role === 'STUDENT' && (
+                                        <button
+                                            className={`btn btn-sm ${manageModal.targetUser.is_online_student ? 'btn-primary' : 'btn-outline'}`}
+                                            onClick={async () => {
+                                                const target = manageModal.targetUser!;
+                                                await handleToggleOnlineMode(target);
+                                                setManageModal(prev => ({
+                                                    ...prev,
+                                                    targetUser: { ...target, is_online_student: !target.is_online_student }
+                                                }));
+                                            }}
+                                            style={{ fontSize: '11px', borderRadius: '8px', padding: '4px 10px' }}
+                                            title="Toggle Online Student Direct Mobile Punch"
+                                        >
+                                            {manageModal.targetUser.is_online_student ? '🌐 ONLINE MODE' : '🏢 OFFLINE MODE'}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <button className="btn btn-ghost btn-sm" onClick={() => setManageModal({ show: false, targetUser: null, details: null })}>✕</button>
                         </div>
