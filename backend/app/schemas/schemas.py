@@ -146,6 +146,7 @@ class StudentOut(BaseModel):
     student_id: str | None = None
     role: str
     can_build_resume: bool = False
+    is_online_student: bool = False
     is_active: bool
     created_at: datetime
     attendance_percentage: int | None = None
